@@ -258,9 +258,6 @@ class TdmsSegment(object):
 
             if self.toc["kTocInterleavedData"]:
                 log.debug("Data is interleaved")
-                # This is currently much slower that reading
-                # contiguous data, as we can easily use fromfile
-                # for the contiguous case
                 for object in self.ordered_objects:
                     if object.has_data:
                         object_data[object.path] = object.new_segment_data()
@@ -383,6 +380,13 @@ class TdmsObject(object):
     def read_value(self, file, endianness):
         """Read a single value from the given file"""
 
+        if self.data_type.nptype is not None:
+            try:
+                dtype = (np.dtype(self.data_type.nptype).
+                        newbyteorder(endianness))
+                return np.fromfile(file, dtype=dtype, count=1)
+            except IOError:
+                pass
         return read_type(file, self.data_type, endianness)
 
     def read_values(self, file, endianness):
