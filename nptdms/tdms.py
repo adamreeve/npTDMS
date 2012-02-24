@@ -270,20 +270,22 @@ class TdmsSegment(object):
             object_data = {}
 
             if self.toc["kTocInterleavedData"]:
+                points_added = {}
                 log.debug("Data is interleaved")
                 for object in self.ordered_objects:
                     if object.has_data:
                         object_data[object.path] = object.new_segment_data()
+                        points_added[object.path] = 0
                 data_objects = [
                         o for o in self.ordered_objects
                         if o.has_data]
-                # Format documentation doesn't state that interleaved data
-                # must have the same number of values in each channel,
-                # but we assume it must
-                for i in range(data_objects[0].number_values):
-                    for object in data_objects:
-                        object_data[object.path][i] = object.read_value(
-                                f, endianness)
+                while any([points_added[o.path] < o.number_values
+                        for o in data_objects]):
+                    for obj in data_objects:
+                        if points_added[obj.path] < obj.number_values:
+                            object_data[obj.path][points_added[obj.path]] = (
+                                    obj.read_value(f, endianness))
+                            points_added[obj.path] += 1
             else:
                 log.debug("Data is contiguous")
                 for object in self.ordered_objects:
