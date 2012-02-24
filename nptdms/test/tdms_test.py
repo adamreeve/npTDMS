@@ -1,6 +1,7 @@
 """Test reading of example TDMS files"""
 
 import unittest
+import sys
 import logging
 import binascii
 import struct
@@ -8,31 +9,43 @@ import tempfile
 from nptdms import tdms
 
 
+try:
+    long
+except NameError:
+    # Python 3
+    long = int
+
+
+def string_hexlify(input_string):
+    """Return hex string representation of string"""
+    return binascii.hexlify(input_string.encode('utf-8')).decode('utf-8')
+
+
 class TestFile(object):
     """Generate a TDMS file for testing"""
 
     def __init__(self):
         self.file = tempfile.TemporaryFile()
-        self.data = bytes('')
+        self.data = bytes()
 
     def add_segment(self, metadata, data, toc=None):
         metadata = self.to_bytes(metadata)
         data = self.to_bytes(data)
         if toc is not None:
             lead_in = b'TDSm'
-            toc_mask = 0L
+            toc_mask = long(0)
             if "kTocMetaData" in toc:
-                toc_mask = toc_mask | 1L << 1
+                toc_mask = toc_mask | long(1) << 1
             if "kTocRawData" in toc:
-                toc_mask = toc_mask | 1L << 3
+                toc_mask = toc_mask | long(1) << 3
             if "kTocDAQmxRawData" in toc:
-                toc_mask = toc_mask | 1L << 7
+                toc_mask = toc_mask | long(1) << 7
             if "kTocInterleavedData" in toc:
-                toc_mask = toc_mask | 1L << 5
+                toc_mask = toc_mask | long(1) << 5
             if "kTocBigEndian" in toc:
-                toc_mask = toc_mask | 1L << 6
+                toc_mask = toc_mask | long(1) << 6
             if "kTocNewObjList" in toc:
-                toc_mask = toc_mask | 1L << 2
+                toc_mask = toc_mask | long(1) << 2
             lead_in += struct.pack('<i', toc_mask)
             lead_in += self.to_bytes("69 12 00 00")
             next_segment_offset = len(metadata) + len(data)
@@ -43,8 +56,8 @@ class TestFile(object):
         self.data += lead_in + metadata + data
 
     def to_bytes(self, hex_data):
-        return (hex_data.replace(" ", "").
-                replace("\n", "").decode('hex'))
+        return binascii.unhexlify(hex_data.replace(" ", "").
+                replace("\n", "").encode('utf-8'))
 
     def load(self):
         self.file.write(self.data)
@@ -200,7 +213,7 @@ class TDMSTestClass(unittest.TestCase):
             "01 00 00 00"
             # Length of the third object path
             "12 00 00 00")
-        metadata += binascii.hexlify(b"/'Group'/'Voltage'")
+        metadata += string_hexlify("/'Group'/'Voltage'")
         metadata += (
             # Length of index information
             "14 00 00 00"
@@ -247,7 +260,7 @@ class TDMSTestClass(unittest.TestCase):
             "01 00 00 00"
             # Length of the object path
             "13 00 00 00")
-        metadata += binascii.hexlify(b"/'Group'/'Channel2'")
+        metadata += string_hexlify("/'Group'/'Channel2'")
         metadata += (
             # Length of index information
             "14 00 00 00"
@@ -290,7 +303,7 @@ class TDMSTestClass(unittest.TestCase):
             "01 00 00 00"
             # Length of the object path
             "13 00 00 00")
-        metadata += binascii.hexlify(b"/'Group'/'Channel1'")
+        metadata += string_hexlify("/'Group'/'Channel1'")
         metadata += (
             # Length of index information
             "14 00 00 00"

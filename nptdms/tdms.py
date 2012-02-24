@@ -2,6 +2,7 @@
 
 import logging
 import struct
+import sys
 from collections import namedtuple
 import numpy as np
 
@@ -11,13 +12,18 @@ log.setLevel(logging.WARNING)
 # To adjust the log level for this module from a script, use eg:
 # logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 
+try:
+    long
+except NameError:
+    # Python 3
+    long = int
 tocProperties = {
-    'kTocMetaData': (1L << 1),
-    'kTocRawData': (1L << 3),
-    'kTocDAQmxRawData': (1L << 7),
-    'kTocInterleavedData': (1L << 5),
-    'kTocBigEndian': (1L << 6),
-    'kTocNewObjList': (1L << 2)
+    'kTocMetaData': (long(1) << 1),
+    'kTocRawData': (long(1) << 3),
+    'kTocDAQmxRawData': (long(1) << 7),
+    'kTocInterleavedData': (long(1) << 5),
+    'kTocBigEndian': (long(1) << 6),
+    'kTocNewObjList': (long(1) << 2)
 }
 
 # Class for describing data types, with data type name,
@@ -251,7 +257,7 @@ class TdmsSegment(object):
             raise ValueError("Data size %d is not a multiple of the "
                     "chunk size %d" % (total_data_size, data_size))
         else:
-            num_chunks = total_data_size / data_size
+            num_chunks = total_data_size // data_size
         log.debug("Reading %d bytes of data at %d in %d chunks" %
                 (total_data_size, f.tell(), num_chunks))
 
