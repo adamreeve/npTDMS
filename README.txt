@@ -19,6 +19,12 @@ Typical usage might look like:
     time = object.time_track()
     # do stuff with data
 
+What Currently Doesn't Work
+---------------------------
+
+This module doesn't support TDMS files with XML headers and some data types,
+eg. strings, time stamps and extended floating point values.
+
 Contributors/Thanks
 -------------------
 
