@@ -82,13 +82,20 @@ def read_type(file, data_type, endianness):
 class TdmsFile(object):
     """Represents a TDMS file."""
 
-    def __init__(self, file_path):
-        self.file_path = file_path
+    def __init__(self, file):
+        """Initialise a new TDMS file object from an open
+        file or a path to a file"""
+
         self.segments = []
         self.objects = {}
 
-        with open(self.file_path, 'rb') as tdms_file:
-            self._read_segments(tdms_file)
+        if hasattr(file, "read"):
+            # Is a file
+            self._read_segments(file)
+        else:
+            # Is path to a file
+            with open(self.file, 'rb') as tdms_file:
+                self._read_segments(tdms_file)
 
     def _read_segments(self, tdms_file):
         previous_segment = None
@@ -224,7 +231,7 @@ class TdmsSegment(object):
                 objects[object_path] = object
             object.read_metadata(f)
             if (self.toc["kTocNewObjList"] or
-                    object_path not in [o.path for o in ordered_objects]):
+                    object_path not in [o.path for o in self.ordered_objects]):
                 self.ordered_objects.append(object)
 
     def read_raw_data(self, f, objects):
@@ -381,26 +388,18 @@ class TdmsObject(object):
         """Read a single value from the given file"""
 
         if self.data_type.nptype is not None:
-            try:
-                dtype = (np.dtype(self.data_type.nptype).
-                        newbyteorder(endianness))
-                return np.fromfile(file, dtype=dtype, count=1)
-            except IOError:
-                pass
+            dtype = (np.dtype(self.data_type.nptype).
+                    newbyteorder(endianness))
+            return np.fromfile(file, dtype=dtype, count=1)
         return read_type(file, self.data_type, endianness)
 
     def read_values(self, file, endianness):
         """Read all values for this object from a contiguous segment"""
 
         if self.data_type.nptype is not None:
-            try:
-                dtype = (np.dtype(self.data_type.nptype).
-                        newbyteorder(endianness))
-                return np.fromfile(file, dtype=dtype, count=self.number_values)
-            except IOError:
-                # For testing, we don't use an actual file so need to use
-                # same code for non-nmpy types
-                pass
+            dtype = (np.dtype(self.data_type.nptype).
+                    newbyteorder(endianness))
+            return np.fromfile(file, dtype=dtype, count=self.number_values)
         data = self.new_segment_data()
         for i in range(self.number_values):
             data[i] = read_type(file, self.data_type, endianness)

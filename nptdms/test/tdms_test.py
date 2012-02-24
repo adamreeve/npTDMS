@@ -1,31 +1,68 @@
-"""Test reading in an example TDMS file"""
+"""Test reading of example TDMS files"""
 
 import unittest
+import logging
+import binascii
+import struct
+import tempfile
 from nptdms import tdms
 
 
 class TestFile(object):
-    """Provide a file like interface to example TDMS file"""
+    """Generate a TDMS file for testing"""
 
-    def __init__(self, interleaved=False):
-        # tdms header
-        tdms_contents = "54 44 53 6D"
+    def __init__(self):
+        self.file = tempfile.TemporaryFile()
+        self.data = bytes('')
 
-        # toc mask
-        if interleaved:
-            tdms_contents += "2E 00 00 00"
+    def add_segment(self, metadata, data, toc=None):
+        metadata = self.to_bytes(metadata)
+        data = self.to_bytes(data)
+        if toc is not None:
+            lead_in = b'TDSm'
+            toc_mask = 0L
+            if "kTocMetaData" in toc:
+                toc_mask = toc_mask | 1L << 1
+            if "kTocRawData" in toc:
+                toc_mask = toc_mask | 1L << 3
+            if "kTocDAQmxRawData" in toc:
+                toc_mask = toc_mask | 1L << 7
+            if "kTocInterleavedData" in toc:
+                toc_mask = toc_mask | 1L << 5
+            if "kTocBigEndian" in toc:
+                toc_mask = toc_mask | 1L << 6
+            if "kTocNewObjList" in toc:
+                toc_mask = toc_mask | 1L << 2
+            lead_in += struct.pack('<i', toc_mask)
+            lead_in += self.to_bytes("69 12 00 00")
+            next_segment_offset = len(metadata) + len(data)
+            raw_data_offset = len(metadata)
+            lead_in += struct.pack('<QQ', next_segment_offset, raw_data_offset)
         else:
-            tdms_contents += "0E 00 00 00"
+            lead_in = b''
+        self.data += lead_in + metadata + data
 
-        tdms_contents += (
-            # version number
-            "69 12 00 00"
-            # next segment offset
-            "73 00 00 00 00 00 00 00"
-            # raw data offset
-            "6B 00 00 00 00 00 00 00"
+    def to_bytes(self, hex_data):
+        return (hex_data.replace(" ", "").
+                replace("\n", "").decode('hex'))
+
+    def load(self):
+        self.file.write(self.data)
+        self.file.seek(0)
+        return tdms.TdmsFile(self.file)
+
+
+class TDMSTestClass(unittest.TestCase):
+    def setUp(self):
+        logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
+
+    def basic_segment(self):
+        """Basic TDMS segment with one group and two channels"""
+
+        toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+        metadata = (
             # Number of objects
-            "02 00 00 00"
+            "03 00 00 00"
             # Length of the first object path
             "08 00 00 00"
             # Object path (/'Group')
@@ -72,42 +109,252 @@ class TestFile(object):
             "00 00 00 00"
             # Number of properties (0)
             "00 00 00 00"
+            # Length of the third object path
+            "13 00 00 00"
+            # Third object path (/'Group'/'Channel2')
+            "2F 27 47 72"
+            "6F 75 70 27"
+            "2F 27 43 68"
+            "61 6E 6E 65"
+            "6C 32 27"
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "03 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = (
             # Data for segment
             "01 00 00 00"
             "02 00 00 00"
+            "03 00 00 00"
+            "04 00 00 00"
         )
-        self.data = tdms_contents.replace(" ", "").decode('hex')
-        self.pos = 0
+        return (metadata, data, toc)
 
-    def read(self, length):
-        data = self.data[self.pos:self.pos + length]
-        self.pos += length
-        return data
+    def test_data_read(self):
+        """Test reading data"""
 
-    def tell(self):
-        return self.pos
+        test_file = TestFile()
+        test_file.add_segment(*self.basic_segment())
+        tdms = test_file.load()
 
-    def seek(self, pos):
-        self.pos = pos
+        data = tdms.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 1)
+        self.assertEqual(data[1], 2)
+        data = tdms.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 3)
+        self.assertEqual(data[1], 4)
 
+    def test_property_read(self):
+        """Test reading an object property"""
 
-class TdmsTestFile(tdms.TdmsFile):
-    """Reimplement the init routine so we can read from our example file"""
+        test_file = TestFile()
+        test_file.add_segment(*self.basic_segment())
+        tdms = test_file.load()
 
-    def __init__(self, tdms_file):
-        self.segments = []
-        self.objects = {}
-        self._read_segments(tdms_file)
+        object = tdms.object("Group")
+        self.assertEqual(object.property("num"), 10)
 
+    def test_no_metadata_segment(self):
+        """Add a segment with two channels, then a second
+        segment with the same metadata as before,
+        so there is only the lead in and binary data"""
 
-class TDMSTestClass(unittest.TestCase):
-    def test_basic_read(self):
-        tdms_file = TestFile()
-        t = TdmsTestFile(tdms_file)
-        data = t.channel_data("Group", "Channel1")
-        assert(len(data) == 2)
-        assert(data[0] == 1)
-        assert(data[1] == 2)
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        test_file.add_segment(metadata, data, toc)
+        data = ("05 00 00 00"
+            "06 00 00 00"
+            "07 00 00 00"
+            "08 00 00 00"
+        )
+        toc = ("kTocRawData")
+        test_file.add_segment('', data, toc)
+        tdms = test_file.load()
+
+        data = tdms.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [1, 2, 5, 6]))
+        data = tdms.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [3, 4, 7, 8]))
+
+    def test_new_channel(self):
+        """Add a new voltage channel, with the other two channels
+        remaining unchanged, so only the new channel is in metadata section"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        test_file.add_segment(metadata, data, toc)
+        toc = ("kTocMetaData", "kTocRawData")
+        metadata = (
+            # Number of objects
+            "01 00 00 00"
+            # Length of the third object path
+            "12 00 00 00")
+        metadata += binascii.hexlify(b"/'Group'/'Voltage'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "03 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = (
+            "05 00 00 00"
+            "06 00 00 00"
+            "07 00 00 00"
+            "08 00 00 00"
+            "09 00 00 00"
+            "0A 00 00 00"
+        )
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+
+        data = tdms.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [1, 2, 5, 6]))
+        data = tdms.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [3, 4, 7, 8]))
+        data = tdms.channel_data("Group", "Voltage")
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(data == [9, 10]))
+
+    def test_larger_channel(self):
+        """In the second segment, increase the channel size
+        of one channel"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        test_file.add_segment(metadata, data, toc)
+        toc = ("kTocMetaData", "kTocRawData")
+        metadata = (
+            # Number of objects
+            "01 00 00 00"
+            # Length of the object path
+            "13 00 00 00")
+        metadata += binascii.hexlify(b"/'Group'/'Channel2'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "03 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "04 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = (
+            "05 00 00 00"
+            "06 00 00 00"
+            "07 00 00 00"
+            "08 00 00 00"
+            "09 00 00 00"
+            "0A 00 00 00"
+        )
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+        data = tdms.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [1, 2, 5, 6]))
+        data = tdms.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 6)
+        self.assertTrue(all(data == [3, 4, 7, 8, 9, 10]))
+
+    def test_remove_channel(self):
+        """In the second segment, remove a channel.
+        We need to write a new object list in this case"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        test_file.add_segment(metadata, data, toc)
+        # Keep toc as it was before, with new object list set
+        metadata = (
+            # Number of objects
+            "01 00 00 00"
+            # Length of the object path
+            "13 00 00 00")
+        metadata += binascii.hexlify(b"/'Group'/'Channel1'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "03 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = (
+            "05 00 00 00"
+            "06 00 00 00"
+        )
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+        data = tdms.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [1, 2, 5, 6]))
+        data = tdms.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(data == [3, 4]))
+
+    def test_no_lead_in(self):
+        """Add segment and then a repeated segment without
+        any lead in or metadata, so data is read in chunks"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        data = data + (
+            "05 00 00 00"
+            "06 00 00 00"
+            "07 00 00 00"
+            "08 00 00 00"
+        )
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+
+        data = tdms.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [1, 2, 5, 6]))
+        data = tdms.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [3, 4, 7, 8]))
+
+    def test_interleaved(self):
+        """Test reading interleaved data"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        toc = toc + ("kTocInterleavedData", )
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+
+        data = tdms.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 1)
+        self.assertEqual(data[1], 3)
+        data = tdms.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 2)
+        self.assertEqual(data[1], 4)
 
 
 if __name__ == '__main__':
