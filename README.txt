@@ -19,6 +19,12 @@ Typical usage might look like::
     time = object.time_track()
     # do stuff with data
 
+Links
+-----
+
+Source code lives at https://github.com/adamreeve/npTDMS and any issues can be
+reported at https://github.com/adamreeve/npTDMS/issues.
+
 What Currently Doesn't Work
 ---------------------------
 
