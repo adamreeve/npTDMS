@@ -231,14 +231,14 @@ class TdmsSegment(object):
             # If this is a new object, add it to the object dictionary,
             # otherwise reuse the existing object
             if object_path in objects:
-                object = objects[object_path]
+                obj = objects[object_path]
             else:
-                object = TdmsObject(object_path)
-                objects[object_path] = object
-            object.read_metadata(f)
+                obj = TdmsObject(object_path)
+                objects[object_path] = obj
+            obj.read_metadata(f)
             if (self.toc["kTocNewObjList"] or
                     object_path not in [o.path for o in self.ordered_objects]):
-                self.ordered_objects.append(object)
+                self.ordered_objects.append(obj)
 
     def read_raw_data(self, f, objects):
         """Read signal data from file"""
@@ -272,10 +272,10 @@ class TdmsSegment(object):
             if self.toc["kTocInterleavedData"]:
                 points_added = {}
                 log.debug("Data is interleaved")
-                for object in self.ordered_objects:
-                    if object.has_data:
-                        object_data[object.path] = object.new_segment_data()
-                        points_added[object.path] = 0
+                for obj in self.ordered_objects:
+                    if obj.has_data:
+                        object_data[obj.path] = obj.new_segment_data()
+                        points_added[obj.path] = 0
                 data_objects = [
                         o for o in self.ordered_objects
                         if o.has_data]
@@ -288,14 +288,14 @@ class TdmsSegment(object):
                             points_added[obj.path] += 1
             else:
                 log.debug("Data is contiguous")
-                for object in self.ordered_objects:
-                    if object.has_data:
-                        object_data[object.path] = (
-                                object.read_values(f, endianness))
+                for obj in self.ordered_objects:
+                    if obj.has_data:
+                        object_data[obj.path] = (
+                                obj.read_values(f, endianness))
 
-            for object in self.ordered_objects:
-                if object.has_data:
-                    object.update_data(object_data[object.path])
+            for obj in self.ordered_objects:
+                if obj.has_data:
+                    obj.update_data(object_data[obj.path])
 
 
 class TdmsObject(object):
