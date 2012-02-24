@@ -94,7 +94,7 @@ class TdmsFile(object):
             self._read_segments(file)
         else:
             # Is path to a file
-            with open(self.file, 'rb') as tdms_file:
+            with open(file, 'rb') as tdms_file:
                 self._read_segments(tdms_file)
 
     def _read_segments(self, tdms_file):
