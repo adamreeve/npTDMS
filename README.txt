@@ -5,8 +5,8 @@ npTDMS
 Cross-platform module for reading TDMS files as produced by LabView, based
 on the file format description at http://zone.ni.com/devzone/cda/tut/p/id/5696.
 
-Data is returned as a numpy array, and if the data storage is contiguous then
-numpy's fromfile is used so that loading is very fast.
+Data is returned as a numpy array, and is loaded using numpy's fromfile routine
+so is very fast.
 
 Typical usage might look like::
 
