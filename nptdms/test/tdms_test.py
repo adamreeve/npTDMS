@@ -369,6 +369,83 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(data[0], 2)
         self.assertEqual(data[1], 4)
 
+    def test_timestamp_data(self):
+        """Test reading contiguous and interleaved timestamp data,
+        which isn't read by numpy"""
+
+        metadata = (
+            # Number of objects
+            "02 00 00 00"
+            # Length of the object path
+            "17 00 00 00")
+        metadata += string_hexlify("/'Group'/'TimeChannel1'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "44 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        metadata += (
+            "17 00 00 00")
+        metadata += string_hexlify("/'Group'/'TimeChannel2'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "44 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = (
+            "00 00 00 00 00 00 00 60"
+            "01 00 00 00 00 00 00 00"
+            "00 00 00 00 00 00 00 60"
+            "02 00 00 00 00 00 00 00"
+            "00 00 00 00 00 00 00 60"
+            "03 00 00 00 00 00 00 00"
+            "00 00 00 00 00 00 00 60"
+            "04 00 00 00 00 00 00 00"
+        )
+
+        test_file = TestFile()
+        toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+        channel_data = tdms.channel_data("Group", "TimeChannel1")
+        self.assertEqual(len(channel_data), 2)
+        self.assertEqual(channel_data[0][0], 1)
+        self.assertEqual(channel_data[1][0], 2)
+        # Read fraction of second
+        self.assertEqual(channel_data[0][1], 0.375)
+        channel_data = tdms.channel_data("Group", "TimeChannel2")
+        self.assertEqual(len(channel_data), 2)
+        self.assertEqual(channel_data[0][0], 3)
+        self.assertEqual(channel_data[1][0], 4)
+
+        # Now test it interleaved
+        toc = toc + ("kTocInterleavedData", )
+        test_file = TestFile()
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+        channel_data = tdms.channel_data("Group", "TimeChannel1")
+        self.assertEqual(len(channel_data), 2)
+        self.assertEqual(channel_data[0][0], 1)
+        self.assertEqual(channel_data[1][0], 3)
+        channel_data = tdms.channel_data("Group", "TimeChannel2")
+        self.assertEqual(len(channel_data), 2)
+        self.assertEqual(channel_data[0][0], 2)
+        self.assertEqual(channel_data[1][0], 4)
+
 
 if __name__ == '__main__':
     unittest.main()

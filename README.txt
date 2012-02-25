@@ -28,8 +28,8 @@ reported at https://github.com/adamreeve/npTDMS/issues.
 What Currently Doesn't Work
 ---------------------------
 
-This module doesn't support TDMS files with XML headers and some data types,
-eg. strings, time stamps and extended floating point values.
+This module doesn't support TDMS files with XML headers or files with
+string or extended floating point data.
 
 Contributors/Thanks
 -------------------
