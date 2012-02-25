@@ -267,35 +267,76 @@ class TdmsSegment(object):
             endianness = '<'
 
         for chunk in range(num_chunks):
-            object_data = {}
-
             if self.toc["kTocInterleavedData"]:
-                points_added = {}
                 log.debug("Data is interleaved")
-                for obj in self.ordered_objects:
-                    if obj.has_data:
-                        object_data[obj.path] = obj.new_segment_data()
-                        points_added[obj.path] = 0
-                data_objects = [
-                        o for o in self.ordered_objects
-                        if o.has_data]
-                while any([points_added[o.path] < o.number_values
-                        for o in data_objects]):
-                    for obj in data_objects:
-                        if points_added[obj.path] < obj.number_values:
-                            object_data[obj.path][points_added[obj.path]] = (
-                                    obj.read_value(f, endianness))
-                            points_added[obj.path] += 1
+                data_objects = [o for o in self.ordered_objects if o.has_data]
+                # If all data types have numpy types and all the lengths are
+                # the same, then we can read all data at once with numpy,
+                # which is much faster
+                all_numpy = all(
+                        (o.data_type.nptype is not None for o in data_objects))
+                same_length = (len(
+                        set((o.number_values for o in data_objects))) == 1)
+                if (all_numpy and same_length):
+                    self._read_interleaved_numpy(f, data_objects, endianness)
+                else:
+                    self._read_interleaved(f, data_objects, endianness)
             else:
+                object_data = {}
                 log.debug("Data is contiguous")
                 for obj in self.ordered_objects:
                     if obj.has_data:
                         object_data[obj.path] = (
                                 obj.read_values(f, endianness))
 
-            for obj in self.ordered_objects:
-                if obj.has_data:
-                    obj.update_data(object_data[obj.path])
+                for obj in self.ordered_objects:
+                    if obj.has_data:
+                        obj.update_data(object_data[obj.path])
+
+    def _read_interleaved_numpy(self, f, data_objects, endianness):
+        """Read interleaved data where all channels have a numpy type"""
+
+        log.debug("Reading interleaved data all at once")
+        # Read all data into 1 byte unsigned ints first
+        all_channel_bytes = sum((o.data_type.length for o in data_objects))
+        number_bytes = all_channel_bytes * data_objects[0].number_values
+        combined_data = np.fromfile(f, dtype=np.uint8, count=number_bytes)
+        # Reshape, so that one row is all bytes for all objects
+        combined_data = combined_data.reshape(-1, all_channel_bytes)
+        # Now set arrays for each channel
+        data_pos = 0
+        for (i, obj) in enumerate(data_objects):
+            byte_columns = tuple(
+                    range(data_pos, obj.data_type.length + data_pos))
+            log.debug("Byte columns for channel %d: %s" % (i, byte_columns))
+            # Select columns for this channel, so that number of values will
+            # be number of bytes per point * number of data points
+            object_data = combined_data[:, byte_columns].ravel()
+            # Now set correct data type, so that the array length should
+            # be correct
+            object_data.dtype = (
+                    np.dtype(obj.data_type.nptype).newbyteorder(endianness))
+            obj.update_data(object_data)
+            data_pos += obj.data_type.length
+
+    def _read_interleaved(self, f, data_objects, endianness):
+        """Read interleaved data that doesn't have a numpy type"""
+
+        log.debug("Reading interleaved data point by point")
+        object_data = {}
+        points_added = {}
+        for obj in data_objects:
+            object_data[obj.path] = obj.new_segment_data()
+            points_added[obj.path] = 0
+        while any([points_added[o.path] < o.number_values
+                for o in data_objects]):
+            for obj in data_objects:
+                if points_added[obj.path] < obj.number_values:
+                    object_data[obj.path][points_added[obj.path]] = (
+                            obj.read_value(f, endianness))
+                    points_added[obj.path] += 1
+        for obj in data_objects:
+            obj.update_data(object_data[obj.path])
 
 
 class TdmsObject(object):
