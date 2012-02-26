@@ -19,6 +19,19 @@ Typical usage might look like::
     time = object.time_track()
     # do stuff with data
 
+Installation
+------------
+
+npTDMS is available from the Python Package Index, so the easiest way to
+install it is by running (as root)::
+
+    pip install npTDMS
+
+Alternatively, after downloading the source code you can extract it and
+change into the new directory, then run::
+
+    python setup.py install
+
 Links
 -----
 
