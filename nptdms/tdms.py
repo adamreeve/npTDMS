@@ -86,7 +86,13 @@ def read_type(file, data_type, endianness):
 
 
 class TdmsFile(object):
-    """Represents a TDMS file."""
+    """Represents a TDMS file.
+
+    Instance Attributes:
+    --------------------
+        objects: A dictionary of objects within the file, with the object paths
+                 as keys.
+    """
 
     def __init__(self, file):
         """Initialise a new TDMS file object from an open
@@ -107,7 +113,7 @@ class TdmsFile(object):
         previous_segment = None
         while True:
             try:
-                segment = TdmsSegment(tdms_file)
+                segment = _TdmsSegment(tdms_file)
             except EOFError:
                 # We've finished reading the file
                 break
@@ -159,7 +165,7 @@ class TdmsFile(object):
         return self.objects[self._path(group, channel)].data
 
 
-class TdmsSegment(object):
+class _TdmsSegment(object):
     def __init__(self, f):
         """Read the lead in section of a segment"""
 
@@ -343,12 +349,24 @@ class TdmsSegment(object):
 
 
 class TdmsObject(object):
-    """Represents an object in a TDMS file"""
+    """Represents an object in a TDMS file.
+
+    Instance Attributes:
+    --------------------
+        path: The TDMS object path.
+        properties: Dictionary of TDMS properties defined for this object,
+                    for example the start time and time increment for
+                    waveforms.
+        has_data: Boolean, true if there is data associated with the object.
+        data: NumPy array containing data if there is data, otherwise None.
+        data_type: DataType object describing the data type.
+    """
 
     def __init__(self, path):
         self.path = path
         self.data = None
         self.properties = {}
+        self.properties_with_type = {}
         self.raw_data_index = 0
         self.data_type = None
         self.dimension = 1
@@ -414,13 +432,14 @@ class TdmsObject(object):
                 value = read_string(f)
             else:
                 value = read_type(f, prop_data_type, '<')
-            self.properties[prop_name] = (prop_data_type.name, value)
+            self.properties_with_type[prop_name] = (prop_data_type.name, value)
+            self.properties[prop_name] = value
             log.debug("Property %s: %s" % (prop_name, value))
 
     def property(self, property_name):
         """Returns the value of a property"""
 
-        return self.properties[property_name][1]
+        return self.properties[property_name]
 
     def time_track(self):
         """Return an array of time for this channel"""
@@ -488,6 +507,6 @@ def read(file_path):
             o.path,
             o.raw_data_index,
             (o.data_type.name, o.dimension, o.number_values),
-            o.properties))
+            o.properties_with_type))
         for o in tdms_file.objects])
     return (metadata, data)
