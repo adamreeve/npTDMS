@@ -4,3 +4,6 @@ v0.1.0, 24th February 2012
 v0.2.0, 25th February 2012
 - Support for Python 3
 - Much faster reading of interleaved data
+
+v0.2.1, 27th February 2012
+- Improved documentation
