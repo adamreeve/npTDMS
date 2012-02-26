@@ -209,6 +209,9 @@ class TdmsSegment(object):
             self.next_segment_pos = (self.position +
                     self.next_segment_offset + lead_size)
 
+    def __repr__(self):
+        return "<TdmsSegment at position %d>" % self.position
+
     def read_metadata(self, f, objects, previous_segment=None):
         """Read segment metadata section and update object information"""
 
@@ -235,7 +238,7 @@ class TdmsSegment(object):
             else:
                 obj = TdmsObject(object_path)
                 objects[object_path] = obj
-            obj.read_metadata(f)
+            obj._read_metadata(f)
             if (self.toc["kTocNewObjList"] or
                     object_path not in [o.path for o in self.ordered_objects]):
                 self.ordered_objects.append(obj)
@@ -287,11 +290,11 @@ class TdmsSegment(object):
                 for obj in self.ordered_objects:
                     if obj.has_data:
                         object_data[obj.path] = (
-                                obj.read_values(f, endianness))
+                                obj._read_values(f, endianness))
 
                 for obj in self.ordered_objects:
                     if obj.has_data:
-                        obj.update_data(object_data[obj.path])
+                        obj._update_data(object_data[obj.path])
 
     def _read_interleaved_numpy(self, f, data_objects, endianness):
         """Read interleaved data where all channels have a numpy type"""
@@ -316,7 +319,7 @@ class TdmsSegment(object):
             # be correct
             object_data.dtype = (
                     np.dtype(obj.data_type.nptype).newbyteorder(endianness))
-            obj.update_data(object_data)
+            obj._update_data(object_data)
             data_pos += obj.data_type.length
 
     def _read_interleaved(self, f, data_objects, endianness):
@@ -326,17 +329,17 @@ class TdmsSegment(object):
         object_data = {}
         points_added = {}
         for obj in data_objects:
-            object_data[obj.path] = obj.new_segment_data()
+            object_data[obj.path] = obj._new_segment_data()
             points_added[obj.path] = 0
         while any([points_added[o.path] < o.number_values
                 for o in data_objects]):
             for obj in data_objects:
                 if points_added[obj.path] < obj.number_values:
                     object_data[obj.path][points_added[obj.path]] = (
-                            obj.read_value(f, endianness))
+                            obj._read_value(f, endianness))
                     points_added[obj.path] += 1
         for obj in data_objects:
-            obj.update_data(object_data[obj.path])
+            obj._update_data(object_data[obj.path])
 
 
 class TdmsObject(object):
@@ -353,7 +356,10 @@ class TdmsObject(object):
         self.data_size = 0
         self.has_data = True
 
-    def read_metadata(self, f):
+    def __repr__(self):
+        return "<TdmsObject with path %s>" % self.path
+
+    def _read_metadata(self, f):
         """Read object metadata and update object information"""
 
         s = f.read(4)
@@ -425,7 +431,7 @@ class TdmsObject(object):
         return np.arange(
                 offset, offset + len(self.data) * increment, increment)
 
-    def new_segment_data(self):
+    def _new_segment_data(self):
         """Return a new array to read the data of the current section into"""
 
         if self.data_type.nptype is not None:
@@ -433,7 +439,7 @@ class TdmsObject(object):
         else:
             return [None] * self.number_values
 
-    def read_value(self, file, endianness):
+    def _read_value(self, file, endianness):
         """Read a single value from the given file"""
 
         if self.data_type.nptype is not None:
@@ -442,19 +448,19 @@ class TdmsObject(object):
             return np.fromfile(file, dtype=dtype, count=1)
         return read_type(file, self.data_type, endianness)
 
-    def read_values(self, file, endianness):
+    def _read_values(self, file, endianness):
         """Read all values for this object from a contiguous segment"""
 
         if self.data_type.nptype is not None:
             dtype = (np.dtype(self.data_type.nptype).
                     newbyteorder(endianness))
             return np.fromfile(file, dtype=dtype, count=self.number_values)
-        data = self.new_segment_data()
+        data = self._new_segment_data()
         for i in range(self.number_values):
             data[i] = read_type(file, self.data_type, endianness)
         return data
 
-    def update_data(self, new_data):
+    def _update_data(self, new_data):
         """Update the object data with a new array of data"""
 
         log.debug("Adding %d data points to data for %s" %
