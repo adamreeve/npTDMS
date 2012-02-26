@@ -425,8 +425,11 @@ class TdmsObject(object):
     def time_track(self):
         """Return an array of time for this channel"""
 
-        increment = self.property('wf_increment')
-        offset = self.property('wf_start_offset')
+        try:
+            increment = self.property('wf_increment')
+            offset = self.property('wf_start_offset')
+        except KeyError:
+            raise KeyError("Object does not have time properties available.")
 
         return np.arange(
                 offset, offset + len(self.data) * increment, increment)
