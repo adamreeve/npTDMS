@@ -86,17 +86,20 @@ def read_type(file, data_type, endianness):
 
 
 class TdmsFile(object):
-    """Represents a TDMS file.
+    """Reads and stores data from a TDMS file.
 
-    Instance Attributes:
-    --------------------
-        objects: A dictionary of objects within the file, with the object paths
-                 as keys.
+    :ivar objects: A dictionary of objects in the TDMS file, where the keys are
+        the object paths.
+
     """
 
     def __init__(self, file):
-        """Initialise a new TDMS file object from an open
-        file or a path to a file"""
+        """Initialise a new TDMS file object, reading all data.
+
+        :param file: Either the path to the tdms file to read or an already
+            opened file.
+
+        """
 
         self.segments = []
         self.objects = {}
@@ -140,27 +143,48 @@ class TdmsFile(object):
         return path
 
     def object(self, group, channel=None):
-        """Return the TDMs object given the group name and channel name.
-        If the channel is None then the group object is returned."""
+        """Get a TDMS Object from the file
+
+        :param group: Name of the group of the object.
+        :keyword channel: The name of the channel, or None to get the
+            group object.
+        :rtype: :class:`TdmsObject`
+
+        """
 
         return self.objects[self._path(group, channel)]
 
     def groups(self):
-        """Return the names of groups in the file"""
+        """Return the names of groups in the file
+
+        :rtype: List of strings.
+
+        """
 
         return [path[2:-1]
                 for path in self.objects
                 if path.count('/') == 1 and path != '/']
 
     def group_channels(self, group):
-        """Returns a list of channel objects for the given group"""
+        """Returns a list of channel objects for the given group
+
+        :param group: Name of the group to get channels for.
+        :rtype: List of :class:`TdmsObject` objects.
+
+        """
 
         path = self._path(group)
         return [self.objects[p] for p in self.objects if p.startswith(path)]
 
     def channel_data(self, group, channel):
-        """Return the data for a channel given the group name and
-        channel name"""
+        """Get the data for a channel
+
+        :param group: The name of the group the channel is in.
+        :param channel: The name of the channel to get data for.
+        :returns: The channel data.
+        :rtype: NumPy array.
+
+        """
 
         return self.objects[self._path(group, channel)].data
 
@@ -351,15 +375,13 @@ class _TdmsSegment(object):
 class TdmsObject(object):
     """Represents an object in a TDMS file.
 
-    Instance Attributes:
-    --------------------
-        path: The TDMS object path.
-        properties: Dictionary of TDMS properties defined for this object,
-                    for example the start time and time increment for
-                    waveforms.
-        has_data: Boolean, true if there is data associated with the object.
-        data: NumPy array containing data if there is data, otherwise None.
-        data_type: DataType object describing the data type.
+    :ivar path: The TDMS object path.
+    :ivar properties: Dictionary of TDMS properties defined for this object,
+                      for example the start time and time increment for
+                      waveforms.
+    :ivar has_data: Boolean, true if there is data associated with the object.
+    :ivar data: NumPy array containing data if there is data, otherwise None.
+
     """
 
     def __init__(self, path):
@@ -435,12 +457,26 @@ class TdmsObject(object):
             log.debug("Property %s: %s" % (prop_name, value))
 
     def property(self, property_name):
-        """Returns the value of a property"""
+        """Returns the value of a TDMS property
+
+        :param property_name: The name of the property to get.
+        :returns: The value of the requested property.
+        :raises: KeyError if the property isn't found.
+
+        """
 
         return self.properties[property_name]
 
     def time_track(self):
-        """Return an array of time for this channel"""
+        """Return an array of time for this channel
+
+        This depends on the object having the wf_increment
+        and wf_start_offset properties defined.
+
+        :rtype: NumPy array.
+        :raises: KeyError if required properties aren't found
+
+        """
 
         try:
             increment = self.property('wf_increment')

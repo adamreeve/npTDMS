@@ -1,11 +1,8 @@
-======
 npTDMS
 ======
 
-Cross-platform module for reading TDMS files as produced by LabView, based
-on the file format description at http://zone.ni.com/devzone/cda/tut/p/id/5696.
-
-Data is returned as a numpy array, and is loaded using numpy's fromfile routine
+Cross-platform module for reading TDMS files as produced by LabView.
+Data is stored as a numpy array, and is loaded using numpy's fromfile routine
 so is very fast.
 
 Typical usage might look like::
@@ -14,10 +11,12 @@ Typical usage might look like::
 
     from nptdms import tdms
     tdms_file = tdms.TdmsFile("path_to_file.tdms")
-    object = tdms_file.object('Group', 'Channel1')
-    data = object.data
-    time = object.time_track()
+    channel = tdms_file.object('Group', 'Channel1')
+    data = channel.data
+    time = channel.time_track()
     # do stuff with data
+
+For more information, see the `npTDMS documentation <http://readthedocs.org/docs/nptdms>`__.
 
 Installation
 ------------
@@ -37,6 +36,7 @@ Links
 
 Source code lives at https://github.com/adamreeve/npTDMS and any issues can be
 reported at https://github.com/adamreeve/npTDMS/issues.
+Documentation is available at http://readthedocs.org/docs/npTDMS.
 
 What Currently Doesn't Work
 ---------------------------
