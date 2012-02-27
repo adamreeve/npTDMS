@@ -7,3 +7,7 @@ v0.2.0, 25th February 2012
 
 v0.2.1, 27th February 2012
 - Improved documentation
+
+v0.2.2, 28th February 2012
+- Put documentation on readthedocs.org
+- Allow importing TdmsFile from nptdms
