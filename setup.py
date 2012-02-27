@@ -9,6 +9,6 @@ setup(
   author_email = 'adreeve@gmail.com',
   url = 'https://github.com/adamreeve/npTDMS',
   packages = ['nptdms', 'nptdms.test'],
-  long_description=open('README.txt').read(),
+  long_description=open('README.rst').read(),
   license = 'LGPL',
   install_requires = ['numpy'])
