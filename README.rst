@@ -36,7 +36,7 @@ Links
 
 Source code lives at https://github.com/adamreeve/npTDMS and any issues can be
 reported at https://github.com/adamreeve/npTDMS/issues.
-Documentation is available at http://readthedocs.org/docs/npTDMS.
+Documentation is available at http://readthedocs.org/docs/nptdms.
 
 What Currently Doesn't Work
 ---------------------------
