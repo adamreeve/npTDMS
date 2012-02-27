@@ -9,8 +9,8 @@ Typical usage might look like::
 
     #!/usr/bin/env python
 
-    from nptdms import tdms
-    tdms_file = tdms.TdmsFile("path_to_file.tdms")
+    from nptdms import TdmsFile
+    tdms_file = TdmsFile("path_to_file.tdms")
     channel = tdms_file.object('Group', 'Channel1')
     data = channel.data
     time = channel.time_track()
