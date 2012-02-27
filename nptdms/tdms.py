@@ -366,7 +366,6 @@ class TdmsObject(object):
         self.path = path
         self.data = None
         self.properties = {}
-        self.properties_with_type = {}
         self.raw_data_index = 0
         self.data_type = None
         self.dimension = 1
@@ -432,7 +431,6 @@ class TdmsObject(object):
                 value = read_string(f)
             else:
                 value = read_type(f, prop_data_type, '<')
-            self.properties_with_type[prop_name] = (prop_data_type.name, value)
             self.properties[prop_name] = value
             log.debug("Property %s: %s" % (prop_name, value))
 
@@ -494,19 +492,3 @@ class TdmsObject(object):
                 self.data = np.append(self.data, new_data)
             else:
                 self.data.extend(new_data)
-
-
-def read(file_path):
-    """Read a tdms file and return the metadata and data in
-    dictionaries with the data paths as keys"""
-
-    tdms_file = TdmsFile(file_path)
-    data = dict([(o.path, o.data) for o in tdms_file.objects])
-    metadata = dict([
-        (o.path, (
-            o.path,
-            o.raw_data_index,
-            (o.data_type.name, o.dimension, o.number_values),
-            o.properties_with_type))
-        for o in tdms_file.objects])
-    return (metadata, data)
