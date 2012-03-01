@@ -484,8 +484,10 @@ class TdmsObject(object):
         except KeyError:
             raise KeyError("Object does not have time properties available.")
 
-        return np.arange(
-                offset, offset + len(self.data) * increment, increment)
+        return np.linspace(
+                offset,
+                offset + (len(self.data) - 1) * increment,
+                len(self.data))
 
     def _new_segment_data(self):
         """Return a new array to read the data of the current section into"""
