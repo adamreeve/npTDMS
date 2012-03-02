@@ -443,6 +443,7 @@ class TdmsObject(object):
         # Read data properties
         s = f.read(4)
         num_properties = struct.unpack("<L", s)[0]
+        log.debug("Reading %d properties" % num_properties)
         for i in range(num_properties):
             prop_name = read_string(f)
 

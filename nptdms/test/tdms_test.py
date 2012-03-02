@@ -20,6 +20,10 @@ def string_hexlify(input_string):
     """Return hex string representation of string"""
     return binascii.hexlify(input_string.encode('utf-8')).decode('utf-8')
 
+def hexlify_value(struct_type, value):
+    """Return hex string representation of a value"""
+    return binascii.hexlify(struct.pack(struct_type, value)).decode('utf-8')
+
 
 class TestFile(object):
     """Generate a TDMS file for testing"""
@@ -139,8 +143,16 @@ class TDMSTestClass(unittest.TestCase):
             # Number of raw datata values
             "02 00 00 00"
             "00 00 00 00"
-            # Number of properties (0)
-            "00 00 00 00")
+            # Set time properties for the second channel
+            "02 00 00 00"
+            "0F 00 00 00" +
+            string_hexlify('wf_start_offset') +
+            "0A 00 00 00" +
+            hexlify_value("<d", 0.0) +
+            "0C 00 00 00" +
+            string_hexlify('wf_increment') +
+            "0A 00 00 00" +
+            hexlify_value("<d", 0.1))
         data = (
             # Data for segment
             "01 00 00 00"
@@ -446,6 +458,20 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(channel_data[0][0], 2)
         self.assertEqual(channel_data[1][0], 4)
 
+    def test_time_track(self):
+        """Add a time track to waveform data"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+
+        obj = tdms.object("Group", "Channel2")
+        time = obj.time_track()
+        self.assertEqual(len(time), len(obj.data))
+        epsilon = 1.0E-15
+        self.assertTrue(abs(time[0]) < epsilon)
+        self.assertTrue(abs(time[1] - 0.1) < epsilon)
 
 if __name__ == '__main__':
     unittest.main()
