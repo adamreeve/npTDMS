@@ -286,6 +286,14 @@ class _TdmsSegment(object):
                 o.data_size
                 for o in self.ordered_objects])
         total_data_size = self.next_segment_offset - self.raw_data_offset
+        if data_size < 0 or total_data_size < 0:
+            raise ValueError("Negative data size")
+        elif data_size == 0:
+            # Sometimes kTocRawData is set, but there isn't actually any data
+            if total_data_size != data_size:
+                raise ValueError("Zero channel data size but non-zero data "
+                        "length based on segment offset.")
+            return
         if total_data_size % data_size != 0:
             raise ValueError("Data size %d is not a multiple of the "
                     "chunk size %d" % (total_data_size, data_size))

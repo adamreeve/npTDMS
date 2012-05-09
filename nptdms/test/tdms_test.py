@@ -20,6 +20,7 @@ def string_hexlify(input_string):
     """Return hex string representation of string"""
     return binascii.hexlify(input_string.encode('utf-8')).decode('utf-8')
 
+
 def hexlify_value(struct_type, value):
     """Return hex string representation of a value"""
     return binascii.hexlify(struct.pack(struct_type, value)).decode('utf-8')
@@ -472,6 +473,61 @@ class TDMSTestClass(unittest.TestCase):
         epsilon = 1.0E-15
         self.assertTrue(abs(time[0]) < epsilon)
         self.assertTrue(abs(time[1] - 0.1) < epsilon)
+
+    def test_no_data_section(self):
+        """kTocRawData is set but data length is zero
+
+        Keep first segment the same but add a second
+        segment with no data."""
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        test_file.add_segment(metadata, data, toc)
+        toc = ("kTocMetaData", "kTocRawData")
+        metadata = (
+            # Number of objects
+            "02 00 00 00"
+            # Length of the object path
+            "13 00 00 00")
+        metadata += string_hexlify("/'Group'/'Channel1'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "03 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "00 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        metadata += (
+            # Length of the object path
+            "13 00 00 00")
+        metadata += string_hexlify("/'Group'/'Channel2'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "03 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "00 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = ""
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+        data = tdms.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(data == [1, 2]))
+        data = tdms.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(data == [3, 4]))
+
 
 if __name__ == '__main__':
     unittest.main()
