@@ -421,6 +421,7 @@ class TdmsObject(object):
         elif self.raw_data_index == 0x00000000:
             pass
         else:
+            self.has_data = True
             index_length = self.raw_data_index
 
             # Read the data type
