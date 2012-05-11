@@ -52,7 +52,7 @@ tdsDataTypes = dict(enumerate((
 tdsDataTypes.update({
     0x19: DataType('tdsTypeSingleFloatWithUnit', None, 4, None),
     0x20: DataType('tdsTypeString', None, None, None),
-    0x21: DataType('tdsTypeBoolean', 'b', 8, np.bool8),
+    0x21: DataType('tdsTypeBoolean', 'b', 1, np.bool8),
     0x44: DataType('tdsTypeTimeStamp', 'Qq', 16, None),
     0xFFFFFFFF: DataType('tdsTypeDAQmxRawData', None, None, None)
 })
