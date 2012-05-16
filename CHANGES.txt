@@ -11,3 +11,9 @@ v0.2.1, 27th February 2012
 v0.2.2, 28th February 2012
 - Put documentation on readthedocs.org
 - Allow importing TdmsFile from nptdms
+
+v0.2.3, 16th May 2012
+- Fix bug with segments that have kTocRawData set but zero data length
+- Fix number of bytes for boolean data
+- Fix for updating whether an object has data in a segment
+- Thanks to G-A-N on GitHub for these fixes
