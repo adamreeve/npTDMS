@@ -134,25 +134,38 @@ class TdmsFile(object):
                             "segment, there may be unread data.")
                     tdms_file.seek(segment.next_segment_pos)
 
-    def _path(self, group=None, channel=None):
-        path = '/'
-        if group is not None:
-            path += "'" + group.replace("'", "''") + "'"
-        if channel is not None:
-            path += "/'" + channel.replace("'", "''") + "'"
-        return path
+    def _path(self, *args):
+        """Convert group and channel to object path"""
 
-    def object(self, group, channel=None):
-        """Get a TDMS Object from the file
+        return ('/' + '/'.join(
+                ["'" + arg.replace("'", "''") + "'" for arg in args]))
 
-        :param group: Name of the group of the object.
-        :keyword channel: The name of the channel, or None to get the
-            group object.
+    def object(self, *path):
+        """Get a TDMS object from the file
+
+        :param path: The object group and channel. Providing no channel
+            returns a group object, and providing no channel or group
+            will return the root object.
         :rtype: :class:`TdmsObject`
 
+        For example, to get the root object::
+
+            object()
+
+        To get a group::
+
+            object("group_name")
+
+        To get a channel::
+
+            object("group_name", "channel_name")
         """
 
-        return self.objects[self._path(group, channel)]
+        object_path = self._path(*path)
+        try:
+            return self.objects[object_path]
+        except KeyError:
+            raise KeyError("Invalid object path: %s" % object_path)
 
     def groups(self):
         """Return the names of groups in the file
