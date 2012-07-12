@@ -213,6 +213,65 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(len(data), 4)
         self.assertTrue(all(data == [3, 4, 7, 8]))
 
+    def test_no_metadata_object(self):
+        """Re-use an object, but without setting any metadata"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        test_file.add_segment(metadata, data, toc)
+        data = ("05 00 00 00"
+            "06 00 00 00"
+            "07 00 00 00"
+            "08 00 00 00"
+        )
+        toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+        # Use same object list, but set raw data index to 0
+        metadata = (
+            # Number of objects
+            "03 00 00 00"
+            # Length of the first object path
+            "08 00 00 00"
+            # Object path (/'Group')
+            "2F 27 47 72"
+            "6F 75 70 27"
+            # Raw data index
+            "00 00 00 00"
+            # Num properties
+            "00 00 00 00"
+            # Length of the second object path
+            "13 00 00 00"
+            # Second object path (/'Group'/'Channel1')
+            "2F 27 47 72"
+            "6F 75 70 27"
+            "2F 27 43 68"
+            "61 6E 6E 65"
+            "6C 31 27"
+            # Length of index information
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00"
+            # Length of the third object path
+            "13 00 00 00"
+            # Third object path (/'Group'/'Channel2')
+            "2F 27 47 72"
+            "6F 75 70 27"
+            "2F 27 43 68"
+            "61 6E 6E 65"
+            "6C 32 27"
+            # Length of index information
+            "00 00 00 00"
+            "00 00 00 00")
+        test_file.add_segment(metadata, data, toc)
+        tdms = test_file.load()
+
+        data = tdms.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [1, 2, 5, 6]))
+        data = tdms.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 4)
+        self.assertTrue(all(data == [3, 4, 7, 8]))
+
+
     def test_new_channel(self):
         """Add a new voltage channel, with the other two channels
         remaining unchanged, so only the new channel is in metadata section"""
