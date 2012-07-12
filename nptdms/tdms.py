@@ -8,6 +8,7 @@ import numpy as np
 
 
 log = logging.getLogger(__name__)
+logging.basicConfig()
 log.setLevel(logging.WARNING)
 # To adjust the log level for this module from a script, use eg:
 # logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
@@ -113,6 +114,7 @@ class TdmsFile(object):
                 self._read_segments(tdms_file)
 
     def _read_segments(self, tdms_file):
+        # Read metadata first to work out how much space we need
         previous_segment = None
         while True:
             try:
@@ -122,17 +124,17 @@ class TdmsFile(object):
                 break
             segment.read_metadata(tdms_file, self.objects,
                     previous_segment)
-            segment.read_raw_data(tdms_file, self.objects)
 
             self.segments.append(segment)
             previous_segment = segment
             if segment.next_segment_pos is None:
                 break
             else:
-                if(tdms_file.tell() != segment.next_segment_pos):
-                    log.warning("Did not read to the end of the "
-                            "segment, there may be unread data.")
-                    tdms_file.seek(segment.next_segment_pos)
+                tdms_file.seek(segment.next_segment_pos)
+
+        # Now actually read all the data
+        for segment in self.segments:
+            segment.read_raw_data(tdms_file)
 
     def _path(self, *args):
         """Convert group and channel to object path"""
@@ -242,8 +244,9 @@ class _TdmsSegment(object):
         (self.next_segment_offset, self.raw_data_offset) = (
                 struct.unpack('<QQ', s))
 
-        # Calculate next segment position
+        # Calculate data and next segment position
         lead_size = 7 * 4
+        self.data_position = self.position + lead_size + self.raw_data_offset
         if self.next_segment_offset == struct.unpack('<Q', b'\xFF' * 8)[0]:
             # This can happen if Labview crashes
             log.warning("Last segment of file has unknown size")
@@ -262,7 +265,7 @@ class _TdmsSegment(object):
             self.ordered_objects = previous_segment.ordered_objects
             return
         if not self.toc["kTocNewObjList"]:
-            self.ordered_objects = previous_segment.ordered_objects
+            self.ordered_objects = previous_segment.ordered_objects[:]
 
         log.debug("Reading metadata at %d" % f.tell())
 
@@ -281,16 +284,29 @@ class _TdmsSegment(object):
             else:
                 obj = TdmsObject(object_path)
                 objects[object_path] = obj
-            obj._read_metadata(f)
-            if (self.toc["kTocNewObjList"] or
-                    object_path not in [o.path for o in self.ordered_objects]):
-                self.ordered_objects.append(obj)
 
-    def read_raw_data(self, f, objects):
+            # Update or create list of ordered segment objects
+            segment_obj = TdmsSegmentObject(obj)
+            segment_obj._read_metadata(f)
+            if self.toc["kTocNewObjList"]:
+                self.ordered_objects.append(segment_obj)
+            else:
+                obj_index = [
+                        i for i, o in enumerate(self.ordered_objects)
+                        if o.tdms_object is obj]
+                if len(obj_index) == 0:
+                    self.ordered_objects.append(segment_obj)
+                else:
+                    obj_index = obj_index[0]
+                    self.ordered_objects[obj_index] = segment_obj
+
+    def read_raw_data(self, f):
         """Read signal data from file"""
 
         if not self.toc["kTocRawData"]:
             return
+
+        f.seek(self.data_position)
 
         # Work out the number of chunks the data is in, for cases
         # where the meta data doesn't change at all so there is no
@@ -345,7 +361,7 @@ class _TdmsSegment(object):
 
                 for obj in self.ordered_objects:
                     if obj.has_data:
-                        obj._update_data(object_data[obj.path])
+                        obj.tdms_object._update_data(object_data[obj.path])
 
     def _read_interleaved_numpy(self, f, data_objects, endianness):
         """Read interleaved data where all channels have a numpy type"""
@@ -370,7 +386,7 @@ class _TdmsSegment(object):
             # be correct
             object_data.dtype = (
                     np.dtype(obj.data_type.nptype).newbyteorder(endianness))
-            obj._update_data(object_data)
+            obj.tdms_object._update_data(object_data)
             data_pos += obj.data_type.length
 
     def _read_interleaved(self, f, data_objects, endianness):
@@ -390,7 +406,7 @@ class _TdmsSegment(object):
                             obj._read_value(f, endianness))
                     points_added[obj.path] += 1
         for obj in data_objects:
-            obj._update_data(object_data[obj.path])
+            obj.tdms_object._update_data(object_data[obj.path])
 
 
 class TdmsObject(object):
@@ -407,77 +423,16 @@ class TdmsObject(object):
 
     def __init__(self, path):
         self.path = path
+        self.segment_objects = []
         self.data = None
         self.properties = {}
-        self.raw_data_index = 0
         self.data_type = None
         self.dimension = 1
         self.number_values = 0
-        self.data_size = 0
-        self.has_data = True
+        self.has_data = False
 
     def __repr__(self):
         return "<TdmsObject with path %s>" % self.path
-
-    def _read_metadata(self, f):
-        """Read object metadata and update object information"""
-
-        s = f.read(4)
-        self.raw_data_index = struct.unpack("<L", s)[0]
-
-        log.debug("Reading metadata for object %s" % self.path)
-
-        # Object has no data in this segment
-        if self.raw_data_index == 0xFFFFFFFF:
-            self.has_data = False
-        # Data has same structure as previously
-        elif self.raw_data_index == 0x00000000:
-            pass
-        else:
-            self.has_data = True
-            index_length = self.raw_data_index
-
-            # Read the data type
-            s = f.read(4)
-            self.data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
-
-            # Read data dimension
-            s = f.read(4)
-            self.dimension = struct.unpack("<L", s)[0]
-            if self.dimension != 1:
-                log.warning("Data dimension is not 1")
-
-            # Read number of values
-            s = f.read(8)
-            self.number_values = struct.unpack("<Q", s)[0]
-
-            # Variable length data types have total size
-            if self.data_type.name in ('tdsTypeString', ):
-                s = f.read(8)
-                self.data_size = struct.unpack("<Q", s)[0]
-            else:
-                self.data_size = (self.number_values *
-                        self.data_type.length * self.dimension)
-
-            log.debug("Object number of values in segment: %d" %
-                    self.number_values)
-
-        # Read data properties
-        s = f.read(4)
-        num_properties = struct.unpack("<L", s)[0]
-        log.debug("Reading %d properties" % num_properties)
-        for i in range(num_properties):
-            prop_name = read_string(f)
-
-            # Property data type
-            s = f.read(4)
-            prop_data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
-            if prop_data_type.name == 'tdsTypeString':
-                value = read_string(f)
-            else:
-                value = read_type(f, prop_data_type, '<')
-            self.properties[prop_name] = value
-            log.debug("Property %s: %s" % (prop_name, value))
 
     def property(self, property_name):
         """Returns the value of a TDMS property
@@ -512,13 +467,106 @@ class TdmsObject(object):
                 offset + (len(self.data) - 1) * increment,
                 len(self.data))
 
-    def _new_segment_data(self):
-        """Return a new array to read the data of the current section into"""
+    def _update_data(self, new_data):
+        """Update the object data with a new array of data"""
 
-        if self.data_type.nptype is not None:
-            return np.zeros(self.number_values, dtype=self.data_type.nptype)
+        log.debug("Adding %d data points to data for %s" %
+                (len(new_data), self.path))
+        if self.data is None:
+            self.data = new_data
         else:
-            return [None] * self.number_values
+            if self.data_type.nptype is not None:
+                self.data = np.append(self.data, new_data)
+            else:
+                self.data.extend(new_data)
+
+
+class TdmsSegmentObject(object):
+    """
+    Describes an object in an individual TDMS file segment
+    """
+
+    def __init__(self, tdms_object):
+        self.tdms_object = tdms_object
+        tdms_object.segment_objects.append(self)
+
+        self.path = tdms_object.path
+        self.raw_data_index = 0
+        self.number_values = 0
+        self.data_size = 0
+        self.has_data = True
+        self.data_type = None
+        self.dimension = 1
+        self.properties = {}
+
+    def _read_metadata(self, f):
+        """Read object metadata and update object information"""
+
+        s = f.read(4)
+        self.raw_data_index = struct.unpack("<L", s)[0]
+
+        log.debug("Reading metadata for object %s" % self.path)
+
+        # Object has no data in this segment
+        if self.raw_data_index == 0xFFFFFFFF:
+            self.has_data = False
+        # Data has same structure as previously
+        elif self.raw_data_index == 0x00000000:
+            pass
+        else:
+            self.has_data = True
+            self.tdms_object.has_data = True
+            index_length = self.raw_data_index
+
+            # Read the data type
+            s = f.read(4)
+            self.data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
+            if (self.tdms_object.data_type is not None and
+                    self.data_type != self.tdms_object.data_type):
+                raise ValueError("Segment object doesn't have the same data "
+                        "type as previous segments.")
+            else:
+                self.tdms_object.data_type = self.data_type
+
+            # Read data dimension
+            s = f.read(4)
+            self.dimension = struct.unpack("<L", s)[0]
+            if self.dimension != 1:
+                log.warning("Data dimension is not 1")
+
+            # Read number of values
+            s = f.read(8)
+            self.number_values = struct.unpack("<Q", s)[0]
+            self.tdms_object.number_values += self.number_values
+
+            # Variable length data types have total size
+            if self.data_type.name in ('tdsTypeString', ):
+                s = f.read(8)
+                self.data_size = struct.unpack("<Q", s)[0]
+            else:
+                self.data_size = (self.number_values *
+                        self.data_type.length * self.dimension)
+
+            log.debug("Object number of values in segment: %d" %
+                    self.number_values)
+
+        # Read data properties
+        s = f.read(4)
+        num_properties = struct.unpack("<L", s)[0]
+        log.debug("Reading %d properties" % num_properties)
+        for i in range(num_properties):
+            prop_name = read_string(f)
+
+            # Property data type
+            s = f.read(4)
+            prop_data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
+            if prop_data_type.name == 'tdsTypeString':
+                value = read_string(f)
+            else:
+                value = read_type(f, prop_data_type, '<')
+            self.properties[prop_name] = value
+            log.debug("Property %s: %s" % (prop_name, value))
+        self.tdms_object.properties.update(self.properties)
 
     def _read_value(self, file, endianness):
         """Read a single value from the given file"""
@@ -541,15 +589,10 @@ class TdmsObject(object):
             data[i] = read_type(file, self.data_type, endianness)
         return data
 
-    def _update_data(self, new_data):
-        """Update the object data with a new array of data"""
+    def _new_segment_data(self):
+        """Return a new array to read the data of the current section into"""
 
-        log.debug("Adding %d data points to data for %s" %
-                (len(new_data), self.path))
-        if self.data is None:
-            self.data = new_data
+        if self.data_type.nptype is not None:
+            return np.zeros(self.number_values, dtype=self.data_type.nptype)
         else:
-            if self.data_type.nptype is not None:
-                self.data = np.append(self.data, new_data)
-            else:
-                self.data.extend(new_data)
+            return [None] * self.number_values
