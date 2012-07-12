@@ -17,3 +17,9 @@ v0.2.3, 16th May 2012
 - Fix number of bytes for boolean data
 - Fix for updating whether an object has data in a segment
 - Thanks to G-A-N on GitHub for these fixes
+
+v0.3.0, 13th July 2012
+- Allow getting the root object from the object method
+- Delay reading data until after reading all segment
+  metadata, so that arrays can be pre-allocated, improving
+  speed for files with many segments.
