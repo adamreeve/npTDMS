@@ -300,9 +300,13 @@ class _TdmsSegment(object):
                 obj = TdmsObject(object_path)
                 objects[object_path] = obj
 
-            # Update or create list of ordered segment objects
+            # Update or create list of ordered segment objects, re-using
+            # any properties from previous segments
             if self.toc["kTocNewObjList"]:
-                segment_obj = _TdmsSegmentObject(obj)
+                if obj._previous_segment_object is not None:
+                    segment_obj = copy(obj._previous_segment_object)
+                else:
+                    segment_obj = _TdmsSegmentObject(obj)
                 segment_obj._read_metadata(f)
                 self.ordered_objects.append(segment_obj)
             else:
@@ -319,6 +323,7 @@ class _TdmsSegment(object):
                     # Here the data type and number of data values is
                     # always set, but properties might be updated
                     segment_obj._read_metadata(f)
+            obj._previous_segment_object = segment_obj
 
         self.calculate_chunks()
 
@@ -466,6 +471,7 @@ class TdmsObject(object):
         self.dimension = 1
         self.number_values = 0
         self.has_data = False
+        self._previous_segment_object = None
 
     def __repr__(self):
         return "<TdmsObject with path %s>" % self.path
