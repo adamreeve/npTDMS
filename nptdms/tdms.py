@@ -4,6 +4,7 @@ import logging
 import struct
 import sys
 from collections import namedtuple
+from copy import copy
 import numpy as np
 
 
@@ -132,6 +133,10 @@ class TdmsFile(object):
             else:
                 tdms_file.seek(segment.next_segment_pos)
 
+        # Allocate space for data
+        for object in self.objects.values():
+            object._initialise_data()
+
         # Now actually read all the data
         for segment in self.segments:
             segment.read_raw_data(tdms_file)
@@ -209,6 +214,7 @@ class _TdmsSegment(object):
         """Read the lead in section of a segment"""
 
         self.position = f.tell()
+        self.num_chunks = 0
         self.ordered_objects = []
 
         # First four bytes should be TDSm
@@ -262,10 +268,19 @@ class _TdmsSegment(object):
         """Read segment metadata section and update object information"""
 
         if not self.toc["kTocMetaData"]:
-            self.ordered_objects = previous_segment.ordered_objects
+            try:
+                self.ordered_objects = previous_segment.ordered_objects
+            except AttributeError:
+                raise ValueError("kTocMetaData is set for segment but "
+                        "there is no previous segment")
+            self.calculate_chunks()
             return
         if not self.toc["kTocNewObjList"]:
-            self.ordered_objects = previous_segment.ordered_objects[:]
+            # In this case, there can be a list of new objects that
+            # are appended, or previous objects can also be repeated
+            # if their properties change
+            self.ordered_objects = [
+                    copy(o) for o in previous_segment.ordered_objects]
 
         log.debug("Reading metadata at %d" % f.tell())
 
@@ -286,31 +301,37 @@ class _TdmsSegment(object):
                 objects[object_path] = obj
 
             # Update or create list of ordered segment objects
-            segment_obj = TdmsSegmentObject(obj)
-            segment_obj._read_metadata(f)
             if self.toc["kTocNewObjList"]:
+                segment_obj = _TdmsSegmentObject(obj)
+                segment_obj._read_metadata(f)
                 self.ordered_objects.append(segment_obj)
             else:
                 obj_index = [
                         i for i, o in enumerate(self.ordered_objects)
                         if o.tdms_object is obj]
                 if len(obj_index) == 0:
+                    segment_obj = _TdmsSegmentObject(obj)
+                    segment_obj._read_metadata(f)
                     self.ordered_objects.append(segment_obj)
                 else:
                     obj_index = obj_index[0]
-                    self.ordered_objects[obj_index] = segment_obj
+                    segment_obj = self.ordered_objects[obj_index]
+                    # Here the data type and number of data values is
+                    # always set, but properties might be updated
+                    segment_obj._read_metadata(f)
 
-    def read_raw_data(self, f):
-        """Read signal data from file"""
+        self.calculate_chunks()
 
-        if not self.toc["kTocRawData"]:
-            return
+    def calculate_chunks(self):
+        """
+        Work out the number of chunks the data is in, for cases
+        where the meta data doesn't change at all so there is no
+        lead in.
 
-        f.seek(self.data_position)
+        Also increments the number of values for objects in this
+        segment, based on the number of chunks.
+        """
 
-        # Work out the number of chunks the data is in, for cases
-        # where the meta data doesn't change at all so there is no
-        # lead in.
         data_size = sum([
                 o.data_size
                 for o in self.ordered_objects])
@@ -322,21 +343,37 @@ class _TdmsSegment(object):
             if total_data_size != data_size:
                 raise ValueError("Zero channel data size but non-zero data "
                         "length based on segment offset.")
+            self.num_chunks = 0
             return
         if total_data_size % data_size != 0:
             raise ValueError("Data size %d is not a multiple of the "
                     "chunk size %d" % (total_data_size, data_size))
         else:
-            num_chunks = total_data_size // data_size
+            self.num_chunks = total_data_size // data_size
+
+        # Update data count for object
+        for obj in self.ordered_objects:
+            obj.tdms_object.number_values += (
+                    obj.number_values * self.num_chunks)
+
+    def read_raw_data(self, f):
+        """Read signal data from file"""
+
+        if not self.toc["kTocRawData"]:
+            return
+
+        f.seek(self.data_position)
+
+        total_data_size = self.next_segment_offset - self.raw_data_offset
         log.debug("Reading %d bytes of data at %d in %d chunks" %
-                (total_data_size, f.tell(), num_chunks))
+                (total_data_size, f.tell(), self.num_chunks))
 
         if self.toc['kTocBigEndian']:
             endianness = '>'
         else:
             endianness = '<'
 
-        for chunk in range(num_chunks):
+        for chunk in range(self.num_chunks):
             if self.toc["kTocInterleavedData"]:
                 log.debug("Data is interleaved")
                 data_objects = [o for o in self.ordered_objects if o.has_data]
@@ -423,7 +460,6 @@ class TdmsObject(object):
 
     def __init__(self, path):
         self.path = path
-        self.segment_objects = []
         self.data = None
         self.properties = {}
         self.data_type = None
@@ -467,6 +503,17 @@ class TdmsObject(object):
                 offset + (len(self.data) - 1) * increment,
                 len(self.data))
 
+    def _initialise_data(self):
+        """Initialise data array to zeros"""
+
+        if self.number_values > 0:
+            if self.data_type.nptype is None:
+                self.data = []
+            else:
+                self.data = np.zeros(
+                        self.number_values, dtype=self.data_type.nptype)
+                self._data_insert_position = 0
+
     def _update_data(self, new_data):
         """Update the object data with a new array of data"""
 
@@ -476,19 +523,21 @@ class TdmsObject(object):
             self.data = new_data
         else:
             if self.data_type.nptype is not None:
-                self.data = np.append(self.data, new_data)
+                data_pos = (self._data_insert_position,
+                        self._data_insert_position + len(new_data))
+                self._data_insert_position += len(new_data)
+                self.data[data_pos[0]:data_pos[1]] = new_data
             else:
                 self.data.extend(new_data)
 
 
-class TdmsSegmentObject(object):
+class _TdmsSegmentObject(object):
     """
     Describes an object in an individual TDMS file segment
     """
 
     def __init__(self, tdms_object):
         self.tdms_object = tdms_object
-        tdms_object.segment_objects.append(self)
 
         self.path = tdms_object.path
         self.raw_data_index = 0
@@ -516,7 +565,6 @@ class TdmsSegmentObject(object):
         else:
             self.has_data = True
             self.tdms_object.has_data = True
-            index_length = self.raw_data_index
 
             # Read the data type
             s = f.read(4)
@@ -537,7 +585,6 @@ class TdmsSegmentObject(object):
             # Read number of values
             s = f.read(8)
             self.number_values = struct.unpack("<Q", s)[0]
-            self.tdms_object.number_values += self.number_values
 
             # Variable length data types have total size
             if self.data_type.name in ('tdsTypeString', ):
