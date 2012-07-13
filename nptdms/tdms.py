@@ -206,7 +206,7 @@ class TdmsFile(object):
 
         """
 
-        return self.objects[self._path(group, channel)].data
+        return self.object(group, channel).data
 
 
 class _TdmsSegment(object):
