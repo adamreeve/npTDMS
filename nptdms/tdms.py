@@ -4,6 +4,11 @@ import logging
 import struct
 import sys
 from collections import namedtuple
+try:
+    from collections import OrderedDict
+except ImportError:
+    # For Python < 2.7, just use a normal dict
+    OrderedDict = dict
 from copy import copy
 import numpy as np
 
@@ -104,7 +109,7 @@ class TdmsFile(object):
         """
 
         self.segments = []
-        self.objects = {}
+        self.objects = OrderedDict()
 
         if hasattr(file, "read"):
             # Is a file
@@ -234,7 +239,7 @@ class _TdmsSegment(object):
         s = f.read(4)
         toc_mask = struct.unpack('<i', s)[0]
 
-        self.toc = {}
+        self.toc = OrderedDict()
         for property in tocProperties.keys():
             self.toc[property] = (toc_mask & tocProperties[property]) != 0
             log.debug("Property %s is %s" % (property, self.toc[property]))
@@ -466,7 +471,7 @@ class TdmsObject(object):
     def __init__(self, path):
         self.path = path
         self.data = None
-        self.properties = {}
+        self.properties = OrderedDict()
         self.data_type = None
         self.dimension = 1
         self.number_values = 0
@@ -552,7 +557,7 @@ class _TdmsSegmentObject(object):
         self.has_data = True
         self.data_type = None
         self.dimension = 1
-        self.properties = {}
+        self.properties = OrderedDict()
 
     def _read_metadata(self, f):
         """Read object metadata and update object information"""
