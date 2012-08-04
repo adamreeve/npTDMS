@@ -7,8 +7,12 @@ from collections import namedtuple
 try:
     from collections import OrderedDict
 except ImportError:
-    # For Python < 2.7, just use a normal dict
-    OrderedDict = dict
+    try:
+        # ordereddict available on pypi for Python < 2.7
+        from ordereddict import OrderedDict
+    except ImportError:
+        # Otherwise fall back on normal dict
+        OrderedDict = dict
 from copy import copy
 import numpy as np
 
