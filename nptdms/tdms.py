@@ -203,7 +203,7 @@ class TdmsFile(object):
         """
 
         path = self._path(group)
-        return [self.objects[p] for p in self.objects if p.startswith(path)]
+        return [self.objects[p] for p in self.objects if p.startswith(path + '/')]
 
     def channel_data(self, group, channel):
         """Get the data for a channel
