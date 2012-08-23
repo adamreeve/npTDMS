@@ -15,6 +15,11 @@ except ImportError:
         OrderedDict = dict
 from copy import copy
 import numpy as np
+from datetime import datetime, timedelta
+try:
+    import pytz
+except ImportError:
+    pytz = None
 
 
 log = logging.getLogger(__name__)
@@ -69,6 +74,13 @@ tdsDataTypes.update({
 })
 
 
+if pytz:
+    # Use UTC time zone if pytz is installed
+    timezone = pytz.utc
+else:
+    timezone = None
+
+
 def read_string(file):
     """Read a string from a tdms file
 
@@ -84,11 +96,17 @@ def read_type(file, data_type, endianness):
     """Read a value from the file of the specified data type"""
 
     if data_type.name == 'tdsTypeTimeStamp':
-        # Time stamps are stored as number of seconds since the epoch
-        # and number of 2^-64 fractions of a second
+        # Time stamps are stored as number of seconds since
+        # 01/01/1904 00:00:00.00 UTC, ignoring leap seconds,
+        # and number of 2^-64 fractions of a second.
+        # Note that the TDMS epoch is not the Unix epoch.
         s = file.read(data_type.length)
         (s_frac, s) = struct.unpack('%s%s' % (endianness, data_type.struct), s)
-        return (s, s_frac * (2 ** -64))
+        tdms_start = datetime(1904, 1, 1, 0, 0, 0, tzinfo=timezone)
+        ms = float(s_frac) * 5 ** 6 / 2 ** 58
+        # Adding timedelta with seconds ignores leap
+        # seconds, so this is correct
+        return tdms_start + timedelta(seconds=s) + timedelta(microseconds=ms)
     elif None not in (data_type.struct, data_type.length):
         s = file.read(data_type.length)
         return struct.unpack('%s%s' % (endianness, data_type.struct), s)[0]
@@ -203,7 +221,10 @@ class TdmsFile(object):
         """
 
         path = self._path(group)
-        return [self.objects[p] for p in self.objects if p.startswith(path + '/')]
+        return [
+            self.objects[p]
+            for p in self.objects
+            if p.startswith(path + '/')]
 
     def channel_data(self, group, channel):
         """Get the data for a channel
@@ -494,7 +515,11 @@ class TdmsObject(object):
 
         """
 
-        return self.properties[property_name]
+        try:
+            return self.properties[property_name]
+        except KeyError:
+            raise KeyError(
+                "Object does not have property '%s'" % property_name)
 
     def time_track(self):
         """Return an array of time for this channel

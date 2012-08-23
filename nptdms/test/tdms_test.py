@@ -6,6 +6,8 @@ import logging
 import binascii
 import struct
 import tempfile
+from datetime import datetime
+
 from nptdms import tdms
 
 
@@ -445,6 +447,26 @@ class TDMSTestClass(unittest.TestCase):
         """Test reading contiguous and interleaved timestamp data,
         which isn't read by numpy"""
 
+
+        times = [
+            datetime(2012, 8, 23, 0, 0, 0, 123, tzinfo=tdms.timezone),
+            datetime(2012, 8, 23, 1, 2, 3, 456, tzinfo=tdms.timezone),
+            datetime(2012, 8, 23, 12, 0, 0, 0, tzinfo=tdms.timezone),
+            datetime(2012, 8, 23, 12, 2, 3, 9999, tzinfo=tdms.timezone),
+            ]
+
+        def total_seconds(td):
+            # timedelta.total_seconds() only added in 2.7
+            return td.seconds + td.days * 24 * 3600
+
+        seconds = [
+            total_seconds(t -
+                datetime(1904, 1, 1, 0, 0, 0, tzinfo=tdms.timezone))
+            for t in times]
+        fractions = [
+            int(float(t.microsecond) * 2 ** 58 / 5 ** 6)
+            for t in times]
+
         metadata = (
             # Number of objects
             "02 00 00 00"
@@ -478,16 +500,19 @@ class TDMSTestClass(unittest.TestCase):
             "00 00 00 00"
             # Number of properties (0)
             "00 00 00 00")
-        data = (
-            "00 00 00 00 00 00 00 60"
-            "01 00 00 00 00 00 00 00"
-            "00 00 00 00 00 00 00 60"
-            "02 00 00 00 00 00 00 00"
-            "00 00 00 00 00 00 00 60"
-            "03 00 00 00 00 00 00 00"
-            "00 00 00 00 00 00 00 60"
-            "04 00 00 00 00 00 00 00"
-        )
+        data = ""
+        for f, s in zip(fractions, seconds):
+            data += hexlify_value("<Q", f)
+            data += hexlify_value("<q", s)
+
+        def assertTimeEqual(a, b):
+            """Check times are equal, allowing for small difference
+            in microseconds due to floating point math being used
+            """
+
+            self.assertEqual(
+                a.replace(microsecond=0), b.replace(microsecond=0))
+            assert(abs(a.microsecond - b.microsecond) < 10)
 
         test_file = TestFile()
         toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
@@ -495,14 +520,13 @@ class TDMSTestClass(unittest.TestCase):
         tdmsData = test_file.load()
         channel_data = tdmsData.channel_data("Group", "TimeChannel1")
         self.assertEqual(len(channel_data), 2)
-        self.assertEqual(channel_data[0][0], 1)
-        self.assertEqual(channel_data[1][0], 2)
+        assertTimeEqual(channel_data[0], times[0])
+        assertTimeEqual(channel_data[1], times[1])
         # Read fraction of second
-        self.assertEqual(channel_data[0][1], 0.375)
         channel_data = tdmsData.channel_data("Group", "TimeChannel2")
         self.assertEqual(len(channel_data), 2)
-        self.assertEqual(channel_data[0][0], 3)
-        self.assertEqual(channel_data[1][0], 4)
+        assertTimeEqual(channel_data[0], times[2])
+        assertTimeEqual(channel_data[1], times[3])
 
         # Now test it interleaved
         toc = toc + ("kTocInterleavedData", )
@@ -511,12 +535,12 @@ class TDMSTestClass(unittest.TestCase):
         tdmsData = test_file.load()
         channel_data = tdmsData.channel_data("Group", "TimeChannel1")
         self.assertEqual(len(channel_data), 2)
-        self.assertEqual(channel_data[0][0], 1)
-        self.assertEqual(channel_data[1][0], 3)
+        assertTimeEqual(channel_data[0], times[0])
+        assertTimeEqual(channel_data[1], times[2])
         channel_data = tdmsData.channel_data("Group", "TimeChannel2")
         self.assertEqual(len(channel_data), 2)
-        self.assertEqual(channel_data[0][0], 2)
-        self.assertEqual(channel_data[1][0], 4)
+        assertTimeEqual(channel_data[0], times[1])
+        assertTimeEqual(channel_data[1], times[3])
 
     def test_time_track(self):
         """Add a time track to waveform data"""
