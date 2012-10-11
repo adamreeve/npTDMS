@@ -16,6 +16,7 @@ except ImportError:
 from copy import copy
 import numpy as np
 from datetime import datetime, timedelta
+import tempfile
 try:
     import pytz
 except ImportError:
@@ -122,16 +123,21 @@ class TdmsFile(object):
 
     """
 
-    def __init__(self, file):
+    def __init__(self, file, memmap_dir=None):
         """Initialise a new TDMS file object, reading all data.
 
         :param file: Either the path to the tdms file to read or an already
             opened file.
-
+        :param memmap_dir: The directory to store memmapped data files in,
+            or None to read data into memory. The data files are created
+            as temporary files and are deleted when the channel data is no
+            longer used. tempfile.gettempdir() can be used to get the default
+            temporary file directory.
         """
 
         self.segments = []
         self.objects = OrderedDict()
+        self.memmap_dir = memmap_dir
 
         if hasattr(file, "read"):
             # Is a file
@@ -162,7 +168,7 @@ class TdmsFile(object):
 
         # Allocate space for data
         for object in self.objects.values():
-            object._initialise_data()
+            object._initialise_data(memmap_dir=self.memmap_dir)
 
         # Now actually read all the data
         for segment in self.segments:
@@ -543,16 +549,26 @@ class TdmsObject(object):
                 offset + (len(self.data) - 1) * increment,
                 len(self.data))
 
-    def _initialise_data(self):
+    def _initialise_data(self, memmap_dir=None):
         """Initialise data array to zeros"""
 
-        if self.number_values > 0:
-            if self.data_type.nptype is None:
-                self.data = []
+        if self.number_values == 0:
+            pass
+        elif self.data_type.nptype is None:
+            self.data = []
+        else:
+            if memmap_dir:
+                memmap_file = tempfile.TemporaryFile(
+                        mode='w+b', prefix="nptdms_", dir=memmap_dir)
+                self.data = np.memmap(
+                        memmap_file,
+                        mode='w+',
+                        shape=(self.number_values,),
+                        dtype=self.data_type.nptype)
             else:
                 self.data = np.zeros(
                         self.number_values, dtype=self.data_type.nptype)
-                self._data_insert_position = 0
+            self._data_insert_position = 0
 
     def _update_data(self, new_data):
         """Update the object data with a new array of data"""

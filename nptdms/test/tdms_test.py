@@ -7,6 +7,7 @@ import binascii
 import struct
 import tempfile
 from datetime import datetime
+import tempfile
 
 from nptdms import tdms
 
@@ -66,10 +67,10 @@ class TestFile(object):
         return binascii.unhexlify(hex_data.replace(" ", "").
                 replace("\n", "").encode('utf-8'))
 
-    def load(self):
+    def load(self, *args, **kwargs):
         self.file.write(self.data)
         self.file.seek(0)
-        return tdms.TdmsFile(self.file)
+        return tdms.TdmsFile(self.file, *args, **kwargs)
 
 
 class TDMSTestClass(unittest.TestCase):
@@ -610,6 +611,22 @@ class TDMSTestClass(unittest.TestCase):
         data = tdmsData.channel_data("Group", "Channel2")
         self.assertEqual(len(data), 2)
         self.assertTrue(all(data == [3, 4]))
+
+    def test_memmapped_read(self):
+        """Test reading data into memmapped arrays"""
+
+        test_file = TestFile()
+        test_file.add_segment(*self.basic_segment())
+        tdmsData = test_file.load(memmap_dir=tempfile.gettempdir())
+
+        data = tdmsData.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 1)
+        self.assertEqual(data[1], 2)
+        data = tdmsData.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 3)
+        self.assertEqual(data[1], 4)
 
 
 if __name__ == '__main__':
