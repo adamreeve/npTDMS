@@ -23,3 +23,9 @@ v0.3.0, 13th July 2012
 - Delay reading data until after reading all segment
   metadata, so that arrays can be pre-allocated, improving
   speed for files with many segments.
+
+v0.4.0, 19th November 2012
+- Use an ordered dict when available so that channels and
+  groups retain the same order as in the TDMS file.
+- Return timestamps in a TDMS file as Python datetime objects.
+- Allow reading data into a memmapped file.
