@@ -558,10 +558,10 @@ class TdmsObject(object):
             self.data = []
         else:
             if memmap_dir:
-                memmap_file = tempfile.TemporaryFile(
+                memmap_file = tempfile.NamedTemporaryFile(
                         mode='w+b', prefix="nptdms_", dir=memmap_dir)
                 self.data = np.memmap(
-                        memmap_file,
+                        memmap_file.name,
                         mode='w+',
                         shape=(self.number_values,),
                         dtype=self.data_type.nptype)
