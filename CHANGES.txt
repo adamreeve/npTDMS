@@ -29,3 +29,6 @@ v0.4.0, 19th November 2012
   groups retain the same order as in the TDMS file.
 - Return timestamps in a TDMS file as Python datetime objects.
 - Allow reading data into a memmapped file.
+
+v0.4.1, 20th November 2012
+- Fix use of memmapped file with Python 3.
