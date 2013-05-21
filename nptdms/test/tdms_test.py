@@ -612,6 +612,68 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(len(data), 2)
         self.assertTrue(all(data == [3, 4]))
 
+    def test_repeated_object_without_data(self):
+        """Repeated objects with no data in new segment
+
+        A new object is also added with new data in order
+        to trigger a bug with the chunk size calculation.
+        """
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        test_file.add_segment(metadata, data, toc)
+        toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+        metadata = (
+            # Number of objects
+            "03 00 00 00"
+            # Length of the object path
+            "13 00 00 00")
+        metadata += string_hexlify("/'Group'/'Channel1'")
+        metadata += (
+            # Raw data index
+            "FF FF FF FF"
+            # Number of properties (0)
+            "00 00 00 00")
+        metadata += (
+            # Length of the object path
+            "13 00 00 00")
+        metadata += string_hexlify("/'Group'/'Channel2'")
+        metadata += (
+            # Raw data index
+            "FF FF FF FF"
+            # Number of properties (0)
+            "00 00 00 00"
+            # Length of the third object path
+            "13 00 00 00")
+        metadata += string_hexlify("/'Group'/'Channel3'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "03 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = (
+            "01 00 00 00"
+            "02 00 00 00"
+        )
+        test_file.add_segment(metadata, data, toc)
+        tdmsData = test_file.load()
+        data = tdmsData.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(data == [1, 2]))
+        data = tdmsData.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(data == [3, 4]))
+        data = tdmsData.channel_data("Group", "Channel3")
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(data == [1, 2]))
+
     def test_memmapped_read(self):
         """Test reading data into memmapped arrays"""
 

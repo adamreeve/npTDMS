@@ -614,9 +614,13 @@ class _TdmsSegmentObject(object):
 
         # Object has no data in this segment
         if self.raw_data_index == 0xFFFFFFFF:
+            log.debug("Object has no data in this segment")
             self.has_data = False
+            self.number_values = 0
+            self.data_size = 0
         # Data has same structure as previously
         elif self.raw_data_index == 0x00000000:
+            log.debug("Object has same data structure as in the previous segment")
             pass
         else:
             self.has_data = True
