@@ -1,28 +1,8 @@
-v0.1.0, 24th February 2012
-- Initial release
+v0.4.2, 22nd May 2013
+- Fix bug with repeated objects that don't have any data.
 
-v0.2.0, 25th February 2012
-- Support for Python 3
-- Much faster reading of interleaved data
-
-v0.2.1, 27th February 2012
-- Improved documentation
-
-v0.2.2, 28th February 2012
-- Put documentation on readthedocs.org
-- Allow importing TdmsFile from nptdms
-
-v0.2.3, 16th May 2012
-- Fix bug with segments that have kTocRawData set but zero data length
-- Fix number of bytes for boolean data
-- Fix for updating whether an object has data in a segment
-- Thanks to G-A-N on GitHub for these fixes
-
-v0.3.0, 13th July 2012
-- Allow getting the root object from the object method
-- Delay reading data until after reading all segment
-  metadata, so that arrays can be pre-allocated, improving
-  speed for files with many segments.
+v0.4.1, 20th November 2012
+- Fix use of memmapped file with Python 3.
 
 v0.4.0, 19th November 2012
 - Use an ordered dict when available so that channels and
@@ -30,5 +10,28 @@ v0.4.0, 19th November 2012
 - Return timestamps in a TDMS file as Python datetime objects.
 - Allow reading data into a memmapped file.
 
-v0.4.1, 20th November 2012
-- Fix use of memmapped file with Python 3.
+v0.3.0, 13th July 2012
+- Allow getting the root object from the object method
+- Delay reading data until after reading all segment
+  metadata, so that arrays can be pre-allocated, improving
+  speed for files with many segments.
+
+v0.2.3, 16th May 2012
+- Fix bug with segments that have kTocRawData set but zero data length
+- Fix number of bytes for boolean data
+- Fix for updating whether an object has data in a segment
+- Thanks to G-A-N on GitHub for these fixes
+
+v0.2.2, 28th February 2012
+- Put documentation on readthedocs.org
+- Allow importing TdmsFile from nptdms
+
+v0.2.1, 27th February 2012
+- Improved documentation
+
+v0.2.0, 25th February 2012
+- Support for Python 3
+- Much faster reading of interleaved data
+
+v0.1.0, 24th February 2012
+- Initial release
