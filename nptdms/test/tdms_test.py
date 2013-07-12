@@ -36,7 +36,7 @@ class TestFile(object):
         self.file = tempfile.TemporaryFile()
         self.data = bytes()
 
-    def add_segment(self, metadata, data, toc=None):
+    def add_segment(self, metadata, data, toc=None, incomplete=False):
         metadata = self.to_bytes(metadata)
         data = self.to_bytes(data)
         if toc is not None:
@@ -58,7 +58,11 @@ class TestFile(object):
             lead_in += self.to_bytes("69 12 00 00")
             next_segment_offset = len(metadata) + len(data)
             raw_data_offset = len(metadata)
-            lead_in += struct.pack('<QQ', next_segment_offset, raw_data_offset)
+            if incomplete:
+                lead_in += self.to_bytes('FF' * 8)
+            else:
+                lead_in += struct.pack('<Q', next_segment_offset)
+            lead_in += struct.pack('<Q', raw_data_offset)
         else:
             lead_in = b''
         self.data += lead_in + metadata + data
@@ -274,7 +278,6 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(len(data), 4)
         self.assertTrue(all(data == [3, 4, 7, 8]))
 
-
     def test_new_channel(self):
         """Add a new voltage channel, with the other two channels
         remaining unchanged, so only the new channel is in metadata section"""
@@ -447,7 +450,6 @@ class TDMSTestClass(unittest.TestCase):
     def test_timestamp_data(self):
         """Test reading contiguous and interleaved timestamp data,
         which isn't read by numpy"""
-
 
         times = [
             datetime(2012, 8, 23, 0, 0, 0, 123, tzinfo=tdms.timezone),
@@ -681,6 +683,28 @@ class TDMSTestClass(unittest.TestCase):
         test_file.add_segment(*self.basic_segment())
         tdmsData = test_file.load(memmap_dir=tempfile.gettempdir())
 
+        data = tdmsData.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 1)
+        self.assertEqual(data[1], 2)
+        data = tdmsData.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 3)
+        self.assertEqual(data[1], 4)
+
+    def test_incomplete_data(self):
+        """Test incomplete last segment, eg. if LabView crashed"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = self.basic_segment()
+        test_file.add_segment(metadata, data, toc)
+        # Add second, incomplete segment
+        test_file.add_segment(metadata, data, toc, incomplete=True)
+        tdmsData = test_file.load()
+
+        # Eventually we might want to attempt to read the data
+        # from the incomplete segment, but for now just make
+        # sure we can read the data from previous segments
         data = tdmsData.channel_data("Group", "Channel1")
         self.assertEqual(len(data), 2)
         self.assertEqual(data[0], 1)

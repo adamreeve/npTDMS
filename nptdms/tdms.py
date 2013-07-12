@@ -291,8 +291,13 @@ class _TdmsSegment(object):
         self.data_position = self.position + lead_size + self.raw_data_offset
         if self.next_segment_offset == struct.unpack('<Q', b'\xFF' * 8)[0]:
             # This can happen if Labview crashes
-            log.warning("Last segment of file has unknown size")
+            log.warning("Last segment of file has unknown size, "
+                "not attempting to read it")
             self.next_segment_pos = None
+            self.next_segment_offset = None
+            # Could try to read as much as possible but for now
+            # don't attempt to read last segment
+            raise EOFError
         else:
             self.next_segment_pos = (self.position +
                     self.next_segment_offset + lead_size)
