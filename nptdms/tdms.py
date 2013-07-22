@@ -312,7 +312,7 @@ class _TdmsSegment(object):
             try:
                 self.ordered_objects = previous_segment.ordered_objects
             except AttributeError:
-                raise ValueError("kTocMetaData is set for segment but "
+                raise ValueError("kTocMetaData is not set for segment but "
                         "there is no previous segment")
             self.calculate_chunks()
             return
