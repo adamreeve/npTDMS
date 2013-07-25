@@ -625,7 +625,8 @@ class _TdmsSegmentObject(object):
             self.data_size = 0
         # Data has same structure as previously
         elif self.raw_data_index == 0x00000000:
-            log.debug("Object has same data structure as in the previous segment")
+            log.debug("Object has same data structure "
+                    "as in the previous segment")
             pass
         else:
             self.has_data = True
@@ -633,13 +634,21 @@ class _TdmsSegmentObject(object):
 
             # Read the data type
             s = f.read(4)
-            self.data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
+            try:
+                self.data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
+            except KeyError:
+                raise KeyError("Unrecognised data type")
             if (self.tdms_object.data_type is not None and
                     self.data_type != self.tdms_object.data_type):
                 raise ValueError("Segment object doesn't have the same data "
                         "type as previous segments.")
             else:
                 self.tdms_object.data_type = self.data_type
+            log.debug("Object data type: %s" % self.tdms_object.data_type.name)
+
+            if self.tdms_object.data_type.length is None:
+                raise ValueError("Unsupported data type: %s" %
+                        self.tdms_object.data_type.name)
 
             # Read data dimension
             s = f.read(4)
