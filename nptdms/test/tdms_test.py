@@ -714,6 +714,48 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(data[0], 3)
         self.assertEqual(data[1], 4)
 
+    def test_string_data(self):
+        """Test reading a file with string data"""
+
+        strings = ["abcdefg", "qwertyuiop"]
+
+        test_file = TestFile()
+        toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+        metadata = (
+            # Number of objects
+            "01 00 00 00"
+            # Length of the third object path
+            "18 00 00 00")
+        metadata += string_hexlify("/'Group'/'StringChannel'")
+        metadata += (
+            # Length of index information
+            "1C 00 00 00"
+            # Raw data data type
+            "20 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of bytes in data
+            "19 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = (
+            "07 00 00 00" # index to after first string
+            "11 00 00 00" # index to after second string
+        )
+        for string in strings:
+            data += string_hexlify(string)
+        test_file.add_segment(metadata, data, toc)
+        tdmsData = test_file.load()
+
+        data = tdmsData.channel_data("Group", "StringChannel")
+        self.assertEqual(len(data), len(strings))
+        for expected, read in zip(strings, data):
+            self.assertEqual(expected, read)
+
 
 if __name__ == '__main__':
     unittest.main()
