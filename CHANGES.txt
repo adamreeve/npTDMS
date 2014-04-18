@@ -1,3 +1,8 @@
+v0.5, 19th April 2014
+- Support string data
+- Fix for reading int16 and uint16
+- Better handling of incomplete files
+
 v0.4.2, 22nd May 2013
 - Fix bug with repeated objects that don't have any data.
 
