@@ -41,8 +41,8 @@ Documentation is available at http://readthedocs.org/docs/nptdms.
 What Currently Doesn't Work
 ---------------------------
 
-This module doesn't support TDMS files with XML headers or files with
-string or extended floating point data.
+This module doesn't support TDMS files with XML headers or with
+extended floating point data.
 
 Files with DAQmx raw data are not supported either.
 

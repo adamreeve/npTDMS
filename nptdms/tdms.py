@@ -646,7 +646,8 @@ class _TdmsSegmentObject(object):
                 self.tdms_object.data_type = self.data_type
             log.debug("Object data type: %s" % self.tdms_object.data_type.name)
 
-            if self.tdms_object.data_type.length is None:
+            if (self.tdms_object.data_type.length is None and
+                    self.tdms_object.data_type.name != 'tdsTypeString'):
                 raise ValueError("Unsupported data type: %s" %
                         self.tdms_object.data_type.name)
 
@@ -705,6 +706,8 @@ class _TdmsSegmentObject(object):
             dtype = (np.dtype(self.data_type.nptype).
                     newbyteorder(endianness))
             return np.fromfile(file, dtype=dtype, count=self.number_values)
+        elif self.data_type.name == "tdsTypeString":
+            return read_string_data(file, self.number_values)
         data = self._new_segment_data()
         for i in range(self.number_values):
             data[i] = read_type(file, self.data_type, endianness)
@@ -717,3 +720,21 @@ class _TdmsSegmentObject(object):
             return np.zeros(self.number_values, dtype=self.data_type.nptype)
         else:
             return [None] * self.number_values
+
+
+def read_string_data(file, number_values):
+    """ Read string raw data
+
+        This is stored as an array of offsets
+        followed by the contiguous string data.
+    """
+    offsets = [0]
+    for i in range(number_values):
+        s = file.read(4)
+        offset = struct.unpack("<L", s)[0]
+        offsets.append(offset)
+    strings = []
+    for i in range(number_values):
+        s = file.read(offsets[i + 1] - offsets[i])
+        strings.append(s.decode('utf-8'))
+    return strings
