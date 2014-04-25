@@ -48,7 +48,7 @@ def main():
 def display_properties(tdms_object, level):
     if tdms_object.properties:
         display("properties:", level)
-        for prop, val in tdms_object.properties.iteritems():
+        for prop, val in tdms_object.properties.items():
             display("%s: %s" % (prop, val), level)
 
 
