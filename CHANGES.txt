@@ -1,4 +1,4 @@
-Development version
+v0.6, 25th April 2014
 - Add tdmsinfo command line program.
 
 v0.5, 19th April 2014

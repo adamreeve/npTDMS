@@ -2,7 +2,7 @@ from distutils.core import setup
 
 setup(
   name = 'npTDMS',
-  version = '0.5',
+  version = '0.6',
   description = ("Cross-platform, NumPy based module for reading "
     "TDMS files produced by LabView."),
   author = 'Adam Reeve',
