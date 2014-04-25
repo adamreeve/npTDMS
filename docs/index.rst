@@ -36,6 +36,18 @@ Typical usage might look like::
     time = channel.time_track()
     # do stuff with data
 
+tdmsinfo Program
+================
+
+npTDMS comes with a command line program, ``tdmsinfo``, which
+lists the contents of a TDMS file.
+Usage looks like::
+
+    tdmsinfo [--properties] tdms_file
+
+Passing the ``--properties`` or ``-p`` argument will include TDMS object
+properties in the printed information.
+
 What Doesn't Work
 =================
 

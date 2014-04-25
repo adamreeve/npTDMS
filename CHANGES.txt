@@ -1,3 +1,6 @@
+Development version
+- Add tdmsinfo command line program.
+
 v0.5, 19th April 2014
 - Support string data
 - Fix for reading int16 and uint16

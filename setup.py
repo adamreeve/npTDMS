@@ -27,4 +27,9 @@ setup(
     'Intended Audience :: Science/Research',
     'Natural Language :: English',
   ],
-  install_requires = ['numpy'])
+  install_requires = ['numpy'],
+  entry_points = """
+  [console_scripts]
+  tdmsinfo=nptdms.tdmsinfo:main
+  """
+)
