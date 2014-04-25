@@ -1,3 +1,6 @@
+v0.6.1, 25th April 2014
+- Fix tdmsinfo to work with Python 3.
+
 v0.6, 25th April 2014
 - Add tdmsinfo command line program.
 
