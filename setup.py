@@ -1,8 +1,20 @@
+import os
+
 from setuptools import setup
+
+
+def read_version():
+    here = os.path.abspath(os.path.dirname(__file__))
+    version_path = os.path.sep.join((here, "nptdms", "version.py"))
+    v_globals = {}
+    v_locals = {}
+    exec(open(version_path).read(), v_globals, v_locals)
+    return v_locals['__version__']
+
 
 setup(
   name = 'npTDMS',
-  version = '0.6.1',
+  version = read_version(),
   description = ("Cross-platform, NumPy based module for reading "
     "TDMS files produced by LabView."),
   author = 'Adam Reeve',
