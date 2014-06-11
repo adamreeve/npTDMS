@@ -242,7 +242,7 @@ class TDMSTestClass(unittest.TestCase):
             "2F 27 47 72"
             "6F 75 70 27"
             # Raw data index
-            "00 00 00 00"
+            "FF FF FF FF"
             # Num properties
             "00 00 00 00"
             # Length of the second object path
