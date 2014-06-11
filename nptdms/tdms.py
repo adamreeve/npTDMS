@@ -251,6 +251,7 @@ class _TdmsSegment(object):
 
         self.position = f.tell()
         self.num_chunks = 0
+        # A list of _TdmsSegmentObject
         self.ordered_objects = []
 
         # First four bytes should be TDSm
@@ -341,29 +342,31 @@ class _TdmsSegment(object):
                 obj = TdmsObject(object_path)
                 objects[object_path] = obj
 
-            # Update or create list of ordered segment objects, re-using
-            # any properties from previous segments
-            if self.toc["kTocNewObjList"]:
-                if obj._previous_segment_object is not None:
-                    segment_obj = copy(obj._previous_segment_object)
-                else:
-                    segment_obj = _TdmsSegmentObject(obj)
-                segment_obj._read_metadata(f)
-                self.ordered_objects.append(segment_obj)
-            else:
+            # Add this segment object to the list of segment objects,
+            # re-using any properties from previous segments.
+            updating_existing = False
+            if not self.toc["kTocNewObjList"]:
+                # Search for the same object from the previous segment
+                # object list.
                 obj_index = [
                         i for i, o in enumerate(self.ordered_objects)
                         if o.tdms_object is obj]
-                if len(obj_index) == 0:
-                    segment_obj = _TdmsSegmentObject(obj)
-                    segment_obj._read_metadata(f)
-                    self.ordered_objects.append(segment_obj)
-                else:
+                if len(obj_index) > 0:
+                    updating_existing = True
+                    log.debug("Updating object in segment list")
                     obj_index = obj_index[0]
                     segment_obj = self.ordered_objects[obj_index]
-                    # Here the data type and number of data values is
-                    # always set, but properties might be updated
-                    segment_obj._read_metadata(f)
+            if not updating_existing:
+                if obj._previous_segment_object is not None:
+                    log.debug("Copying previous segment object")
+                    segment_obj = copy(obj._previous_segment_object)
+                else:
+                    log.debug("Creating a new segment object")
+                    segment_obj = _TdmsSegmentObject(obj)
+                self.ordered_objects.append(segment_obj)
+            # Read the metadata for this object, updating any
+            # data structure information and properties.
+            segment_obj._read_metadata(f)
             obj._previous_segment_object = segment_obj
 
         self.calculate_chunks()
@@ -380,7 +383,7 @@ class _TdmsSegment(object):
 
         data_size = sum([
                 o.data_size
-                for o in self.ordered_objects])
+                for o in self.ordered_objects if o.has_data])
         total_data_size = self.next_segment_offset - self.raw_data_offset
         if data_size < 0 or total_data_size < 0:
             raise ValueError("Negative data size")
@@ -397,10 +400,12 @@ class _TdmsSegment(object):
         else:
             self.num_chunks = total_data_size // data_size
 
-        # Update data count for object
+        # Update data count for the overall tdms object
+        # using the data count for this segment.
         for obj in self.ordered_objects:
-            obj.tdms_object.number_values += (
-                    obj.number_values * self.num_chunks)
+            if obj.has_data:
+                obj.tdms_object.number_values += (
+                        obj.number_values * self.num_chunks)
 
     def read_raw_data(self, f):
         """Read signal data from file"""
@@ -621,13 +626,13 @@ class _TdmsSegmentObject(object):
         if self.raw_data_index == 0xFFFFFFFF:
             log.debug("Object has no data in this segment")
             self.has_data = False
-            self.number_values = 0
-            self.data_size = 0
+            # Leave number_values and data_size as set previously,
+            # as these may be re-used by later segments.
         # Data has same structure as previously
         elif self.raw_data_index == 0x00000000:
             log.debug("Object has same data structure "
                     "as in the previous segment")
-            pass
+            self.has_data = True
         else:
             self.has_data = True
             self.tdms_object.has_data = True
