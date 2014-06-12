@@ -634,6 +634,7 @@ class _TdmsSegmentObject(object):
                     "as in the previous segment")
             self.has_data = True
         else:
+            # self.raw_data_index gives the length of the index information.
             self.has_data = True
             self.tdms_object.has_data = True
 

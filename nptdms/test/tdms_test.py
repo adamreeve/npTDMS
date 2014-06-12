@@ -111,7 +111,7 @@ class TDMSTestClass(unittest.TestCase):
             "03 00 00 00"
             # Property name (num)
             "6E 75 6D"
-            #Data type of property
+            # Data type of property
             "03 00 00 00"
             # Value
             "0A 00 00 00"
@@ -148,7 +148,7 @@ class TDMSTestClass(unittest.TestCase):
             "03 00 00 00"
             # Dimension
             "01 00 00 00"
-            # Number of raw datata values
+            # Number of data values
             "02 00 00 00"
             "00 00 00 00"
             # Set time properties for the second channel
@@ -221,7 +221,8 @@ class TDMSTestClass(unittest.TestCase):
         self.assertTrue(all(data == [3, 4, 7, 8]))
 
     def test_no_metadata_object(self):
-        """Re-use an object, but without setting any metadata"""
+        """Re-use an object without setting any new metadata and
+        re-using the data structure"""
 
         test_file = TestFile()
         (metadata, data, toc) = self.basic_segment()
@@ -253,7 +254,7 @@ class TDMSTestClass(unittest.TestCase):
             "2F 27 43 68"
             "61 6E 6E 65"
             "6C 31 27"
-            # Length of index information
+            # Raw data index meaning repeat previous data structure
             "00 00 00 00"
             # Number of properties (0)
             "00 00 00 00"
@@ -265,8 +266,9 @@ class TDMSTestClass(unittest.TestCase):
             "2F 27 43 68"
             "61 6E 6E 65"
             "6C 32 27"
-            # Length of index information
+            # Raw data index meaning repeat previous data structure
             "00 00 00 00"
+            # Number of properties
             "00 00 00 00")
         test_file.add_segment(metadata, data, toc)
         tdmsData = test_file.load()
