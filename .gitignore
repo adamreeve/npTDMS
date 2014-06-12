@@ -1,4 +1,7 @@
 /build
 /dist
-MANIFEST
+/*.egg-info
+/coverage
+/.coverage
+/MANIFEST
 *.pyc
