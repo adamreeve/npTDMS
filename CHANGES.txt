@@ -1,3 +1,10 @@
+v0.6.2, 12th June 2014
+- Fix for TDMS files with segments that re-use the previous list
+  of objects and also include additional objects that re-use their
+  previous data structure.
+- Add nptdms.__version__ and nptdms.__version_info__ attributes.
+- Change setup.py to use setuptools instead of distutils.
+
 v0.6.1, 25th April 2014
 - Fix tdmsinfo to work with Python 3.
 
