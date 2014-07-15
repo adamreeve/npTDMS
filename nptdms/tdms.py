@@ -180,6 +180,19 @@ class TdmsFile(object):
         return ('/' + '/'.join(
                 ["'" + arg.replace("'", "''") + "'" for arg in args]))
 
+    def _path_components(self, path):
+        """Convert a path into group and channel name components"""
+
+        if not path.startswith('/'):
+            raise ValueError("Invalid path")
+        raw_components = path[1:].split('/')
+        if raw_components == [""]:
+            raw_components = []
+        components = [
+                c.strip("'").replace("''", "'")
+                for c in raw_components]
+        return components
+
     def object(self, *path):
         """Get a TDMS object from the file
 
@@ -210,13 +223,24 @@ class TdmsFile(object):
     def groups(self):
         """Return the names of groups in the file
 
+        Note that there is not necessarily a TDMS object associated with
+        each group name.
+
         :rtype: List of strings.
 
         """
 
-        return [path[2:-1]
-                for path in self.objects
-                if path.count('/') == 1 and path != '/']
+        # Split paths into components and take the first (group) component.
+        object_paths = (self._path_components(path)
+                for path in self.objects)
+        group_names = (path[0] for path in object_paths if len(path) > 0)
+
+        # Use an ordered dict as an ordered set to find unique
+        # groups in order.
+        groups_set = OrderedDict()
+        for group in group_names:
+            groups_set[group] = None
+        return list(groups_set)
 
     def group_channels(self, group):
         """Returns a list of channel objects for the given group
@@ -693,7 +717,8 @@ class _TdmsSegmentObject(object):
             else:
                 value = read_type(f, prop_data_type, '<')
             self.properties[prop_name] = value
-            log.debug("Property %s: %s" % (prop_name, value))
+            log.debug("Property %s (%s): %s" % (
+                prop_name, prop_data_type.name, value))
         self.tdms_object.properties.update(self.properties)
 
     def _read_value(self, file, endianness):

@@ -32,10 +32,14 @@ def main():
         display_properties(root, level)
     for group in tdmsfile.groups():
         level = 1
-        group_obj = tdmsfile.object(group)
-        display("%s" % group_obj.path, level)
-        if args.properties:
-            display_properties(group_obj, level)
+        try:
+            group_obj = tdmsfile.object(group)
+            display("%s" % group_obj.path, level)
+            if args.properties:
+                display_properties(group_obj, level)
+        except KeyError:
+            # It is possible to have a group without an object
+            display("/'%s'" % group, level)
         for channel in tdmsfile.group_channels(group):
             level = 2
             display("%s" % channel.path, level)
