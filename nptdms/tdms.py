@@ -270,6 +270,11 @@ class TdmsFile(object):
 
 
 class _TdmsSegment(object):
+
+    __slots__ = ['position', 'num_chunks', 'ordered_objects', 'toc', 'version',
+            'next_segment_offset', 'next_segment_pos',
+            'raw_data_offset', 'data_position']
+
     def __init__(self, f):
         """Read the lead in section of a segment"""
 
@@ -629,7 +634,6 @@ class _TdmsSegmentObject(object):
 
     __slots__ = ['tdms_object', 'number_values', 'data_size',
             'has_data', 'data_type', 'dimension']
-
 
     def __init__(self, tdms_object):
         self.tdms_object = tdms_object
