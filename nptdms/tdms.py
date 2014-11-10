@@ -358,8 +358,9 @@ class _TdmsSegment(object):
             # Read the object path
             object_path = read_string(f)
 
-            # If this is a new object, add it to the object dictionary,
-            # otherwise reuse the existing object
+            # If this is a new segment for an existing object,
+            # reuse the existing object, otherwise,
+            # create a new object and add it to the object dictionary
             if object_path in objects:
                 obj = objects[object_path]
             else:
@@ -626,39 +627,40 @@ class _TdmsSegmentObject(object):
     Describes an object in an individual TDMS file segment
     """
 
+    __slots__ = ['tdms_object', 'number_values', 'data_size',
+            'has_data', 'data_type', 'dimension']
+
+
     def __init__(self, tdms_object):
         self.tdms_object = tdms_object
 
-        self.path = tdms_object.path
-        self.raw_data_index = 0
         self.number_values = 0
         self.data_size = 0
         self.has_data = True
         self.data_type = None
         self.dimension = 1
-        self.properties = OrderedDict()
 
     def _read_metadata(self, f):
         """Read object metadata and update object information"""
 
         s = f.read(4)
-        self.raw_data_index = struct.unpack("<L", s)[0]
+        raw_data_index = struct.unpack("<L", s)[0]
 
-        log.debug("Reading metadata for object %s" % self.path)
+        log.debug("Reading metadata for object %s" % self.tdms_object.path)
 
         # Object has no data in this segment
-        if self.raw_data_index == 0xFFFFFFFF:
+        if raw_data_index == 0xFFFFFFFF:
             log.debug("Object has no data in this segment")
             self.has_data = False
             # Leave number_values and data_size as set previously,
             # as these may be re-used by later segments.
         # Data has same structure as previously
-        elif self.raw_data_index == 0x00000000:
+        elif raw_data_index == 0x00000000:
             log.debug("Object has same data structure "
                     "as in the previous segment")
             self.has_data = True
         else:
-            # self.raw_data_index gives the length of the index information.
+            # raw_data_index gives the length of the index information.
             self.has_data = True
             self.tdms_object.has_data = True
 
@@ -716,10 +718,13 @@ class _TdmsSegmentObject(object):
                 value = read_string(f)
             else:
                 value = read_type(f, prop_data_type, '<')
-            self.properties[prop_name] = value
             log.debug("Property %s (%s): %s" % (
                 prop_name, prop_data_type.name, value))
-        self.tdms_object.properties.update(self.properties)
+            self.tdms_object.properties[prop_name] = value
+
+    @property
+    def path(self):
+        return self.tdms_object.path
 
     def _read_value(self, file, endianness):
         """Read a single value from the given file"""
