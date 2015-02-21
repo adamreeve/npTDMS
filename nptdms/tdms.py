@@ -15,7 +15,6 @@ except ImportError:
         OrderedDict = dict
 from copy import copy
 import numpy as np
-import pandas as pd
 from datetime import datetime, timedelta
 import tempfile
 try:
@@ -269,27 +268,19 @@ class TdmsFile(object):
 
         return self.object(group, channel).data
 
-    def as_DataFrame(self):
+    def as_dataframe(self):
         """
         Converts the TDMS file to a DataFrame
-
         :return: The full TDMS file data.
         :rtype: Pandas DataFrame
         """
 
-        temp = []
-        for item in self.objects.items():
-            key = item[0]
-            key = key.split('/')
-            if key == ['', '']:
-                key = 'root'
-            else:
-                key = str(key[-1])
-            value = item[1]
-            temp.append((key, value.data))
+        import pandas as pd
 
-        df = pd.DataFrame.from_dict(dict(temp))
-        return df.dropna(axis=1, how='all')
+        temp = {}
+        for key, value in self.objects.items():
+            temp[key] = value.data
+        return pd.DataFrame.from_dict(temp)
 
 
 class _TdmsSegment(object):
