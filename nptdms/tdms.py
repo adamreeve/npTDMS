@@ -268,6 +268,20 @@ class TdmsFile(object):
 
         return self.object(group, channel).data
 
+    def as_dataframe(self):
+        """
+        Converts the TDMS file to a DataFrame
+        :return: The full TDMS file data.
+        :rtype: Pandas DataFrame
+        """
+
+        import pandas as pd
+
+        temp = {}
+        for key, value in self.objects.items():
+            temp[key] = value.data
+        return pd.DataFrame.from_dict(temp)
+
 
 class _TdmsSegment(object):
 
