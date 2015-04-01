@@ -1,3 +1,8 @@
+v0.6.3 1st April 2015
+- Improve memory usage for TDMS files with a large number of objects.
+- Add Pandas data frame export method.
+- Fix for groups without an associated TDMS object.
+
 v0.6.2, 12th June 2014
 - Fix for TDMS files with segments that re-use the previous list
   of objects and also include additional objects that re-use their
