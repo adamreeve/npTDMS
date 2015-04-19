@@ -22,6 +22,8 @@ try:
 except ImportError:
     pytz = None
 
+from nptdms.utils import Timer
+
 
 log = logging.getLogger(__name__)
 logging.basicConfig()
@@ -148,31 +150,34 @@ class TdmsFile(object):
                 self._read_segments(tdms_file)
 
     def _read_segments(self, tdms_file):
-        # Read metadata first to work out how much space we need
-        previous_segment = None
-        while True:
-            try:
-                segment = _TdmsSegment(tdms_file)
-            except EOFError:
-                # We've finished reading the file
-                break
-            segment.read_metadata(tdms_file, self.objects,
-                    previous_segment)
+        with Timer(log, "Read metadata"):
+            # Read metadata first to work out how much space we need
+            previous_segment = None
+            while True:
+                try:
+                    segment = _TdmsSegment(tdms_file)
+                except EOFError:
+                    # We've finished reading the file
+                    break
+                segment.read_metadata(tdms_file, self.objects,
+                        previous_segment)
 
-            self.segments.append(segment)
-            previous_segment = segment
-            if segment.next_segment_pos is None:
-                break
-            else:
-                tdms_file.seek(segment.next_segment_pos)
+                self.segments.append(segment)
+                previous_segment = segment
+                if segment.next_segment_pos is None:
+                    break
+                else:
+                    tdms_file.seek(segment.next_segment_pos)
 
-        # Allocate space for data
-        for object in self.objects.values():
-            object._initialise_data(memmap_dir=self.memmap_dir)
+        with Timer(log, "Allocate space"):
+            # Allocate space for data
+            for object in self.objects.values():
+                object._initialise_data(memmap_dir=self.memmap_dir)
 
-        # Now actually read all the data
-        for segment in self.segments:
-            segment.read_raw_data(tdms_file)
+        with Timer(log, "Read data"):
+            # Now actually read all the data
+            for segment in self.segments:
+                segment.read_raw_data(tdms_file)
 
     def _path(self, *args):
         """Convert group and channel to object path"""
