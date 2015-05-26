@@ -1,5 +1,6 @@
 """Python module for reading TDMS files produced by LabView"""
 
+import itertools
 import logging
 import struct
 import sys
@@ -33,9 +34,11 @@ log.setLevel(logging.WARNING)
 
 try:
     long
+    zip_longest = itertools.izip_longest
 except NameError:
     # Python 3
     long = int
+    zip_longest = itertools.zip_longest
 tocProperties = {
     'kTocMetaData': (long(1) << 1),
     'kTocRawData': (long(1) << 3),
@@ -188,15 +191,37 @@ class TdmsFile(object):
     def _path_components(self, path):
         """Convert a path into group and channel name components"""
 
-        if not path.startswith('/'):
-            raise ValueError("Invalid path")
-        raw_components = path[1:].split('/')
-        if raw_components == [""]:
-            raw_components = []
-        components = [
-                c.strip("'").replace("''", "'")
-                for c in raw_components]
-        return components
+        def yield_components(path):
+            # Iterate over each character and the next character
+            chars = zip_longest(path, path[1:])
+            try:
+                # Iterate over components
+                while True:
+                    c, n = next(chars)
+                    if c != '/':
+                        raise ValueError("Invalid path, expected \"/\"")
+                    elif (n != None and n != "'"):
+                        raise ValueError("Invalid path, expected \"'\"")
+                    else:
+                        # Consume "'" or raise StopIteration if at the end
+                        next(chars)
+                    component = []
+                    # Iterate over characters in component name
+                    while True:
+                        c, n = next(chars)
+                        if c == "'" and n == "'":
+                            component += "'"
+                            # Consume second "'"
+                            next(chars)
+                        elif c == "'":
+                            yield "".join(component)
+                            break
+                        else:
+                            component += c
+            except StopIteration:
+                return
+
+        return list(yield_components(path))
 
     def object(self, *path):
         """Get a TDMS object from the file
