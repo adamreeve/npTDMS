@@ -726,7 +726,7 @@ class TDMSTestClass(unittest.TestCase):
         metadata = (
             # Number of objects
             "01 00 00 00"
-            # Length of the third object path
+            # Length of the object path
             "18 00 00 00")
         metadata += string_hexlify("/'Group'/'StringChannel'")
         metadata += (
@@ -757,6 +757,72 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(len(data), len(strings))
         for expected, read in zip(strings, data):
             self.assertEqual(expected, read)
+
+    def test_slash_and_space_in_name(self):
+        """Test name like '01/02/03 something'"""
+
+        group_1_name = "01/02/03 something"
+        channel_1_name = "04/05/06 another thing"
+        group_2_name = "01/02/03 a"
+        channel_2_name = "04/05/06 b"
+
+        test_file = TestFile()
+
+        toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+
+        # Number of objects
+        metadata = "04 00 00 00"
+
+        for group in [group_1_name, group_2_name]:
+            path = "/'{0}'".format(group)
+            metadata += hexlify_value('<l', len(path))
+            metadata += string_hexlify(path)
+            metadata += (
+                # Raw data index
+                "FF FF FF FF"
+                # Number of properties (0)
+                "00 00 00 00"
+            )
+        for (group, channel) in [
+                (group_1_name, channel_1_name),
+                (group_2_name, channel_2_name)]:
+            path = "/'{0}'/'{1}'".format(group, channel)
+            metadata += hexlify_value('<l', len(path))
+            metadata += string_hexlify(path)
+            metadata += (
+                # Length of index information
+                "14 00 00 00"
+                # Raw data data type
+                "03 00 00 00"
+                # Dimension
+                "01 00 00 00"
+                # Number of raw datata values
+                "02 00 00 00"
+                "00 00 00 00"
+                # Number of properties (0)
+                "00 00 00 00"
+            )
+
+        data = (
+            # Data for segment
+            "01 00 00 00"
+            "02 00 00 00"
+            "03 00 00 00"
+            "04 00 00 00"
+        )
+
+        test_file.add_segment(metadata, data, toc)
+        tdmsData = test_file.load()
+
+        self.assertEqual(len(tdmsData.groups()), 2)
+        self.assertEqual(len(tdmsData.group_channels(group_1_name)), 1)
+        self.assertEqual(len(tdmsData.group_channels(group_2_name)), 1)
+        data_1 = tdmsData.channel_data(group_1_name, channel_1_name)
+        self.assertEqual(len(data_1), 2)
+        data_2 = tdmsData.channel_data(group_2_name, channel_2_name)
+        self.assertEqual(len(data_2), 2)
+
+
 
 
 if __name__ == '__main__':
