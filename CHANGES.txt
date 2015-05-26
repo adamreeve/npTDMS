@@ -1,3 +1,6 @@
+v0.6.4 26th May 2015
+- Bug fix for paths with a slash in them.
+
 v0.6.3 1st April 2015
 - Improve memory usage for TDMS files with a large number of objects.
 - Add Pandas data frame export method.
