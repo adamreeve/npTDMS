@@ -1,0 +1,12 @@
+box: adreeve/python-numpy
+
+build:
+  steps:
+    - script:
+        name: Build and install
+        code: |
+          python3 setup.py install
+    - script:
+        name: Run nosetests
+        code: |
+          nosetests3
