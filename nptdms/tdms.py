@@ -670,6 +670,19 @@ class TdmsObject(object):
             else:
                 self.data.extend(new_data)
 
+    def as_dataframe(self):
+        """
+        Converts the TDMS object to a DataFrame
+        :return: The TDMS object data.
+        :rtype: Pandas DataFrame
+        """
+
+        import pandas as pd
+
+        return pd.DataFrame(self.data,
+                index=self.time_track(),
+                columns=[self.path])
+
 
 class _TdmsSegmentObject(object):
     """
