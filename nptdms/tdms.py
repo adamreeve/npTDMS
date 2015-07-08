@@ -312,7 +312,22 @@ class TdmsFile(object):
             temp[key] = value.data
         return pd.DataFrame.from_dict(temp)
 
+    def as_dataframe_withtimeindex(self):
+        """
+        Converts the TDMS file to a DataFrame and include time index
+        :return: The full TDMS file data.
+        :rtype: Pandas DataFrame
+        """
+        
+        import pandas as pd  # only loaded when needed
+        
+        temp = {}
+        for key, value in self.objects.items():
+            if value.has_data:
+                temp[key] = pd.Series(data=value.data, index=value.time_track())
+        return pd.DataFrame.from_dict(temp)        
 
+        
 class _TdmsSegment(object):
 
     __slots__ = ['position', 'num_chunks', 'ordered_objects', 'toc', 'version',
