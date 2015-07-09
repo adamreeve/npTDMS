@@ -1,6 +1,10 @@
 npTDMS
 ======
 
+.. image:: https://app.wercker.com/status/446c67339f7d484188a35abc64dd3f51/s/master
+    :alt: wercker status
+    :target: https://app.wercker.com/project/bykey/446c67339f7d484188a35abc64dd3f51
+
 Cross-platform module for reading TDMS files as produced by LabView.
 Data is stored as a numpy array, and is loaded using numpy's fromfile routine
 so is very fast.
