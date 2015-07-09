@@ -670,7 +670,7 @@ class TdmsObject(object):
 
         return pd.date_range(start=offset + pd.to_datetime(starttime), 
                 periods=len(self.data), 
-                freq=str(increment*1e6)+'U')
+                freq=str(int(increment*1e6))+'U')
 
     def _initialise_data(self, memmap_dir=None):
         """Initialise data array to zeros"""
