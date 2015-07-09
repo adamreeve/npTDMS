@@ -685,7 +685,7 @@ class TdmsObject(object):
             else:
                 self.data.extend(new_data)
 
-    def as_dataframe(self):
+    def as_dataframe(self, absoluteTime=False):
         """
         Converts the TDMS object to a DataFrame
         :return: The TDMS object data.
@@ -694,8 +694,13 @@ class TdmsObject(object):
 
         import pandas as pd
 
+        # When absoluteTime is True, use the wf_start_time as offset for the time_track()
+        time = (pd.to_datetime(self.property("wf_start_time")) 
+                + pd.to_timedelta(self.time_track(),unit="s") if absoluteTime 
+                else self.time_track())
+
         return pd.DataFrame(self.data,
-                index=self.time_track(),
+                index=time,
                 columns=[self.path])
 
 
