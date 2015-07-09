@@ -648,6 +648,30 @@ class TdmsObject(object):
                 offset + (len(self.data) - 1) * increment,
                 len(self.data))
 
+    def pandas_time_track(self):
+        """Return an array of absolute time for this channel
+
+        This depends on the object having the wf_increment
+        and wf_start_offset properties defined.
+
+        :rtype: pandas Series.
+        :raises: KeyError if required properties aren't found
+
+        """
+
+        import pandas as pd
+
+        try:
+            increment = self.property('wf_increment')
+            offset = pd.to_timedelta(self.property('wf_start_offset'), unit='s')
+            starttime = self.property('wf_start_time')
+        except KeyError:
+            raise KeyError("Object does not have time properties available.")
+
+        return pd.date_range(start=offset + pd.to_datetime(starttime), 
+                periods=len(self.data), 
+                freq=str(int(increment*1e6))+'U')
+
     def _initialise_data(self, memmap_dir=None):
         """Initialise data array to zeros"""
 
@@ -685,7 +709,7 @@ class TdmsObject(object):
             else:
                 self.data.extend(new_data)
 
-    def as_dataframe(self):
+    def as_dataframe(self, absoluteTime=False):
         """
         Converts the TDMS object to a DataFrame
         :return: The TDMS object data.
@@ -694,8 +718,12 @@ class TdmsObject(object):
 
         import pandas as pd
 
+        # When absoluteTime is True, use the wf_start_time as offset for the time_track()
+        time = (self.pandas_time_track() if absoluteTime 
+                else self.time_track())
+
         return pd.DataFrame(self.data,
-                index=self.time_track(),
+                index=time,
                 columns=[self.path])
 
 
