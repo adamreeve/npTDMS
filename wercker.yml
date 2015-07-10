@@ -3,10 +3,12 @@ box: adreeve/python-numpy
 build:
   steps:
     - script:
-        name: Build and install
+        name: Test on Python 2.7
+        code: |
+          python2.7 setup.py install
+          nosetests
+    - script:
+        name: Test on Python 3
         code: |
           python3 setup.py install
-    - script:
-        name: Run nosetests
-        code: |
           nosetests3

@@ -5,3 +5,8 @@
 /.coverage
 /MANIFEST
 *.pyc
+
+# Wercker directories
+_builds
+_projects
+_steps
