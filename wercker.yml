@@ -12,3 +12,16 @@ build:
         code: |
           python3 setup.py install
           nosetests3
+
+deploy:
+  steps:
+    - script:
+        name: Deploy to pypi
+        code: |
+          echo "[pypirc]
+          servers = pypi
+          [server-login]
+          username:$PYPI_USER
+          password:$PYPI_PASSWORD" > ~/.pypirc
+          python setup.py sdist upload
+          python setup.py bdist_wheel upload
