@@ -5,6 +5,7 @@
 /.coverage
 /MANIFEST
 *.pyc
+*.swp
 
 # Wercker directories
 _builds
