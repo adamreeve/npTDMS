@@ -646,7 +646,6 @@ class TdmsObject(object):
         """
 
         try:
-            starttime = self.property('wf_start_time')
             increment = self.property('wf_increment')
             offset = self.property('wf_start_offset')
         except KeyError:
@@ -658,8 +657,14 @@ class TdmsObject(object):
                 offset,
                 offset + (periods - 1) * increment,
                 periods)
+
         if not absoluteTime:
             return relativeTime
+
+        try:
+            starttime = self.property('wf_start_time')
+        except KeyError:
+            raise KeyError("Object does not have start time property available.")
 
         def unit_correction(u):
             if u is 's':
