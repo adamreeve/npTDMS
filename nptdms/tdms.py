@@ -626,12 +626,20 @@ class TdmsObject(object):
             raise KeyError(
                 "Object does not have property '%s'" % property_name)
 
-    def time_track(self):
+    def time_track(self, absoluteTime=False, accuracy='ns'):
         """Return an array of time for this channel
 
         This depends on the object having the wf_increment
         and wf_start_offset properties defined.
 
+        For larger timespans, the accuracy setting should be set lower.
+        The default setting is 'ns', which has a timespan of [1678 AD, 2262 AD],
+        for the exact ranges, refer to 
+            http://docs.scipy.org/doc/numpy/reference/arrays.datetime.html
+        section "Datetime Units".
+
+        :param absoluteTime: Whether the returned numpy.array is a datetime64 array
+        :param accuracy: The accuracy of the returned datetime64 array.
         :rtype: NumPy array.
         :raises: KeyError if required properties aren't found
 
@@ -643,34 +651,38 @@ class TdmsObject(object):
         except KeyError:
             raise KeyError("Object does not have time properties available.")
 
-        return np.linspace(
+        periods = len(self.data)
+
+        relativeTime = np.linspace(
                 offset,
-                offset + (len(self.data) - 1) * increment,
-                len(self.data))
+                offset + (periods - 1) * increment,
+                periods)
 
-    def pandas_time_track(self):
-        """Return an array of absolute time for this channel
-
-        This depends on the object having the wf_increment
-        and wf_start_offset properties defined.
-
-        :rtype: pandas Series.
-        :raises: KeyError if required properties aren't found
-
-        """
-
-        import pandas as pd
+        if not absoluteTime:
+            return relativeTime
 
         try:
-            increment = self.property('wf_increment')
-            offset = pd.to_timedelta(self.property('wf_start_offset'), unit='s')
             starttime = self.property('wf_start_time')
         except KeyError:
-            raise KeyError("Object does not have time properties available.")
+            raise KeyError("Object does not have start time property available.")
 
-        return pd.date_range(start=offset + pd.to_datetime(starttime), 
-                periods=len(self.data), 
-                freq=str(int(increment*1e6))+'U')
+        def unit_correction(u):
+            if u is 's':
+                return 1e0
+            elif u is 'ms':
+                return 1e3
+            elif u is 'us':
+                return 1e6
+            elif u is 'ns':
+                return 1e9
+
+        # Because numpy only knows ints as its date datatype, 
+        # convert to accuracy.
+        return (np.datetime64(starttime) 
+                + (relativeTime*unit_correction(accuracy)).astype(
+                    "timedelta64["+accuracy+"]"
+                    )
+                )
 
     def _initialise_data(self, memmap_dir=None):
         """Initialise data array to zeros"""
@@ -719,8 +731,7 @@ class TdmsObject(object):
         import pandas as pd
 
         # When absoluteTime is True, use the wf_start_time as offset for the time_track()
-        time = (self.pandas_time_track() if absoluteTime 
-                else self.time_track())
+        time = self.time_track(absoluteTime)
 
         return pd.DataFrame(self.data,
                 index=time,
