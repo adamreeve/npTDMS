@@ -309,7 +309,7 @@ class TdmsFile(object):
 
         temp = {}
         for key, value in self.objects.items():
-            temp[key] = value.data
+            temp[key] = pd.Series(data=value.data)
         return pd.DataFrame.from_dict(temp)
 
     def as_dataframe_withtimeindex(self):
@@ -325,7 +325,7 @@ class TdmsFile(object):
         for key, value in self.objects.items():
             if value.has_data:
                 temp[key] = pd.Series(data=value.data, index=value.time_track())
-        return pd.DataFrame.from_dict(temp)        
+        return pd.DataFrame.from_dict(temp)
 
         
 class _TdmsSegment(object):
