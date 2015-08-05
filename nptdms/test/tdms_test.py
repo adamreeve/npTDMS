@@ -32,7 +32,8 @@ class TestFile(object):
     """Generate a TDMS file for testing"""
 
     def __init__(self):
-        self.file = tempfile.NamedTemporaryFile().file
+        self._tempfile = tempfile.NamedTemporaryFile()
+        self.file = self._tempfile.file
         self.data = bytes()
 
     def add_segment(self, metadata, data, toc=None, incomplete=False):
