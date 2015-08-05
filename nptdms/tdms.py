@@ -696,7 +696,7 @@ class TdmsObject(object):
                 memmap_file = tempfile.NamedTemporaryFile(
                         mode='w+b', prefix="nptdms_", dir=memmap_dir)
                 self.data = np.memmap(
-                        memmap_file.name,
+                        memmap_file.file,
                         mode='w+',
                         shape=(self.number_values,),
                         dtype=self.data_type.nptype)

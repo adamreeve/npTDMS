@@ -7,7 +7,6 @@ import binascii
 import struct
 import tempfile
 from datetime import datetime
-import tempfile
 
 from nptdms import tdms
 
@@ -33,7 +32,7 @@ class TestFile(object):
     """Generate a TDMS file for testing"""
 
     def __init__(self):
-        self.file = tempfile.TemporaryFile()
+        self.file = tempfile.NamedTemporaryFile().file
         self.data = bytes()
 
     def add_segment(self, metadata, data, toc=None, incomplete=False):
