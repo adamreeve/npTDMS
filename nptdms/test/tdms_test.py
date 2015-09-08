@@ -28,6 +28,96 @@ def hexlify_value(struct_type, value):
     return binascii.hexlify(struct.pack(struct_type, value)).decode('utf-8')
 
 
+def basic_segment():
+    """Basic TDMS segment with one group and two channels"""
+
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+    metadata = (
+        # Number of objects
+        "03 00 00 00"
+        # Length of the first object path
+        "08 00 00 00"
+        # Object path (/'Group')
+        "2F 27 47 72"
+        "6F 75 70 27"
+        # Raw data index
+        "FF FF FF FF"
+        # Num properties
+        "02 00 00 00"
+        # Name length
+        "04 00 00 00"
+        # Property name (prop)
+        "70 72 6F 70"
+        # Property data type (string)
+        "20 00 00 00"
+        # Length of string value
+        "05 00 00 00"
+        # Value
+        "76 61 6C 75 65"
+        # Length of second property name
+        "03 00 00 00"
+        # Property name (num)
+        "6E 75 6D"
+        # Data type of property
+        "03 00 00 00"
+        # Value
+        "0A 00 00 00"
+        # Length of the second object path
+        "13 00 00 00"
+        # Second object path (/'Group'/'Channel1')
+        "2F 27 47 72"
+        "6F 75 70 27"
+        "2F 27 43 68"
+        "61 6E 6E 65"
+        "6C 31 27"
+        # Length of index information
+        "14 00 00 00"
+        # Raw data data type
+        "03 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw datata values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00"
+        # Length of the third object path
+        "13 00 00 00"
+        # Third object path (/'Group'/'Channel2')
+        "2F 27 47 72"
+        "6F 75 70 27"
+        "2F 27 43 68"
+        "61 6E 6E 65"
+        "6C 32 27"
+        # Length of index information
+        "14 00 00 00"
+        # Raw data data type
+        "03 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Set time properties for the second channel
+        "02 00 00 00"
+        "0F 00 00 00" +
+        string_hexlify('wf_start_offset') +
+        "0A 00 00 00" +
+        hexlify_value("<d", 0.0) +
+        "0C 00 00 00" +
+        string_hexlify('wf_increment') +
+        "0A 00 00 00" +
+        hexlify_value("<d", 0.1))
+    data = (
+        # Data for segment
+        "01 00 00 00"
+        "02 00 00 00"
+        "03 00 00 00"
+        "04 00 00 00"
+    )
+    return (metadata, data, toc)
+
+
 class TestFile(object):
     """Generate a TDMS file for testing"""
 
@@ -81,100 +171,11 @@ class TDMSTestClass(unittest.TestCase):
     def setUp(self):
         logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 
-    def basic_segment(self):
-        """Basic TDMS segment with one group and two channels"""
-
-        toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
-        metadata = (
-            # Number of objects
-            "03 00 00 00"
-            # Length of the first object path
-            "08 00 00 00"
-            # Object path (/'Group')
-            "2F 27 47 72"
-            "6F 75 70 27"
-            # Raw data index
-            "FF FF FF FF"
-            # Num properties
-            "02 00 00 00"
-            # Name length
-            "04 00 00 00"
-            # Property name (prop)
-            "70 72 6F 70"
-            # Property data type (string)
-            "20 00 00 00"
-            # Length of string value
-            "05 00 00 00"
-            # Value
-            "76 61 6C 75 65"
-            # Length of second property name
-            "03 00 00 00"
-            # Property name (num)
-            "6E 75 6D"
-            # Data type of property
-            "03 00 00 00"
-            # Value
-            "0A 00 00 00"
-            # Length of the second object path
-            "13 00 00 00"
-            # Second object path (/'Group'/'Channel1')
-            "2F 27 47 72"
-            "6F 75 70 27"
-            "2F 27 43 68"
-            "61 6E 6E 65"
-            "6C 31 27"
-            # Length of index information
-            "14 00 00 00"
-            # Raw data data type
-            "03 00 00 00"
-            # Dimension
-            "01 00 00 00"
-            # Number of raw datata values
-            "02 00 00 00"
-            "00 00 00 00"
-            # Number of properties (0)
-            "00 00 00 00"
-            # Length of the third object path
-            "13 00 00 00"
-            # Third object path (/'Group'/'Channel2')
-            "2F 27 47 72"
-            "6F 75 70 27"
-            "2F 27 43 68"
-            "61 6E 6E 65"
-            "6C 32 27"
-            # Length of index information
-            "14 00 00 00"
-            # Raw data data type
-            "03 00 00 00"
-            # Dimension
-            "01 00 00 00"
-            # Number of data values
-            "02 00 00 00"
-            "00 00 00 00"
-            # Set time properties for the second channel
-            "02 00 00 00"
-            "0F 00 00 00" +
-            string_hexlify('wf_start_offset') +
-            "0A 00 00 00" +
-            hexlify_value("<d", 0.0) +
-            "0C 00 00 00" +
-            string_hexlify('wf_increment') +
-            "0A 00 00 00" +
-            hexlify_value("<d", 0.1))
-        data = (
-            # Data for segment
-            "01 00 00 00"
-            "02 00 00 00"
-            "03 00 00 00"
-            "04 00 00 00"
-        )
-        return (metadata, data, toc)
-
     def test_data_read(self):
         """Test reading data"""
 
         test_file = TestFile()
-        test_file.add_segment(*self.basic_segment())
+        test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
         data = tdmsData.channel_data("Group", "Channel1")
@@ -190,7 +191,7 @@ class TDMSTestClass(unittest.TestCase):
         """Test reading an object property"""
 
         test_file = TestFile()
-        test_file.add_segment(*self.basic_segment())
+        test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
         object = tdmsData.object("Group")
@@ -202,7 +203,7 @@ class TDMSTestClass(unittest.TestCase):
         so there is only the lead in and binary data"""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         data = (
             "05 00 00 00"
@@ -226,7 +227,7 @@ class TDMSTestClass(unittest.TestCase):
         re-using the data structure"""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         data = (
             "05 00 00 00"
@@ -287,7 +288,7 @@ class TDMSTestClass(unittest.TestCase):
         remaining unchanged, so only the new channel is in metadata section"""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         toc = ("kTocMetaData", "kTocRawData")
         metadata = (
@@ -334,7 +335,7 @@ class TDMSTestClass(unittest.TestCase):
         of one channel"""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         toc = ("kTocMetaData", "kTocRawData")
         metadata = (
@@ -377,7 +378,7 @@ class TDMSTestClass(unittest.TestCase):
         We need to write a new object list in this case"""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         # Keep toc as it was before, with new object list set
         metadata = (
@@ -416,7 +417,7 @@ class TDMSTestClass(unittest.TestCase):
         any lead in or metadata, so data is read in chunks"""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         data = data + (
             "05 00 00 00"
             "06 00 00 00"
@@ -437,7 +438,7 @@ class TDMSTestClass(unittest.TestCase):
         """Test reading interleaved data"""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         toc = toc + ("kTocInterleavedData", )
         test_file.add_segment(metadata, data, toc)
         tdmsData = test_file.load()
@@ -553,7 +554,7 @@ class TDMSTestClass(unittest.TestCase):
         """Add a time track to waveform data"""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         tdmsData = test_file.load()
 
@@ -571,7 +572,7 @@ class TDMSTestClass(unittest.TestCase):
         segment with no data."""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         toc = ("kTocMetaData", "kTocRawData")
         metadata = (
@@ -626,7 +627,7 @@ class TDMSTestClass(unittest.TestCase):
         """
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
         metadata = (
@@ -684,7 +685,7 @@ class TDMSTestClass(unittest.TestCase):
         """Test reading data into memmapped arrays"""
 
         test_file = TestFile()
-        test_file.add_segment(*self.basic_segment())
+        test_file.add_segment(*basic_segment())
         tdmsData = test_file.load(memmap_dir=tempfile.gettempdir())
 
         data = tdmsData.channel_data("Group", "Channel1")
@@ -700,7 +701,7 @@ class TDMSTestClass(unittest.TestCase):
         """Test incomplete last segment, eg. if LabView crashed"""
 
         test_file = TestFile()
-        (metadata, data, toc) = self.basic_segment()
+        (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         # Add second, incomplete segment
         test_file.add_segment(metadata, data, toc, incomplete=True)
