@@ -55,3 +55,6 @@ Contributors/Thanks
 
 Thanks to Floris van Vugt who wrote the pyTDMS module,
 which helped when writing this module.
+
+Thanks to Tony Perkins, Ruben De Smet, Martin Hochwallner and Peter Duncan
+for contributing support for converting to Pandas DataFrames.

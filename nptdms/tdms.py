@@ -298,9 +298,12 @@ class TdmsFile(object):
 
         return self.object(group, channel).data
 
-    def as_dataframe(self):
+    def as_dataframe(self, time_index=False, absolute_time=False):
         """
         Converts the TDMS file to a DataFrame
+        :param time_index: Whether to include a time index for the dataframe.
+        :param absolute_time: If time_index is true, whether the time index
+            values are absolute times or relative to the start time.
         :return: The full TDMS file data.
         :rtype: Pandas DataFrame
         """
@@ -309,25 +312,12 @@ class TdmsFile(object):
 
         temp = {}
         for key, value in self.objects.items():
-            temp[key] = pd.Series(data=value.data)
-        return pd.DataFrame.from_dict(temp)
-
-    def as_dataframe_withtimeindex(self):
-        """
-        Converts the TDMS file to a DataFrame and include time index
-        :return: The full TDMS file data.
-        :rtype: Pandas DataFrame
-        """
-        
-        import pandas as pd  # only loaded when needed
-        
-        temp = {}
-        for key, value in self.objects.items():
             if value.has_data:
-                temp[key] = pd.Series(data=value.data, index=value.time_track())
+                index = value.time_track(absolute_time) if time_index else None
+                temp[key] = pd.Series(data=value.data, index=index)
         return pd.DataFrame.from_dict(temp)
 
-        
+
 class _TdmsSegment(object):
 
     __slots__ = ['position', 'num_chunks', 'ordered_objects', 'toc', 'version',
@@ -626,7 +616,7 @@ class TdmsObject(object):
             raise KeyError(
                 "Object does not have property '%s'" % property_name)
 
-    def time_track(self, absoluteTime=False, accuracy='ns'):
+    def time_track(self, absolute_time=False, accuracy='ns'):
         """Return an array of time for this channel
 
         This depends on the object having the wf_increment
@@ -634,11 +624,12 @@ class TdmsObject(object):
 
         For larger timespans, the accuracy setting should be set lower.
         The default setting is 'ns', which has a timespan of [1678 AD, 2262 AD],
-        for the exact ranges, refer to 
+        for the exact ranges, refer to
             http://docs.scipy.org/doc/numpy/reference/arrays.datetime.html
         section "Datetime Units".
 
-        :param absoluteTime: Whether the returned numpy.array is a datetime64 array
+        :param absolute_time: Whether the returned time values are absolute
+            times rather than relative to the start time.
         :param accuracy: The accuracy of the returned datetime64 array.
         :rtype: NumPy array.
         :raises: KeyError if required properties aren't found
@@ -653,36 +644,35 @@ class TdmsObject(object):
 
         periods = len(self.data)
 
-        relativeTime = np.linspace(
+        relative_time = np.linspace(
                 offset,
                 offset + (periods - 1) * increment,
                 periods)
 
-        if not absoluteTime:
-            return relativeTime
+        if not absolute_time:
+            return relative_time
 
         try:
-            starttime = self.property('wf_start_time')
+            start_time = self.property('wf_start_time')
         except KeyError:
-            raise KeyError("Object does not have start time property available.")
+            raise KeyError(
+                    "Object does not have start time property available.")
 
-        def unit_correction(u):
-            if u is 's':
-                return 1e0
-            elif u is 'ms':
-                return 1e3
-            elif u is 'us':
-                return 1e6
-            elif u is 'ns':
-                return 1e9
+        try:
+            unit_correction = {
+                's': 1e0,
+                'ms': 1e3,
+                'us': 1e6,
+                'ns': 1e9,
+            }[accuracy]
+        except KeyError:
+            raise KeyError("Invalid accuracy: {0}".format(accuracy))
 
-        # Because numpy only knows ints as its date datatype, 
+        # Because numpy only knows ints as its date datatype,
         # convert to accuracy.
-        return (np.datetime64(starttime) 
-                + (relativeTime*unit_correction(accuracy)).astype(
-                    "timedelta64["+accuracy+"]"
-                    )
-                )
+        time_type = "timedelta64[{0}]".format(accuracy)
+        return (np.datetime64(start_time)
+                + (relative_time * unit_correction).astype(time_type))
 
     def _initialise_data(self, memmap_dir=None):
         """Initialise data array to zeros"""
@@ -721,21 +711,21 @@ class TdmsObject(object):
             else:
                 self.data.extend(new_data)
 
-    def as_dataframe(self, absoluteTime=False):
+    def as_dataframe(self, absolute_time=False):
         """
         Converts the TDMS object to a DataFrame
+        :param absolute_time: Whether times should be absolute rather than
+            relative to the start time.
         :return: The TDMS object data.
         :rtype: Pandas DataFrame
         """
 
         import pandas as pd
 
-        # When absoluteTime is True, use the wf_start_time as offset for the time_track()
-        time = self.time_track(absoluteTime)
+        # When absolute_time is True, use the wf_start_time as offset for the time_track()
+        time = self.time_track(absolute_time)
 
-        return pd.DataFrame(self.data,
-                index=time,
-                columns=[self.path])
+        return pd.DataFrame(self.data, index=time, columns=[self.path])
 
 
 class _TdmsSegmentObject(object):
