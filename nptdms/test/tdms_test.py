@@ -68,8 +68,8 @@ class TestFile(object):
         self.data += lead_in + metadata + data
 
     def to_bytes(self, hex_data):
-        return binascii.unhexlify(hex_data.replace(" ", "").
-                replace("\n", "").encode('utf-8'))
+        return binascii.unhexlify(
+            hex_data.replace(" ", "").replace("\n", "").encode('utf-8'))
 
     def load(self, *args, **kwargs):
         self.file.write(self.data)
@@ -204,7 +204,8 @@ class TDMSTestClass(unittest.TestCase):
         test_file = TestFile()
         (metadata, data, toc) = self.basic_segment()
         test_file.add_segment(metadata, data, toc)
-        data = ("05 00 00 00"
+        data = (
+            "05 00 00 00"
             "06 00 00 00"
             "07 00 00 00"
             "08 00 00 00"
@@ -227,7 +228,8 @@ class TDMSTestClass(unittest.TestCase):
         test_file = TestFile()
         (metadata, data, toc) = self.basic_segment()
         test_file.add_segment(metadata, data, toc)
-        data = ("05 00 00 00"
+        data = (
+            "05 00 00 00"
             "06 00 00 00"
             "07 00 00 00"
             "08 00 00 00"
@@ -458,15 +460,15 @@ class TDMSTestClass(unittest.TestCase):
             datetime(2012, 8, 23, 1, 2, 3, 456, tzinfo=tdms.timezone),
             datetime(2012, 8, 23, 12, 0, 0, 0, tzinfo=tdms.timezone),
             datetime(2012, 8, 23, 12, 2, 3, 9999, tzinfo=tdms.timezone),
-            ]
+        ]
 
         def total_seconds(td):
             # timedelta.total_seconds() only added in 2.7
             return td.seconds + td.days * 24 * 3600
 
         seconds = [
-            total_seconds(t -
-                datetime(1904, 1, 1, 0, 0, 0, tzinfo=tdms.timezone))
+            total_seconds(
+                t - datetime(1904, 1, 1, 0, 0, 0, tzinfo=tdms.timezone))
             for t in times]
         fractions = [
             int(float(t.microsecond) * 2 ** 58 / 5 ** 6)
@@ -745,8 +747,8 @@ class TDMSTestClass(unittest.TestCase):
             # Number of properties (0)
             "00 00 00 00")
         data = (
-            "07 00 00 00" # index to after first string
-            "11 00 00 00" # index to after second string
+            "07 00 00 00"  # index to after first string
+            "11 00 00 00"  # index to after second string
         )
         for string in strings:
             data += string_hexlify(string)
@@ -821,8 +823,6 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(len(data_1), 2)
         data_2 = tdmsData.channel_data(group_2_name, channel_2_name)
         self.assertEqual(len(data_2), 2)
-
-
 
 
 if __name__ == '__main__':

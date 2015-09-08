@@ -8,16 +8,16 @@ from nptdms import tdms
 
 def main():
     parser = ArgumentParser(
-            description="List the contents of a LabView TDMS file.")
+        description="List the contents of a LabView TDMS file.")
     parser.add_argument(
-            '-p', '--properties', action="store_true",
-            help="Include channel properties.")
+        '-p', '--properties', action="store_true",
+        help="Include channel properties.")
     parser.add_argument(
-            '-d', '--debug', action="store_true",
-            help="Print debugging information to stderr.")
+        '-d', '--debug', action="store_true",
+        help="Print debugging information to stderr.")
     parser.add_argument(
-            'tdms_file',
-            help="TDMS file to read.")
+        'tdms_file',
+        help="TDMS file to read.")
     args = parser.parse_args()
 
     if args.debug:

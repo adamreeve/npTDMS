@@ -3,6 +3,10 @@ box: adreeve/python-numpy
 build:
   steps:
     - script:
+        name: PEP8 Check
+        code: |
+           pep8 ./nptdms
+    - script:
         name: Test on Python 2.7
         code: |
           python2.7 setup.py install
