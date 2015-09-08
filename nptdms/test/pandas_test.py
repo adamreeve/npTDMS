@@ -3,6 +3,11 @@
 import unittest
 import sys
 import logging
+from datetime import datetime
+try:
+    import pytz
+except ImportError:
+    pytz = None
 
 from nptdms import tdms
 from .tdms_test import (
@@ -11,6 +16,12 @@ from .tdms_test import (
     string_hexlify,
     hexlify_value
 )
+
+
+if pytz:
+    timezone = pytz.utc
+else:
+    timezone = None
 
 
 def within_tol(a, b, tol=1.0e-10):
@@ -69,8 +80,8 @@ def timed_segment():
         # Number of raw datata values
         "02 00 00 00"
         "00 00 00 00"
-        # Number of properties (2)
-        "02 00 00 00"
+        # Number of properties
+        "03 00 00 00"
         # Set time properties for the first channel
         "0F 00 00 00" +
         string_hexlify('wf_start_offset') +
@@ -80,6 +91,11 @@ def timed_segment():
         string_hexlify('wf_increment') +
         "0A 00 00 00" +
         hexlify_value("<d", 0.1) +
+        "0D 00 00 00" +
+        string_hexlify('wf_start_time') +
+        "44 00 00 00" +
+        hexlify_value("<Q", 0) +
+        hexlify_value("<q", 3524551547) +
         # Length of the third object path
         "13 00 00 00"
         # Third object path (/'Group'/'Channel2')
@@ -97,8 +113,8 @@ def timed_segment():
         # Number of data values
         "02 00 00 00"
         "00 00 00 00"
-        # Number of properties (2)
-        "02 00 00 00"
+        # Number of properties
+        "03 00 00 00"
         # Set time properties for the second channel
         "0F 00 00 00" +
         string_hexlify('wf_start_offset') +
@@ -107,7 +123,12 @@ def timed_segment():
         "0C 00 00 00" +
         string_hexlify('wf_increment') +
         "0A 00 00 00" +
-        hexlify_value("<d", 0.1))
+        hexlify_value("<d", 0.1) +
+        "0D 00 00 00" +
+        string_hexlify('wf_start_time') +
+        "44 00 00 00" +
+        hexlify_value("<Q", 0) +
+        hexlify_value("<q", 3524551547))
     data = (
         # Data for segment
         "01 00 00 00"
@@ -161,6 +182,18 @@ class TDMSTestClass(unittest.TestCase):
         self.assertTrue(within_tol(df.index[0], 2.0))
         self.assertTrue(within_tol(df.index[1], 2.1))
 
+    def test_file_as_dataframe_with_absolute_time(self):
+        """Convert file to Pandas dataframe with absolute time index"""
+
+        test_file = TestFile()
+        test_file.add_segment(*timed_segment())
+        tdmsData = test_file.load()
+
+        df = tdmsData.as_dataframe(time_index=True, absolute_time=True)
+
+        expected_start = datetime(2015, 9, 8, 10, 5, 49, tzinfo=timezone)
+        self.assertTrue((df.index == expected_start)[0])
+
     def test_channel_as_dataframe(self):
         """Convert a channel to dataframe"""
 
@@ -196,6 +229,19 @@ class TDMSTestClass(unittest.TestCase):
 
         with self.assertRaises(KeyError):
             df = tdmsData.object("Group", "Channel1").as_dataframe()
+
+    def test_channel_as_dataframe_with_absolute_time(self):
+        """Convert channel to Pandas dataframe with absolute time index"""
+
+        test_file = TestFile()
+        test_file.add_segment(*timed_segment())
+        tdmsData = test_file.load()
+
+        df = tdmsData.object("Group", "Channel1").as_dataframe(
+            absolute_time=True)
+
+        expected_start = datetime(2015, 9, 8, 10, 5, 49, tzinfo=timezone)
+        self.assertTrue((df.index == expected_start)[0])
 
 
 if __name__ == '__main__':
