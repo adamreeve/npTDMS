@@ -1,5 +1,6 @@
-v0.7.0
-- Added as_dataframe methods to TdmsFile and TdmsObject.
+v0.7.0 12th September 2015
+- Added as_dataframe methods to TdmsFile and TdmsObject that convert
+  data to Pandas dataframes.
 
 v0.6.4 26th May 2015
 - Bug fix for paths with a slash in them.

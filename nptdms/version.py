@@ -1,2 +1,2 @@
-__version_info__ = (0, 6, 4)
+__version_info__ = (0, 7, 0)
 __version__ = '.'.join('%d' % d for d in __version_info__)
