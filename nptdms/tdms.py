@@ -51,8 +51,8 @@ tocProperties = {
 # Class for describing data types, with data type name,
 # identifier used by struct module, the size in bytes to read and the
 # numpy data type where applicable/implemented
-DataType = namedtuple("DataType",
-        ('name', 'struct', 'length', 'nptype'))
+DataType = namedtuple(
+    "DataType", ('name', 'struct', 'length', 'nptype'))
 
 tdsDataTypes = dict(enumerate((
     DataType('tdsTypeVoid', None, 0, None),
@@ -162,8 +162,8 @@ class TdmsFile(object):
                 except EOFError:
                     # We've finished reading the file
                     break
-                segment.read_metadata(tdms_file, self.objects,
-                        previous_segment)
+                segment.read_metadata(
+                    tdms_file, self.objects, previous_segment)
 
                 self.segments.append(segment)
                 previous_segment = segment
@@ -200,7 +200,7 @@ class TdmsFile(object):
                     c, n = next(chars)
                     if c != '/':
                         raise ValueError("Invalid path, expected \"/\"")
-                    elif (n != None and n != "'"):
+                    elif (n is not None and n != "'"):
                         raise ValueError("Invalid path, expected \"'\"")
                     else:
                         # Consume "'" or raise StopIteration if at the end
@@ -261,8 +261,9 @@ class TdmsFile(object):
         """
 
         # Split paths into components and take the first (group) component.
-        object_paths = (self._path_components(path)
-                for path in self.objects)
+        object_paths = (
+            self._path_components(path)
+            for path in self.objects)
         group_names = (path[0] for path in object_paths if len(path) > 0)
 
         # Use an ordered dict as an ordered set to find unique
@@ -298,9 +299,12 @@ class TdmsFile(object):
 
         return self.object(group, channel).data
 
-    def as_dataframe(self):
+    def as_dataframe(self, time_index=False, absolute_time=False):
         """
         Converts the TDMS file to a DataFrame
+        :param time_index: Whether to include a time index for the dataframe.
+        :param absolute_time: If time_index is true, whether the time index
+            values are absolute times or relative to the start time.
         :return: The full TDMS file data.
         :rtype: Pandas DataFrame
         """
@@ -309,30 +313,18 @@ class TdmsFile(object):
 
         temp = {}
         for key, value in self.objects.items():
-            temp[key] = pd.Series(data=value.data)
-        return pd.DataFrame.from_dict(temp)
-
-    def as_dataframe_withtimeindex(self):
-        """
-        Converts the TDMS file to a DataFrame and include time index
-        :return: The full TDMS file data.
-        :rtype: Pandas DataFrame
-        """
-        
-        import pandas as pd  # only loaded when needed
-        
-        temp = {}
-        for key, value in self.objects.items():
             if value.has_data:
-                temp[key] = pd.Series(data=value.data, index=value.time_track())
+                index = value.time_track(absolute_time) if time_index else None
+                temp[key] = pd.Series(data=value.data, index=index)
         return pd.DataFrame.from_dict(temp)
 
-        
+
 class _TdmsSegment(object):
 
-    __slots__ = ['position', 'num_chunks', 'ordered_objects', 'toc', 'version',
-            'next_segment_offset', 'next_segment_pos',
-            'raw_data_offset', 'data_position']
+    __slots__ = [
+        'position', 'num_chunks', 'ordered_objects', 'toc', 'version',
+        'next_segment_offset', 'next_segment_pos',
+        'raw_data_offset', 'data_position']
 
     def __init__(self, f):
         """Read the lead in section of a segment"""
@@ -350,8 +342,8 @@ class _TdmsSegment(object):
         if s == '':
             raise EOFError
         if s != 'TDSm':
-            raise ValueError("Segment does not start with TDSm, "
-                    "but with %s" % s)
+            raise ValueError(
+                "Segment does not start with TDSm, but with %s" % s)
 
         log.debug("Reading segment at %d" % self.position)
 
@@ -373,14 +365,15 @@ class _TdmsSegment(object):
         # Now 8 bytes each for the offset values
         s = f.read(16)
         (self.next_segment_offset, self.raw_data_offset) = (
-                struct.unpack('<QQ', s))
+            struct.unpack('<QQ', s))
 
         # Calculate data and next segment position
         lead_size = 7 * 4
         self.data_position = self.position + lead_size + self.raw_data_offset
         if self.next_segment_offset == struct.unpack('<Q', b'\xFF' * 8)[0]:
             # This can happen if Labview crashes
-            log.warning("Last segment of file has unknown size, "
+            log.warning(
+                "Last segment of file has unknown size, "
                 "not attempting to read it")
             self.next_segment_pos = None
             self.next_segment_offset = None
@@ -388,8 +381,8 @@ class _TdmsSegment(object):
             # don't attempt to read last segment
             raise EOFError
         else:
-            self.next_segment_pos = (self.position +
-                    self.next_segment_offset + lead_size)
+            self.next_segment_pos = (
+                self.position + self.next_segment_offset + lead_size)
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
@@ -401,8 +394,9 @@ class _TdmsSegment(object):
             try:
                 self.ordered_objects = previous_segment.ordered_objects
             except AttributeError:
-                raise ValueError("kTocMetaData is not set for segment but "
-                        "there is no previous segment")
+                raise ValueError(
+                    "kTocMetaData is not set for segment but "
+                    "there is no previous segment")
             self.calculate_chunks()
             return
         if not self.toc["kTocNewObjList"]:
@@ -410,7 +404,7 @@ class _TdmsSegment(object):
             # are appended, or previous objects can also be repeated
             # if their properties change
             self.ordered_objects = [
-                    copy(o) for o in previous_segment.ordered_objects]
+                copy(o) for o in previous_segment.ordered_objects]
 
         log.debug("Reading metadata at %d" % f.tell())
 
@@ -438,8 +432,8 @@ class _TdmsSegment(object):
                 # Search for the same object from the previous segment
                 # object list.
                 obj_index = [
-                        i for i, o in enumerate(self.ordered_objects)
-                        if o.tdms_object is obj]
+                    i for i, o in enumerate(self.ordered_objects)
+                    if o.tdms_object is obj]
                 if len(obj_index) > 0:
                     updating_existing = True
                     log.debug("Updating object in segment list")
@@ -471,21 +465,23 @@ class _TdmsSegment(object):
         """
 
         data_size = sum([
-                o.data_size
-                for o in self.ordered_objects if o.has_data])
+            o.data_size
+            for o in self.ordered_objects if o.has_data])
         total_data_size = self.next_segment_offset - self.raw_data_offset
         if data_size < 0 or total_data_size < 0:
             raise ValueError("Negative data size")
         elif data_size == 0:
             # Sometimes kTocRawData is set, but there isn't actually any data
             if total_data_size != data_size:
-                raise ValueError("Zero channel data size but non-zero data "
-                        "length based on segment offset.")
+                raise ValueError(
+                    "Zero channel data size but non-zero data "
+                    "length based on segment offset.")
             self.num_chunks = 0
             return
         if total_data_size % data_size != 0:
-            raise ValueError("Data size %d is not a multiple of the "
-                    "chunk size %d" % (total_data_size, data_size))
+            raise ValueError(
+                "Data size %d is not a multiple of the "
+                "chunk size %d" % (total_data_size, data_size))
         else:
             self.num_chunks = total_data_size // data_size
 
@@ -494,7 +490,7 @@ class _TdmsSegment(object):
         for obj in self.ordered_objects:
             if obj.has_data:
                 obj.tdms_object.number_values += (
-                        obj.number_values * self.num_chunks)
+                    obj.number_values * self.num_chunks)
 
     def read_raw_data(self, f):
         """Read signal data from file"""
@@ -505,8 +501,9 @@ class _TdmsSegment(object):
         f.seek(self.data_position)
 
         total_data_size = self.next_segment_offset - self.raw_data_offset
-        log.debug("Reading %d bytes of data at %d in %d chunks" %
-                (total_data_size, f.tell(), self.num_chunks))
+        log.debug(
+            "Reading %d bytes of data at %d in %d chunks" %
+            (total_data_size, f.tell(), self.num_chunks))
 
         if self.toc['kTocBigEndian']:
             endianness = '>'
@@ -521,9 +518,9 @@ class _TdmsSegment(object):
                 # the same, then we can read all data at once with numpy,
                 # which is much faster
                 all_numpy = all(
-                        (o.data_type.nptype is not None for o in data_objects))
+                    (o.data_type.nptype is not None for o in data_objects))
                 same_length = (len(
-                        set((o.number_values for o in data_objects))) == 1)
+                    set((o.number_values for o in data_objects))) == 1)
                 if (all_numpy and same_length):
                     self._read_interleaved_numpy(f, data_objects, endianness)
                 else:
@@ -534,7 +531,7 @@ class _TdmsSegment(object):
                 for obj in self.ordered_objects:
                     if obj.has_data:
                         object_data[obj.path] = (
-                                obj._read_values(f, endianness))
+                            obj._read_values(f, endianness))
 
                 for obj in self.ordered_objects:
                     if obj.has_data:
@@ -554,7 +551,7 @@ class _TdmsSegment(object):
         data_pos = 0
         for (i, obj) in enumerate(data_objects):
             byte_columns = tuple(
-                    range(data_pos, obj.data_type.length + data_pos))
+                range(data_pos, obj.data_type.length + data_pos))
             log.debug("Byte columns for channel %d: %s" % (i, byte_columns))
             # Select columns for this channel, so that number of values will
             # be number of bytes per point * number of data points
@@ -562,7 +559,7 @@ class _TdmsSegment(object):
             # Now set correct data type, so that the array length should
             # be correct
             object_data.dtype = (
-                    np.dtype(obj.data_type.nptype).newbyteorder(endianness))
+                np.dtype(obj.data_type.nptype).newbyteorder(endianness))
             obj.tdms_object._update_data(object_data)
             data_pos += obj.data_type.length
 
@@ -576,11 +573,11 @@ class _TdmsSegment(object):
             object_data[obj.path] = obj._new_segment_data()
             points_added[obj.path] = 0
         while any([points_added[o.path] < o.number_values
-                for o in data_objects]):
+                  for o in data_objects]):
             for obj in data_objects:
                 if points_added[obj.path] < obj.number_values:
                     object_data[obj.path][points_added[obj.path]] = (
-                            obj._read_value(f, endianness))
+                        obj._read_value(f, endianness))
                     points_added[obj.path] += 1
         for obj in data_objects:
             obj.tdms_object._update_data(object_data[obj.path])
@@ -626,19 +623,20 @@ class TdmsObject(object):
             raise KeyError(
                 "Object does not have property '%s'" % property_name)
 
-    def time_track(self, absoluteTime=False, accuracy='ns'):
+    def time_track(self, absolute_time=False, accuracy='ns'):
         """Return an array of time for this channel
 
         This depends on the object having the wf_increment
         and wf_start_offset properties defined.
 
         For larger timespans, the accuracy setting should be set lower.
-        The default setting is 'ns', which has a timespan of [1678 AD, 2262 AD],
-        for the exact ranges, refer to 
+        The default setting is 'ns', which has a timespan of
+        [1678 AD, 2262 AD]. For the exact ranges, refer to
             http://docs.scipy.org/doc/numpy/reference/arrays.datetime.html
         section "Datetime Units".
 
-        :param absoluteTime: Whether the returned numpy.array is a datetime64 array
+        :param absolute_time: Whether the returned time values are absolute
+            times rather than relative to the start time.
         :param accuracy: The accuracy of the returned datetime64 array.
         :rtype: NumPy array.
         :raises: KeyError if required properties aren't found
@@ -653,36 +651,35 @@ class TdmsObject(object):
 
         periods = len(self.data)
 
-        relativeTime = np.linspace(
-                offset,
-                offset + (periods - 1) * increment,
-                periods)
+        relative_time = np.linspace(
+            offset,
+            offset + (periods - 1) * increment,
+            periods)
 
-        if not absoluteTime:
-            return relativeTime
+        if not absolute_time:
+            return relative_time
 
         try:
-            starttime = self.property('wf_start_time')
+            start_time = self.property('wf_start_time')
         except KeyError:
-            raise KeyError("Object does not have start time property available.")
+            raise KeyError(
+                "Object does not have start time property available.")
 
-        def unit_correction(u):
-            if u is 's':
-                return 1e0
-            elif u is 'ms':
-                return 1e3
-            elif u is 'us':
-                return 1e6
-            elif u is 'ns':
-                return 1e9
+        try:
+            unit_correction = {
+                's': 1e0,
+                'ms': 1e3,
+                'us': 1e6,
+                'ns': 1e9,
+            }[accuracy]
+        except KeyError:
+            raise KeyError("Invalid accuracy: {0}".format(accuracy))
 
-        # Because numpy only knows ints as its date datatype, 
+        # Because numpy only knows ints as its date datatype,
         # convert to accuracy.
-        return (np.datetime64(starttime) 
-                + (relativeTime*unit_correction(accuracy)).astype(
-                    "timedelta64["+accuracy+"]"
-                    )
-                )
+        time_type = "timedelta64[{0}]".format(accuracy)
+        return (np.datetime64(start_time)
+                + (relative_time * unit_correction).astype(time_type))
 
     def _initialise_data(self, memmap_dir=None):
         """Initialise data array to zeros"""
@@ -694,48 +691,50 @@ class TdmsObject(object):
         else:
             if memmap_dir:
                 memmap_file = tempfile.NamedTemporaryFile(
-                        mode='w+b', prefix="nptdms_", dir=memmap_dir)
+                    mode='w+b', prefix="nptdms_", dir=memmap_dir)
                 self.data = np.memmap(
-                        memmap_file.file,
-                        mode='w+',
-                        shape=(self.number_values,),
-                        dtype=self.data_type.nptype)
+                    memmap_file.file,
+                    mode='w+',
+                    shape=(self.number_values,),
+                    dtype=self.data_type.nptype)
             else:
                 self.data = np.zeros(
-                        self.number_values, dtype=self.data_type.nptype)
+                    self.number_values, dtype=self.data_type.nptype)
             self._data_insert_position = 0
 
     def _update_data(self, new_data):
         """Update the object data with a new array of data"""
 
         log.debug("Adding %d data points to data for %s" %
-                (len(new_data), self.path))
+                  (len(new_data), self.path))
         if self.data is None:
             self.data = new_data
         else:
             if self.data_type.nptype is not None:
-                data_pos = (self._data_insert_position,
-                        self._data_insert_position + len(new_data))
+                data_pos = (
+                    self._data_insert_position,
+                    self._data_insert_position + len(new_data))
                 self._data_insert_position += len(new_data)
                 self.data[data_pos[0]:data_pos[1]] = new_data
             else:
                 self.data.extend(new_data)
 
-    def as_dataframe(self, absoluteTime=False):
+    def as_dataframe(self, absolute_time=False):
         """
         Converts the TDMS object to a DataFrame
+        :param absolute_time: Whether times should be absolute rather than
+            relative to the start time.
         :return: The TDMS object data.
         :rtype: Pandas DataFrame
         """
 
         import pandas as pd
 
-        # When absoluteTime is True, use the wf_start_time as offset for the time_track()
-        time = self.time_track(absoluteTime)
+        # When absolute_time is True,
+        # use the wf_start_time as offset for the time_track()
+        time = self.time_track(absolute_time)
 
-        return pd.DataFrame(self.data,
-                index=time,
-                columns=[self.path])
+        return pd.DataFrame(self.data, index=time, columns=[self.path])
 
 
 class _TdmsSegmentObject(object):
@@ -743,8 +742,9 @@ class _TdmsSegmentObject(object):
     Describes an object in an individual TDMS file segment
     """
 
-    __slots__ = ['tdms_object', 'number_values', 'data_size',
-            'has_data', 'data_type', 'dimension']
+    __slots__ = [
+        'tdms_object', 'number_values', 'data_size',
+        'has_data', 'data_type', 'dimension']
 
     def __init__(self, tdms_object):
         self.tdms_object = tdms_object
@@ -771,8 +771,8 @@ class _TdmsSegmentObject(object):
             # as these may be re-used by later segments.
         # Data has same structure as previously
         elif raw_data_index == 0x00000000:
-            log.debug("Object has same data structure "
-                    "as in the previous segment")
+            log.debug(
+                "Object has same data structure as in the previous segment")
             self.has_data = True
         else:
             # raw_data_index gives the length of the index information.
@@ -787,16 +787,18 @@ class _TdmsSegmentObject(object):
                 raise KeyError("Unrecognised data type")
             if (self.tdms_object.data_type is not None and
                     self.data_type != self.tdms_object.data_type):
-                raise ValueError("Segment object doesn't have the same data "
-                        "type as previous segments.")
+                raise ValueError(
+                    "Segment object doesn't have the same data "
+                    "type as previous segments.")
             else:
                 self.tdms_object.data_type = self.data_type
             log.debug("Object data type: %s" % self.tdms_object.data_type.name)
 
             if (self.tdms_object.data_type.length is None and
                     self.tdms_object.data_type.name != 'tdsTypeString'):
-                raise ValueError("Unsupported data type: %s" %
-                        self.tdms_object.data_type.name)
+                raise ValueError(
+                    "Unsupported data type: %s" %
+                    self.tdms_object.data_type.name)
 
             # Read data dimension
             s = f.read(4)
@@ -813,11 +815,12 @@ class _TdmsSegmentObject(object):
                 s = f.read(8)
                 self.data_size = struct.unpack("<Q", s)[0]
             else:
-                self.data_size = (self.number_values *
-                        self.data_type.length * self.dimension)
+                self.data_size = (
+                    self.number_values *
+                    self.data_type.length * self.dimension)
 
-            log.debug("Object number of values in segment: %d" %
-                    self.number_values)
+            log.debug(
+                "Object number of values in segment: %d" % self.number_values)
 
         # Read data properties
         s = f.read(4)
@@ -845,8 +848,7 @@ class _TdmsSegmentObject(object):
         """Read a single value from the given file"""
 
         if self.data_type.nptype is not None:
-            dtype = (np.dtype(self.data_type.nptype).
-                    newbyteorder(endianness))
+            dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
             return np.fromfile(file, dtype=dtype, count=1)
         return read_type(file, self.data_type, endianness)
 
@@ -854,8 +856,7 @@ class _TdmsSegmentObject(object):
         """Read all values for this object from a contiguous segment"""
 
         if self.data_type.nptype is not None:
-            dtype = (np.dtype(self.data_type.nptype).
-                    newbyteorder(endianness))
+            dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
             return np.fromfile(file, dtype=dtype, count=self.number_values)
         elif self.data_type.name == "tdsTypeString":
             return read_string_data(file, self.number_values)
