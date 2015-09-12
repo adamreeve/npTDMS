@@ -302,11 +302,12 @@ class TdmsFile(object):
     def as_dataframe(self, time_index=False, absolute_time=False):
         """
         Converts the TDMS file to a DataFrame
+
         :param time_index: Whether to include a time index for the dataframe.
         :param absolute_time: If time_index is true, whether the time index
             values are absolute times or relative to the start time.
         :return: The full TDMS file data.
-        :rtype: Pandas DataFrame
+        :rtype: pandas.DataFrame
         """
 
         import pandas as pd
@@ -722,10 +723,11 @@ class TdmsObject(object):
     def as_dataframe(self, absolute_time=False):
         """
         Converts the TDMS object to a DataFrame
+
         :param absolute_time: Whether times should be absolute rather than
             relative to the start time.
         :return: The TDMS object data.
-        :rtype: Pandas DataFrame
+        :rtype: pandas.DataFrame
         """
 
         import pandas as pd
