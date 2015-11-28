@@ -625,10 +625,14 @@ class TdmsObject(object):
                 "Object does not have property '%s'" % property_name)
 
     def time_track(self, absolute_time=False, accuracy='ns'):
-        """Return an array of time for this channel
+        """Return an array of time or the independent variable for this channel
 
         This depends on the object having the wf_increment
         and wf_start_offset properties defined.
+        Note that wf_start_offset is usually zero for time-series data.
+        If you have time-series data channels with different start times,
+        you should use the absolute time or calculate the time offsets using
+        the wf_start_time property.
 
         For larger timespans, the accuracy setting should be set lower.
         The default setting is 'ns', which has a timespan of
