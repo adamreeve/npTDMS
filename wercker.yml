@@ -27,5 +27,5 @@ deploy:
           [server-login]
           username:$PYPI_USER
           password:$PYPI_PASSWORD" > ~/.pypirc
-          python setup.py sdist upload
-          python setup.py bdist_wheel upload
+          python setup.py sdist upload || exit 1
+          python setup.py bdist_wheel upload || exit 1
