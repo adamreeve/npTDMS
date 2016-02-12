@@ -45,7 +45,8 @@ def main():
             display("%s" % channel.path, level)
             if args.properties:
                 level = 3
-                display("data type: %s" % channel.data_type.name, level)
+                if channel.data_type is not None:
+                    display("data type: %s" % channel.data_type.name, level)
                 display_properties(channel, level)
 
 
