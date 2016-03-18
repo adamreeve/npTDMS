@@ -20,7 +20,7 @@ Typical usage might look like::
     time = channel.time_track()
     # do stuff with data
 
-For more information, see the `npTDMS documentation <http://readthedocs.org/docs/nptdms>`__.
+For more information, see the `npTDMS documentation <http://nptdms.readthedocs.org>`__.
 
 Installation
 ------------
@@ -40,7 +40,7 @@ Links
 
 Source code lives at https://github.com/adamreeve/npTDMS and any issues can be
 reported at https://github.com/adamreeve/npTDMS/issues.
-Documentation is available at http://readthedocs.org/docs/nptdms.
+Documentation is available at http://nptdms.readthedocs.org.
 
 What Currently Doesn't Work
 ---------------------------
