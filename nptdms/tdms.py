@@ -448,19 +448,31 @@ class _TdmsSegment(object):
                     "length based on segment offset.")
             self.num_chunks = 0
             return
-        if total_data_size % data_size != 0:
-            raise ValueError(
-                "Data size %d is not a multiple of the "
-                "chunk size %d" % (total_data_size, data_size))
-        else:
+        chunk_remainder = total_data_size % data_size
+        if chunk_remainder == 0:
             self.num_chunks = total_data_size // data_size
 
-        # Update data count for the overall tdms object
-        # using the data count for this segment.
-        for obj in self.ordered_objects:
-            if obj.has_data:
-                obj.tdms_object.number_values += (
-                    obj.number_values * self.num_chunks)
+            # Update data count for the overall tdms object
+            # using the data count for this segment.
+            for obj in self.ordered_objects:
+                if obj.has_data:
+                    obj.tdms_object.number_values += (
+                        obj.number_values * self.num_chunks)
+
+        else:
+            log.warning(
+                "Data size %d is not a multiple of the "
+                "chunk size %d. Will attempt to read last chunk" %
+                (total_data_size, data_size))
+            self.num_chunks = 1 + total_data_size // data_size
+
+            final_chunk_proportion = float(chunk_remainder) / float(data_size)
+
+            for obj in self.ordered_objects:
+                if obj.has_data:
+                    obj.tdms_object.number_values += (
+                        obj.number_values * (self.num_chunks - 1)
+                        + int(obj.number_values * final_chunk_proportion))
 
     def read_raw_data(self, f):
         """Read signal data from file"""
