@@ -34,7 +34,7 @@ def basic_segment():
     toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
     metadata = (
         # Number of objects
-        "03 00 00 00"
+        "04 00 00 00"
         # Length of the first object path
         "08 00 00 00"
         # Object path (/'Group')
@@ -107,7 +107,16 @@ def basic_segment():
         "0C 00 00 00" +
         string_hexlify('wf_increment') +
         "0A 00 00 00" +
-        hexlify_value("<d", 0.1))
+        hexlify_value("<d", 0.1) +
+        # Length of the object path
+        "01 00 00 00"
+        # Object path (/)
+        "2F"
+        # Raw data index
+        "FF FF FF FF"
+        # Num properties
+        "00 00 00 00"
+    )
     data = (
         # Data for segment
         "01 00 00 00"
@@ -824,6 +833,36 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(len(data_1), 2)
         data_2 = tdmsData.channel_data(group_2_name, channel_2_name)
         self.assertEqual(len(data_2), 2)
+
+    def test_root_object_paths(self):
+        """Test the group and channel properties for the root object"""
+        test_file = TestFile()
+        test_file.add_segment(*basic_segment())
+        tdmsData = test_file.load()
+
+        obj = tdmsData.object()
+        self.assertEqual(obj.group, None)
+        self.assertEqual(obj.channel, None)
+
+    def test_group_object_paths(self):
+        """Test the group and channel properties for a group"""
+        test_file = TestFile()
+        test_file.add_segment(*basic_segment())
+        tdmsData = test_file.load()
+
+        obj = tdmsData.object("Group")
+        self.assertEqual(obj.group, "Group")
+        self.assertEqual(obj.channel, None)
+
+    def test_channel_object_paths(self):
+        """Test the group and channel properties for a group"""
+        test_file = TestFile()
+        test_file.add_segment(*basic_segment())
+        tdmsData = test_file.load()
+
+        obj = tdmsData.object("Group", "Channel1")
+        self.assertEqual(obj.group, "Group")
+        self.assertEqual(obj.channel, "Channel1")
 
 
 if __name__ == '__main__':
