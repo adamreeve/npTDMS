@@ -1,3 +1,12 @@
+v0.8.0 10th May 2016
+- Add group and channel properties to TdmsObject
+
+v0.7.2 12th February 2016
+- Fix crash in tdmsinfo when channel has no data
+
+v0.7.1 12th September 2015
+- Documentation fixes.
+
 v0.7.0 12th September 2015
 - Added as_dataframe methods to TdmsFile and TdmsObject that convert
   data to Pandas dataframes.

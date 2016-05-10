@@ -32,6 +32,10 @@ log.setLevel(logging.WARNING)
 # To adjust the log level for this module from a script, use eg:
 # logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 
+# Have to get a reference to the builtin property decorator
+# so we can use it in TdmsObject, which has a property method.
+_property_builtin = property
+
 try:
     long
     zip_longest = itertools.izip_longest
@@ -188,41 +192,6 @@ class TdmsFile(object):
         return ('/' + '/'.join(
                 ["'" + arg.replace("'", "''") + "'" for arg in args]))
 
-    def _path_components(self, path):
-        """Convert a path into group and channel name components"""
-
-        def yield_components(path):
-            # Iterate over each character and the next character
-            chars = zip_longest(path, path[1:])
-            try:
-                # Iterate over components
-                while True:
-                    c, n = next(chars)
-                    if c != '/':
-                        raise ValueError("Invalid path, expected \"/\"")
-                    elif (n is not None and n != "'"):
-                        raise ValueError("Invalid path, expected \"'\"")
-                    else:
-                        # Consume "'" or raise StopIteration if at the end
-                        next(chars)
-                    component = []
-                    # Iterate over characters in component name
-                    while True:
-                        c, n = next(chars)
-                        if c == "'" and n == "'":
-                            component += "'"
-                            # Consume second "'"
-                            next(chars)
-                        elif c == "'":
-                            yield "".join(component)
-                            break
-                        else:
-                            component += c
-            except StopIteration:
-                return
-
-        return list(yield_components(path))
-
     def object(self, *path):
         """Get a TDMS object from the file
 
@@ -262,7 +231,7 @@ class TdmsFile(object):
 
         # Split paths into components and take the first (group) component.
         object_paths = (
-            self._path_components(path)
+            path_components(path)
             for path in self.objects)
         group_names = (path[0] for path in object_paths if len(path) > 0)
 
@@ -624,6 +593,26 @@ class TdmsObject(object):
             raise KeyError(
                 "Object does not have property '%s'" % property_name)
 
+    @_property_builtin
+    def group(self):
+        """ Returns the name of the group for this object,
+            or None if it is the root object.
+        """
+        path = path_components(self.path)
+        if len(path) > 0:
+            return path[0]
+        return None
+
+    @_property_builtin
+    def channel(self):
+        """ Returns the name of the channel for this object,
+            or None if it is a group or the root object.
+        """
+        path = path_components(self.path)
+        if len(path) > 1:
+            return path[1]
+        return None
+
     def time_track(self, absolute_time=False, accuracy='ns'):
         """Return an array of time or the independent variable for this channel
 
@@ -896,3 +885,39 @@ def read_string_data(file, number_values):
         s = file.read(offsets[i + 1] - offsets[i])
         strings.append(s.decode('utf-8'))
     return strings
+
+
+def path_components(path):
+    """Convert a path into group and channel name components"""
+
+    def yield_components(path):
+        # Iterate over each character and the next character
+        chars = zip_longest(path, path[1:])
+        try:
+            # Iterate over components
+            while True:
+                c, n = next(chars)
+                if c != '/':
+                    raise ValueError("Invalid path, expected \"/\"")
+                elif (n is not None and n != "'"):
+                    raise ValueError("Invalid path, expected \"'\"")
+                else:
+                    # Consume "'" or raise StopIteration if at the end
+                    next(chars)
+                component = []
+                # Iterate over characters in component name
+                while True:
+                    c, n = next(chars)
+                    if c == "'" and n == "'":
+                        component += "'"
+                        # Consume second "'"
+                        next(chars)
+                    elif c == "'":
+                        yield "".join(component)
+                        break
+                    else:
+                        component += c
+        except StopIteration:
+            return
+
+    return list(yield_components(path))
