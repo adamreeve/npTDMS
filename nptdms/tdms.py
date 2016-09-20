@@ -18,6 +18,7 @@ from copy import copy
 import numpy as np
 from datetime import datetime, timedelta
 import tempfile
+from io import BytesIO
 try:
     import pytz
 except ImportError:
@@ -89,6 +90,14 @@ if pytz:
     timezone = pytz.utc
 else:
     timezone = None
+    
+    
+def fromfile(file, *args, **kwargs):
+    """ Wrapper around np.fromfile to support BytesIO fake files."""
+    if isinstance(file, BytesIO):
+        return np.fromstring(file.getvalue(), *args, **kwargs)
+    else:
+        return np.fromfile(file, *args, **kwargs)
 
 
 def read_string(file):
@@ -514,7 +523,7 @@ class _TdmsSegment(object):
         # Read all data into 1 byte unsigned ints first
         all_channel_bytes = sum((o.data_type.length for o in data_objects))
         number_bytes = all_channel_bytes * data_objects[0].number_values
-        combined_data = np.fromfile(f, dtype=np.uint8, count=number_bytes)
+        combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
         # Reshape, so that one row is all bytes for all objects
         combined_data = combined_data.reshape(-1, all_channel_bytes)
         # Now set arrays for each channel
@@ -844,7 +853,7 @@ class _TdmsSegmentObject(object):
 
         if self.data_type.nptype is not None:
             dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
-            return np.fromfile(file, dtype=dtype, count=1)
+            return fromfile(file, dtype=dtype, count=1)
         return read_type(file, self.data_type, endianness)
 
     def _read_values(self, file, endianness):
@@ -852,7 +861,7 @@ class _TdmsSegmentObject(object):
 
         if self.data_type.nptype is not None:
             dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
-            return np.fromfile(file, dtype=dtype, count=self.number_values)
+            return fromfile(file, dtype=dtype, count=self.number_values)
         elif self.data_type.name == "tdsTypeString":
             return read_string_data(file, self.number_values)
         data = self._new_segment_data()
