@@ -94,8 +94,11 @@ else:
     
 def fromfile(file, dtype, count, *args, **kwargs):
     """ Wrapper around np.fromfile to support BytesIO fake files."""
+
     if isinstance(file, BytesIO):
-        return np.fromstring(file.read(count * dtype.itemsize), dtype=dtype, count=count, *args, **kwargs)
+        return np.fromstring(
+            file.read(count * dtype.itemsize),
+            dtype=dtype, count=count, *args, **kwargs)
     else:
         return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
 
