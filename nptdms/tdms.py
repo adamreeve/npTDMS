@@ -90,8 +90,8 @@ if pytz:
     timezone = pytz.utc
 else:
     timezone = None
-    
-    
+
+
 def fromfile(file, dtype, count, *args, **kwargs):
     """ Wrapper around np.fromfile to support BytesIO fake files."""
 
