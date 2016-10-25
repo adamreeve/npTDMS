@@ -306,7 +306,7 @@ class _TdmsSegment(object):
     __slots__ = [
         'position', 'num_chunks', 'ordered_objects', 'toc', 'version',
         'next_segment_offset', 'next_segment_pos',
-        'raw_data_offset', 'data_position']
+        'raw_data_offset', 'data_position', 'final_chunk_proportion']
 
     def __init__(self, f):
         """Read the lead in section of a segment"""
@@ -315,6 +315,7 @@ class _TdmsSegment(object):
         self.num_chunks = 0
         # A list of _TdmsSegmentObject
         self.ordered_objects = []
+        self.final_chunk_proportion = 1.0
 
         # First four bytes should be TDSm
         try:
@@ -460,19 +461,32 @@ class _TdmsSegment(object):
                     "length based on segment offset.")
             self.num_chunks = 0
             return
-        if total_data_size % data_size != 0:
-            raise ValueError(
-                "Data size %d is not a multiple of the "
-                "chunk size %d" % (total_data_size, data_size))
-        else:
+        chunk_remainder = total_data_size % data_size
+        if chunk_remainder == 0:
             self.num_chunks = total_data_size // data_size
 
-        # Update data count for the overall tdms object
-        # using the data count for this segment.
-        for obj in self.ordered_objects:
-            if obj.has_data:
-                obj.tdms_object.number_values += (
-                    obj.number_values * self.num_chunks)
+            # Update data count for the overall tdms object
+            # using the data count for this segment.
+            for obj in self.ordered_objects:
+                if obj.has_data:
+                    obj.tdms_object.number_values += (
+                        obj.number_values * self.num_chunks)
+
+        else:
+            log.warning(
+                "Data size %d is not a multiple of the "
+                "chunk size %d. Will attempt to read last chunk" %
+                (total_data_size, data_size))
+            self.num_chunks = 1 + total_data_size // data_size
+
+            self.final_chunk_proportion = (
+                float(chunk_remainder) / float(data_size))
+
+            for obj in self.ordered_objects:
+                if obj.has_data:
+                    obj.tdms_object.number_values += (
+                        obj.number_values * (self.num_chunks - 1)
+                        + int(obj.number_values * self.final_chunk_proportion))
 
     def read_raw_data(self, f):
         """Read signal data from file"""
@@ -512,8 +526,15 @@ class _TdmsSegment(object):
                 log.debug("Data is contiguous")
                 for obj in self.ordered_objects:
                     if obj.has_data:
+                        if (chunk == (self.num_chunks - 1) and
+                                self.final_chunk_proportion != 1.0):
+                            number_values = int(
+                                obj.number_values *
+                                self.final_chunk_proportion)
+                        else:
+                            number_values = obj.number_values
                         object_data[obj.path] = (
-                            obj._read_values(f, endianness))
+                            obj._read_values(f, endianness, number_values))
 
                 for obj in self.ordered_objects:
                     if obj.has_data:
@@ -859,16 +880,16 @@ class _TdmsSegmentObject(object):
             return fromfile(file, dtype=dtype, count=1)
         return read_type(file, self.data_type, endianness)
 
-    def _read_values(self, file, endianness):
+    def _read_values(self, file, endianness, number_values):
         """Read all values for this object from a contiguous segment"""
 
         if self.data_type.nptype is not None:
             dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
-            return fromfile(file, dtype=dtype, count=self.number_values)
+            return fromfile(file, dtype=dtype, count=number_values)
         elif self.data_type.name == "tdsTypeString":
-            return read_string_data(file, self.number_values)
+            return read_string_data(file, number_values)
         data = self._new_segment_data()
-        for i in range(self.number_values):
+        for i in range(number_values):
             data[i] = read_type(file, self.data_type, endianness)
         return data
 
