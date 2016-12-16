@@ -809,7 +809,7 @@ class _TdmsmxDAQPropertyInfo(object):
     def _read_metadata(self, f):
 
         length = _read_long(f)
-        self.property_name = f.read(length)
+        self.property_name = f.read(length).decode()
         self.data_type_code = _read_long(f)
         self.data_type = tdsDataTypes[self.data_type_code]
         if self.data_type.name == "tdsTypeString":
@@ -981,6 +981,9 @@ class _TdmsSegmentObject(object):
             # handled currently in a separate class
             info = self._read_metadata_mx(f)
             self.has_data = True
+            for property in info.properties:
+                self.tdms_object.properties[property.property_name] = property.value
+            self.has_data = True # Is that the correct idea
             self.tdms_object.has_data = True
             self.dimension = info.dimension
             self.data_type = info.data_type
