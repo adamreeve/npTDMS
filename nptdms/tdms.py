@@ -80,7 +80,7 @@ tdsDataTypes.update({
     0x20: DataType('tdsTypeString', None, None, None),
     0x21: DataType('tdsTypeBoolean', 'b', 1, np.bool8),
     0x44: DataType('tdsTypeTimeStamp', 'Qq', 16, None),
-    0xFFFFFFFF: DataType('tdsTypeDAQmxRawData', None, None, None)
+    0xFFFFFFFF: DataType('tdsTypeDAQmxRawData', None, 2, np.uint16)
 })
 
 
@@ -788,11 +788,12 @@ class _TdmsmxDAQPropertyInfo(object):
     
 class _TdmsmxDAQInfo(object):
     __slots__ = [
-        'dimension', 'number_of_values', 'vector_size',
-        'data_type_code', 'data_type',
+        'dimension', 'number_of_values', 'scaler_vector_length',
+        'data_type',
+        'scaler_data_type_code', 'scaler_data_type',
         'raw_buffer_index','raw_buffer_index', 'raw_byte_offset',
         'sample_format_bitmap', 'scale_id',
-        'elements', 'properties'
+        'raw_data_widths', 'properties'
         ]
 
     _property_names = (
@@ -818,26 +819,32 @@ class _TdmsmxDAQInfo(object):
 
     def _read_metadata(self, f):
         """
+        Read the metadata for a DAQmx raw segment.  This is the raw
+        DAQmx-specific portion of the raw data index.
         """
+        self.data_type = tdsDataTypes[0xFFFFFFFF]
         self.dimension = _read_long(f)
         self.number_of_values = _read_long_long(f)
-        self.vector_size = _read_long(f)        
+        # size of vector of format changing scalers
+        self.scaler_vector_length = _read_long(f)
         #log.debug("mxDAQ Data dimension '%d' n values '%d'" %(self.dimension, self.number_of_values))
         # Size of the vector
-        log.debug("mxDAQ vector size '%d'" %(self.vector_size,))
-        #assert(self.vector_size == 1)
-        
-        self.data_type_code = _read_long(f)
-        self.data_type = tdsDataTypes[self.data_type_code]
-        #log.debug(
-        #    "mxDAQ vector vector_size '%d' data_type '%d' = '%s'"
-        #    %(self.vector_size, self.data_type_code, self.data_type.name) )
-        assert(self.data_type_code == 5)
+        log.debug("mxDAQ vector size '%d'" %(self.scaler_vector_length,))
 
-        self.raw_buffer_index = _read_long(f)    
-        self.raw_byte_offset = _read_long(f)
-        self.sample_format_bitmap = _read_long(f)
-        self.scale_id = _read_long(f)
+        for idx in range(self.scaler_vector_length):
+            # tbd: implement format_changing_scaler vector here
+            self.scaler_data_type_code = _read_long(f)
+            self.scaler_data_type = tdsDataTypes[self.scaler_data_type_code]
+            #log.debug(
+            #    "mxDAQ scaler_vector_length '%d' data_type '%d' = '%s'"
+            #    %(self.scaler_vector_length, self.scaler_data_type_code, self.scaler_data_type.name) )
+
+            # more info for format changing scaler
+            self.raw_buffer_index = _read_long(f)    
+            self.raw_byte_offset = _read_long(f)
+            self.sample_format_bitmap = _read_long(f)
+            self.scale_id = _read_long(f)
+
         #msg = "raw buffer index '%d' raw byte offset '%d' sample_format_bitmap '%d' scale id '%d'"
         #log.debug(msg %(
         #        self.raw_buffer_index,
@@ -847,9 +854,9 @@ class _TdmsmxDAQInfo(object):
         #))
 
         vector_raw_data_width = _read_long(f)
-        self.elements = np.zeros(vector_raw_data_width)
+        self.raw_data_widths = np.zeros(vector_raw_data_width, dtype=np.int32)
         for cnt in range(vector_raw_data_width):
-            self.elements[cnt] = _read_long(f)
+            self.raw_data_widths[cnt] = _read_long(f)
         #log.debug("mxDAQ vector raw data width '%d': '%s" %(vector_raw_data_width, self.elements))
 
         num_properties = _read_long(f)
