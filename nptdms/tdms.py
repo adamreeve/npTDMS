@@ -622,6 +622,7 @@ class TdmsObject(object):
     def __init__(self, path):
         self.path = path
         self.data = None
+        self._data_scaled = None
         self.properties = OrderedDict()
         self.data_type = None
         self.dimension = 1
@@ -790,6 +791,27 @@ class TdmsObject(object):
 
         return pd.DataFrame(self.data, index=time, columns=[self.path])
 
+    @_property_builtin
+    def scaled(self):
+        if self._data_scaled is None:
+            scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
+            if scale_type == 'Polynomial':
+                scale_factors = (self.properties['NI_Scale[1]_Polynomial_Coefficients[0]'],
+                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[1]'],
+                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[2]'],
+                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[3]'])
+                scaled_data = np.zeros_like(self.data, dtype=np.float)
+                for i, scale_factor in enumerate(scale_factors):
+                    scaled_data += scale_factor * self.data**i
+            elif scale_type == 'Linear':
+                slope = self.properties["NI_Scale[1]_Linear_Slope"]
+                intercept = self.properties["NI_Scale[1]_Linear_Y_Intercept"]
+                scaled_data = self.data * slope + intercept
+            else:
+                scaled_data = self.data
+            self._data_scaled = scaled_data
+
+        return self._data_scaled
 
 class _TdmsmxDAQPropertyInfo(object):
     """
