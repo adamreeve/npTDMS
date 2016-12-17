@@ -853,7 +853,6 @@ class _TdmsmxDAQInfo(object):
         'raw_buffer_index', 'raw_buffer_index', 'raw_byte_offset',
         'sample_format_bitmap', 'scale_id',
         'raw_data_widths', 'properties',
-        '_property_names', '_values_check',
         ]
 
     def info(self):
@@ -917,9 +916,6 @@ class _TdmsmxDAQInfo(object):
 
         num_properties = _read_long(f)
         self.properties = [None] * num_properties
-
-        self._property_names = self.__property_names[str(num_properties)]
-        self._values_check = self.__values_check[str(num_properties)]
 
         for cnt in range(num_properties):
             t_prop = _TdmsmxDAQPropertyInfo()
