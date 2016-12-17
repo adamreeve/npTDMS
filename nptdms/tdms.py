@@ -451,7 +451,8 @@ class _TdmsSegment(object):
 
         if self.toc['kTocDAQmxRawData']:
             # chunks defined differently for DAQmxRawData format
-            data_size = self.ordered_objects[0].number_values * self.ordered_objects[0].raw_data_width
+            data_size = self.ordered_objects[0].number_values \
+                * self.ordered_objects[0].raw_data_width
         else:
             data_size = sum([
                 o.data_size
@@ -716,8 +717,8 @@ class TdmsObject(object):
                     self.number_values, dtype=self.data_type.nptype)
             self._data_insert_position = 0
         if self.data is not None:
-            log.debug("Allocated %d sample slots for %s" % (len(self.data), 
-                                                      self.path))
+            log.debug("Allocated %d sample slots for %s" % (len(self.data),
+                                                            self.path))
         else:
             log.debug("Allocated no space for %s" % (self.path,))
 
@@ -816,7 +817,7 @@ class _TdmsmxDAQInfo(object):
         """
         self.data_type = tdsDataTypes[0xFFFFFFFF]
         self.dimension = _read_long(f)
-        # In TDMS file format version 2.0, 1 is the only valid value for dimension
+        # In TDMS format version 2.0, 1 is the only valid value for dimension
         assert(self.dimension == 1)
         self.chunk_size = _read_long_long(f)
         # size of vector of format changing scalers
@@ -824,7 +825,8 @@ class _TdmsmxDAQInfo(object):
         #log.debug("mxDAQ Data dimension '%d' n values '%d'"
         # %(self.dimension, self.chunk_size))
         # Size of the vector
-        log.debug("mxDAQ format scaaler vector size '%d'" % (self.scaler_vector_length,))
+        log.debug("mxDAQ format scaaler vector size '%d'" %
+                  (self.scaler_vector_length,))
 
         for idx in range(self.scaler_vector_length):
             # tbd: implement format_changing_scaler vector here
@@ -949,7 +951,7 @@ class _TdmsSegmentObject(object):
             self.number_values = info.chunk_size/info.data_type.length
             # segment reading code relies on a single consistent data
             # width so assert that there is only one.
-            assert(len(info.raw_data_widths)==1)
+            assert(len(info.raw_data_widths) == 1)
             self.raw_data_width = info.raw_data_widths[0]
             return
 
