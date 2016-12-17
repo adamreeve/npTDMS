@@ -753,12 +753,7 @@ class _TdmsmxDAQPropertyInfo(object):
     """
     __slots__ = [
         'property_name', 'data_type_code', 'data_type', 'value',
-        'property_check_name', 'property_check'
         ]
-
-    def __init__(self, check_name, property_check):
-        self.property_check_name = check_name
-        self.property_check = property_check
 
     def __str__(self):
         l = []
@@ -771,11 +766,6 @@ class _TdmsmxDAQPropertyInfo(object):
 
         length = _read_long(f)
         self.property_name = f.read(length)
-        if self.property_name != self.property_check_name:
-            raise AssertionError("no match for '%s' == '%s'" %
-                                 (self.property_name,
-                                  self.property_check_name))
-
         self.data_type_code = _read_long(f)
         self.data_type = tdsDataTypes[self.data_type_code]
         if self.data_type.name == "tdsTypeString":
@@ -788,11 +778,6 @@ class _TdmsmxDAQPropertyInfo(object):
         #msg = "mxDAQ property data_type '%s' value '%s'"
         #log.debug(msg %(self.data_type.name, self.value))
 
-        if self.property_check is not None \
-           and self.property_check != self.value:
-            raise AssertionError("no match for '%s' == '%s'" %
-                                 (self.property_check, value))
-
 
 class _TdmsmxDAQInfo(object):
     __slots__ = [
@@ -803,17 +788,6 @@ class _TdmsmxDAQInfo(object):
         'sample_format_bitmap', 'scale_id',
         'raw_data_widths', 'properties'
         ]
-
-    _property_names = (
-        "NI_Scaling_Status",
-        "NI_Number_Of_Scales",
-        "NI_Scale[1]_Scale_Type",
-        "NI_Scale[1]_Linear_Slope",
-        "NI_Scale[1]_Linear_Y_Intercept",
-        "NI_Scale[1]_Linear_Input_Source",
-    )
-
-    _values_check = ("unscaled", None, "Linear", None, None, None)
 
     def info(self):
         l = []
@@ -875,8 +849,7 @@ class _TdmsmxDAQInfo(object):
         self.properties = [None] * num_properties
 
         for cnt in range(num_properties):
-            t_prop = _TdmsmxDAQPropertyInfo(self._property_names[cnt],
-                                            self._values_check[cnt])
+            t_prop = _TdmsmxDAQPropertyInfo()
             t_prop._read_metadata(f)
             self.properties[cnt] = t_prop
 
