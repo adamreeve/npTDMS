@@ -18,6 +18,7 @@ from copy import copy
 import numpy as np
 from datetime import datetime, timedelta
 import tempfile
+from io import BytesIO
 try:
     import pytz
 except ImportError:
@@ -89,6 +90,17 @@ if pytz:
     timezone = pytz.utc
 else:
     timezone = None
+
+
+def fromfile(file, dtype, count, *args, **kwargs):
+    """ Wrapper around np.fromfile to support BytesIO fake files."""
+
+    if isinstance(file, BytesIO):
+        return np.fromstring(
+            file.read(count * dtype.itemsize),
+            dtype=dtype, count=count, *args, **kwargs)
+    else:
+        return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
 
 
 def read_string(file):
@@ -309,7 +321,7 @@ class _TdmsSegment(object):
     __slots__ = [
         'position', 'num_chunks', 'ordered_objects', 'toc', 'version',
         'next_segment_offset', 'next_segment_pos',
-        'raw_data_offset', 'data_position']
+        'raw_data_offset', 'data_position', 'final_chunk_proportion']
 
     def __init__(self, f):
         """Read the lead in section of a segment"""
@@ -318,6 +330,7 @@ class _TdmsSegment(object):
         self.num_chunks = 0
         # A list of _TdmsSegmentObject
         self.ordered_objects = []
+        self.final_chunk_proportion = 1.0
 
         # First four bytes should be TDSm
         try:
@@ -469,19 +482,32 @@ class _TdmsSegment(object):
                     "length based on segment offset.")
             self.num_chunks = 0
             return
-        if total_data_size % data_size != 0:
-            raise ValueError(
-                "Data size %d is not a multiple of the "
-                "chunk size %d" % (total_data_size, data_size))
-        else:
+        chunk_remainder = total_data_size % data_size
+        if chunk_remainder == 0:
             self.num_chunks = total_data_size // data_size
 
-        # Update data count for the overall tdms object
-        # using the data count for this segment.
-        for obj in self.ordered_objects:
-            if obj.has_data:
-                obj.tdms_object.number_values += (
-                    obj.number_values * self.num_chunks)
+            # Update data count for the overall tdms object
+            # using the data count for this segment.
+            for obj in self.ordered_objects:
+                if obj.has_data:
+                    obj.tdms_object.number_values += (
+                        obj.number_values * self.num_chunks)
+
+        else:
+            log.warning(
+                "Data size %d is not a multiple of the "
+                "chunk size %d. Will attempt to read last chunk" %
+                (total_data_size, data_size))
+            self.num_chunks = 1 + total_data_size // data_size
+
+            self.final_chunk_proportion = (
+                float(chunk_remainder) / float(data_size))
+
+            for obj in self.ordered_objects:
+                if obj.has_data:
+                    obj.tdms_object.number_values += (
+                        obj.number_values * (self.num_chunks - 1)
+                        + int(obj.number_values * self.final_chunk_proportion))
 
     def read_raw_data(self, f):
         """Read signal data from file"""
@@ -521,8 +547,15 @@ class _TdmsSegment(object):
                 log.debug("Data is contiguous")
                 for obj in self.ordered_objects:
                     if obj.has_data:
+                        if (chunk == (self.num_chunks - 1) and
+                                self.final_chunk_proportion != 1.0):
+                            number_values = int(
+                                obj.number_values *
+                                self.final_chunk_proportion)
+                        else:
+                            number_values = obj.number_values
                         object_data[obj.path] = (
-                            obj._read_values(f, endianness))
+                            obj._read_values(f, endianness, number_values))
 
                 for obj in self.ordered_objects:
                     if obj.has_data:
@@ -535,7 +568,7 @@ class _TdmsSegment(object):
         # Read all data into 1 byte unsigned ints first
         all_channel_bytes = sum((o.data_type.length for o in data_objects))
         number_bytes = all_channel_bytes * data_objects[0].number_values
-        combined_data = np.fromfile(f, dtype=np.uint8, count=number_bytes)
+        combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
         # Reshape, so that one row is all bytes for all objects
         combined_data = combined_data.reshape(-1, all_channel_bytes)
         # Now set arrays for each channel
@@ -589,6 +622,7 @@ class TdmsObject(object):
     def __init__(self, path):
         self.path = path
         self.data = None
+        self._data_scaled = None
         self.properties = OrderedDict()
         self.data_type = None
         self.dimension = 1
@@ -757,6 +791,27 @@ class TdmsObject(object):
 
         return pd.DataFrame(self.data, index=time, columns=[self.path])
 
+    @_property_builtin
+    def scaled(self):
+        if self._data_scaled is None:
+            scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
+            if scale_type == 'Polynomial':
+                scale_factors = (self.properties['NI_Scale[1]_Polynomial_Coefficients[0]'],
+                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[1]'],
+                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[2]'],
+                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[3]'])
+                scaled_data = np.zeros_like(self.data, dtype=np.float)
+                for i, scale_factor in enumerate(scale_factors):
+                    scaled_data += scale_factor * self.data**i
+            elif scale_type == 'Linear':
+                slope = self.properties["NI_Scale[1]_Linear_Slope"]
+                intercept = self.properties["NI_Scale[1]_Linear_Y_Intercept"]
+                scaled_data = self.data * slope + intercept
+            else:
+                scaled_data = self.data
+            self._data_scaled = scaled_data
+
+        return self._data_scaled
 
 class _TdmsmxDAQPropertyInfo(object):
     """
@@ -776,7 +831,7 @@ class _TdmsmxDAQPropertyInfo(object):
     def _read_metadata(self, f):
 
         length = _read_long(f)
-        self.property_name = f.read(length)
+        self.property_name = f.read(length).decode()
         self.data_type_code = _read_long(f)
         self.data_type = tdsDataTypes[self.data_type_code]
         if self.data_type.name == "tdsTypeString":
@@ -797,7 +852,8 @@ class _TdmsmxDAQInfo(object):
         'scaler_data_type_code', 'scaler_data_type',
         'raw_buffer_index', 'raw_buffer_index', 'raw_byte_offset',
         'sample_format_bitmap', 'scale_id',
-        'raw_data_widths', 'properties'
+        'raw_data_widths', 'properties',
+        '_property_names', '_values_check',
         ]
 
     def info(self):
@@ -861,6 +917,9 @@ class _TdmsmxDAQInfo(object):
 
         num_properties = _read_long(f)
         self.properties = [None] * num_properties
+
+        self._property_names = self.__property_names[str(num_properties)]
+        self._values_check = self.__values_check[str(num_properties)]
 
         for cnt in range(num_properties):
             t_prop = _TdmsmxDAQPropertyInfo()
@@ -944,6 +1003,9 @@ class _TdmsSegmentObject(object):
             # handled currently in a separate class
             info = self._read_metadata_mx(f)
             self.has_data = True
+            for property in info.properties:
+                self.tdms_object.properties[property.property_name] = property.value
+            self.has_data = True # Is that the correct idea
             self.tdms_object.has_data = True
             self.dimension = info.dimension
             self.data_type = info.data_type
@@ -1030,19 +1092,19 @@ class _TdmsSegmentObject(object):
 
         if self.data_type.nptype is not None:
             dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
-            return np.fromfile(file, dtype=dtype, count=1)
+            return fromfile(file, dtype=dtype, count=1)
         return read_type(file, self.data_type, endianness)
 
-    def _read_values(self, file, endianness):
+    def _read_values(self, file, endianness, number_values):
         """Read all values for this object from a contiguous segment"""
 
         if self.data_type.nptype is not None:
             dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
-            return np.fromfile(file, dtype=dtype, count=self.number_values)
+            return fromfile(file, dtype=dtype, count=number_values)
         elif self.data_type.name == "tdsTypeString":
-            return read_string_data(file, self.number_values)
+            return read_string_data(file, number_values)
         data = self._new_segment_data()
-        for i in range(self.number_values):
+        for i in range(number_values):
             data[i] = read_type(file, self.data_type, endianness)
         return data
 
