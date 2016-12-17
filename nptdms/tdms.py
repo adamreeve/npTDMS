@@ -781,7 +781,7 @@ class _TdmsmxDAQPropertyInfo(object):
 
 class _TdmsmxDAQInfo(object):
     __slots__ = [
-        'dimension', 'number_of_values', 'scaler_vector_length',
+        'dimension', 'chunk_size', 'scaler_vector_length',
         'data_type',
         'scaler_data_type_code', 'scaler_data_type',
         'raw_buffer_index', 'raw_buffer_index', 'raw_byte_offset',
@@ -806,11 +806,13 @@ class _TdmsmxDAQInfo(object):
         """
         self.data_type = tdsDataTypes[0xFFFFFFFF]
         self.dimension = _read_long(f)
-        self.number_of_values = _read_long_long(f)
+        # In TDMS file format version 2.0, 1 is the only valid value for dimension
+        assert(self.dimension == 1)
+        self.chunk_size = _read_long_long(f)
         # size of vector of format changing scalers
         self.scaler_vector_length = _read_long(f)
         #log.debug("mxDAQ Data dimension '%d' n values '%d'"
-        # %(self.dimension, self.number_of_values))
+        # %(self.dimension, self.chunk_size))
         # Size of the vector
         log.debug("mxDAQ vector size '%d'" % (self.scaler_vector_length,))
 
@@ -930,12 +932,9 @@ class _TdmsSegmentObject(object):
             self.has_data = True
             self.tdms_object.has_data = True
             self.dimension = info.dimension
-            self.number_values = info.number_of_values
             self.data_type = info.data_type
-            # Not yet implemented
-            assert(info.data_type.name != 'tdsTypeString')
-            self.data_size = self.number_values * self.data_type.length \
-                * self.dimension
+            self.data_size = info.chunk_size
+            self.number_values = info.chunk_size/info.data_type.length
             return
 
         else:
