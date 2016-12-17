@@ -1,3 +1,10 @@
+v0.8.2 25th October 2016
+- Fix error reading truncated files, resulting in a message that
+  the "Data size is not a multiple of the chunk size".
+
+v0.8.1 30th September 2016
+- Support loading files from a BytesIO stream.
+
 v0.8.0 10th May 2016
 - Add group and channel properties to TdmsObject
 
