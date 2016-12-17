@@ -449,9 +449,14 @@ class _TdmsSegment(object):
         segment, based on the number of chunks.
         """
 
-        data_size = sum([
-            o.data_size
-            for o in self.ordered_objects if o.has_data])
+        if self.toc['kTocDAQmxRawData']:
+            # chunks defined differently for DAQmxRawData format
+            data_size = self.ordered_objects[0].number_values * self.ordered_objects[0].raw_data_width
+        else:
+            data_size = sum([
+                o.data_size
+                for o in self.ordered_objects if o.has_data])
+
         total_data_size = self.next_segment_offset - self.raw_data_offset
         if data_size < 0 or total_data_size < 0:
             raise ValueError("Negative data size")
@@ -710,6 +715,11 @@ class TdmsObject(object):
                 self.data = np.zeros(
                     self.number_values, dtype=self.data_type.nptype)
             self._data_insert_position = 0
+        if self.data is not None:
+            log.debug("Allocated %d sample slots for %s" % (len(self.data), 
+                                                      self.path))
+        else:
+            log.debug("Allocated no space for %s" % (self.path,))
 
     def _update_data(self, new_data):
         """Update the object data with a new array of data"""
@@ -814,7 +824,7 @@ class _TdmsmxDAQInfo(object):
         #log.debug("mxDAQ Data dimension '%d' n values '%d'"
         # %(self.dimension, self.chunk_size))
         # Size of the vector
-        log.debug("mxDAQ vector size '%d'" % (self.scaler_vector_length,))
+        log.debug("mxDAQ format scaaler vector size '%d'" % (self.scaler_vector_length,))
 
         for idx in range(self.scaler_vector_length):
             # tbd: implement format_changing_scaler vector here
@@ -840,12 +850,12 @@ class _TdmsmxDAQInfo(object):
         #        self.scale_id
         #))
 
-        vector_raw_data_width = _read_long(f)
-        self.raw_data_widths = np.zeros(vector_raw_data_width, dtype=np.int32)
-        for cnt in range(vector_raw_data_width):
+        raw_data_widths_length = _read_long(f)
+        self.raw_data_widths = np.zeros(raw_data_widths_length, dtype=np.int32)
+        for cnt in range(raw_data_widths_length):
             self.raw_data_widths[cnt] = _read_long(f)
         #log.debug("mxDAQ vector raw data width '%d': '%s"
-        # %(vector_raw_data_width, self.elements))
+        # %(raw_data_widths_length, self.raw_data_widths))
 
         num_properties = _read_long(f)
         self.properties = [None] * num_properties
@@ -866,7 +876,8 @@ class _TdmsSegmentObject(object):
 
     __slots__ = [
         'tdms_object', 'number_values', 'data_size',
-        'has_data', 'data_type', 'dimension']
+        'has_data', 'data_type', 'dimension',
+        'raw_data_width']
 
     def __init__(self, tdms_object):
         self.tdms_object = tdms_object
@@ -876,6 +887,7 @@ class _TdmsSegmentObject(object):
         self.has_data = True
         self.data_type = None
         self.dimension = 1
+        self.raw_data_width = 0
 
     def _read_metadata_mx(self, f):
 
@@ -935,6 +947,10 @@ class _TdmsSegmentObject(object):
             self.data_type = info.data_type
             self.data_size = info.chunk_size
             self.number_values = info.chunk_size/info.data_type.length
+            # segment reading code relies on a single consistent data
+            # width so assert that there is only one.
+            assert(len(info.raw_data_widths)==1)
+            self.raw_data_width = info.raw_data_widths[0]
             return
 
         else:
