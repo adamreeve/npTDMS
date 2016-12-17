@@ -149,7 +149,7 @@ def read_property(f):
         value = read_type(f, prop_data_type, '<')
     log.debug("Property %s (%s): %s" % (
         prop_name, prop_data_type.name, value))
-    return prop_name,value
+    return prop_name, value
 
 
 # Some simple speed optimisation; discussable if required
@@ -829,14 +829,21 @@ class TdmsObject(object):
 
         return self._data_scaled
 
+
 class _TdmsmxDAQMetadata(object):
     __slots__ = [
-        'dimension', 'chunk_size', 'scaler_vector_length',
+        'chunk_size',
         'data_type',
-        'scaler_data_type_code', 'scaler_data_type',
-        'scaler_raw_buffer_index', 'scaler_raw_buffer_index', 'scaler_raw_byte_offset',
-        'scaler_sample_format_bitmap', 'scale_id',
+        'dimension',
         'raw_data_widths',
+        'scale_id',
+        'scaler_data_type',
+        'scaler_data_type_code',
+        'scaler_raw_buffer_index',
+        'scaler_raw_buffer_index',
+        'scaler_raw_byte_offset',
+        'scaler_sample_format_bitmap',
+        'scaler_vector_length',
         ]
 
     def info(self):
@@ -868,7 +875,8 @@ class _TdmsmxDAQMetadata(object):
         log.debug("mxDAQ format scaler vector size '%d'" %
                   (self.scaler_vector_length,))
         if self.scaler_vector_length > 1:
-            log.error("mxDAQ multiple format changing scalers are not implemented")
+            log.error("mxDAQ multiple 'format changing' "
+                      "scalers not implemented")
 
         for idx in range(self.scaler_vector_length):
             # WARNING: This code overwrites previous values with new
@@ -978,8 +986,9 @@ class _TdmsSegmentObject(object):
             #    0x00001269 for segment containing Format Changing scaler.
             #    0x00001369 for segment containing Digital Line scaler.
             if raw_data_index == 0x00001369:
-                # special scaling for DAQ's digital input lines?
-                log.warning("DAQmx with Digital Line scaler has not been tested")
+                # Special scaling for DAQ's digital input lines?
+                # Undocumented functionality!
+                log.warning("DAQmx with Digital Line scaler not tested")
 
             # DAQmx raw data format metadata has its own class
             self.has_data = True
@@ -1026,7 +1035,7 @@ class _TdmsSegmentObject(object):
             # Read data dimension
             s = f.read(4)
             self.dimension = struct.unpack("<L", s)[0]
-            # In TDMS format version 2.0, 1 is the only valid value for dimension
+            # In TDMS version 2.0, 1 is only valid value for dimension
             if self.dimension != 1:
                 log.warning("Data dimension is not 1")
 
