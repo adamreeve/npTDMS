@@ -81,7 +81,7 @@ tdsDataTypes.update({
     0x20: DataType('tdsTypeString', None, None, None),
     0x21: DataType('tdsTypeBoolean', 'b', 1, np.bool8),
     0x44: DataType('tdsTypeTimeStamp', 'Qq', 16, None),
-    0xFFFFFFFF: DataType('tdsTypeDAQmxRawData', None, None, None)
+    0xFFFFFFFF: DataType('tdsTypeDAQmxRawData', None, 2, np.uint16)
 })
 
 
@@ -134,6 +134,21 @@ def read_type(file, data_type, endianness):
         return struct.unpack('%s%s' % (endianness, data_type.struct), s)[0]
     else:
         raise ValueError("Unsupported data type to read, %s." % data_type.name)
+
+# Some simple speed optimisation; discussable if required
+_struct_unpack = struct.unpack
+
+
+def _read_long(a_file):
+        t_bytes = a_file.read(4)
+        val, = _struct_unpack("<L", t_bytes)
+        return val
+
+
+def _read_long_long(a_file):
+        t_bytes = a_file.read(8)
+        val, = _struct_unpack("<Q", t_bytes)
+        return val
 
 
 class TdmsFile(object):
@@ -447,9 +462,15 @@ class _TdmsSegment(object):
         segment, based on the number of chunks.
         """
 
-        data_size = sum([
-            o.data_size
-            for o in self.ordered_objects if o.has_data])
+        if self.toc['kTocDAQmxRawData']:
+            # chunks defined differently for DAQmxRawData format
+            data_size = self.ordered_objects[0].number_values \
+                * self.ordered_objects[0].raw_data_width
+        else:
+            data_size = sum([
+                o.data_size
+                for o in self.ordered_objects if o.has_data])
+
         total_data_size = self.next_segment_offset - self.raw_data_offset
         if data_size < 0 or total_data_size < 0:
             raise ValueError("Negative data size")
@@ -728,6 +749,11 @@ class TdmsObject(object):
                 self.data = np.zeros(
                     self.number_values, dtype=self.data_type.nptype)
             self._data_insert_position = 0
+        if self.data is not None:
+            log.debug("Allocated %d sample slots for %s" % (len(self.data),
+                                                            self.path))
+        else:
+            log.debug("Allocated no space for %s" % (self.path,))
 
     def _update_data(self, new_data):
         """Update the object data with a new array of data"""
@@ -765,6 +791,119 @@ class TdmsObject(object):
         return pd.DataFrame(self.data, index=time, columns=[self.path])
 
 
+class _TdmsmxDAQPropertyInfo(object):
+    """
+    Represents the mxDAQ Data
+    """
+    __slots__ = [
+        'property_name', 'data_type_code', 'data_type', 'value',
+        ]
+
+    def __str__(self):
+        l = []
+        fmt = "%s: %s"
+        l = map(lambda name: fmt % (name, getattr(self, name)), self.__slots__)
+        txt = "%s : (%s)" % (self.__class__.__name__, ", ".join(l))
+        return txt
+
+    def _read_metadata(self, f):
+
+        length = _read_long(f)
+        self.property_name = f.read(length)
+        self.data_type_code = _read_long(f)
+        self.data_type = tdsDataTypes[self.data_type_code]
+        if self.data_type.name == "tdsTypeString":
+            self.value = read_string(f)
+        else:
+            length = self.data_type.length
+            t_bytes = f.read(length)
+            self.value, = struct.unpack("<" + self.data_type.struct, t_bytes)
+
+        #msg = "mxDAQ property data_type '%s' value '%s'"
+        #log.debug(msg %(self.data_type.name, self.value))
+
+
+class _TdmsmxDAQInfo(object):
+    __slots__ = [
+        'dimension', 'chunk_size', 'scaler_vector_length',
+        'data_type',
+        'scaler_data_type_code', 'scaler_data_type',
+        'raw_buffer_index', 'raw_buffer_index', 'raw_byte_offset',
+        'sample_format_bitmap', 'scale_id',
+        'raw_data_widths', 'properties'
+        ]
+
+    def info(self):
+        l = []
+        for name in self.__slots__:
+            l.append("%s: %s" % (name, getattr(self, name)))
+
+        tmp = ",".join(l)
+        fmt = "%s: ('%s')"
+        txt = fmt % (self.__class__.__name__, tmp)
+        return txt
+
+    def _read_metadata(self, f):
+        """
+        Read the metadata for a DAQmx raw segment.  This is the raw
+        DAQmx-specific portion of the raw data index.
+        """
+        self.data_type = tdsDataTypes[0xFFFFFFFF]
+        self.dimension = _read_long(f)
+        # In TDMS format version 2.0, 1 is the only valid value for dimension
+        assert(self.dimension == 1)
+        self.chunk_size = _read_long_long(f)
+        # size of vector of format changing scalers
+        self.scaler_vector_length = _read_long(f)
+        #log.debug("mxDAQ Data dimension '%d' n values '%d'"
+        # %(self.dimension, self.chunk_size))
+        # Size of the vector
+        log.debug("mxDAQ format scaaler vector size '%d'" %
+                  (self.scaler_vector_length,))
+
+        for idx in range(self.scaler_vector_length):
+            # tbd: implement format_changing_scaler vector here
+            self.scaler_data_type_code = _read_long(f)
+            self.scaler_data_type = tdsDataTypes[self.scaler_data_type_code]
+            #log.debug(
+            #    "mxDAQ scaler_vector_length '%d' data_type '%d' = '%s'"
+            #    %(self.scaler_vector_length, self.scaler_data_type_code,
+            # self.scaler_data_type.name))
+
+            # more info for format changing scaler
+            self.raw_buffer_index = _read_long(f)
+            self.raw_byte_offset = _read_long(f)
+            self.sample_format_bitmap = _read_long(f)
+            self.scale_id = _read_long(f)
+
+        #msg = "raw buffer index '%d' raw byte offset '%d' "\
+            #"sample_format_bitmap '%d' scale id '%d'"
+        #log.debug(msg %(
+        #        self.raw_buffer_index,
+        #        self.raw_byte_offset,
+        #        self.sample_format_bitmap,
+        #        self.scale_id
+        #))
+
+        raw_data_widths_length = _read_long(f)
+        self.raw_data_widths = np.zeros(raw_data_widths_length, dtype=np.int32)
+        for cnt in range(raw_data_widths_length):
+            self.raw_data_widths[cnt] = _read_long(f)
+        #log.debug("mxDAQ vector raw data width '%d': '%s"
+        # %(raw_data_widths_length, self.raw_data_widths))
+
+        num_properties = _read_long(f)
+        self.properties = [None] * num_properties
+
+        for cnt in range(num_properties):
+            t_prop = _TdmsmxDAQPropertyInfo()
+            t_prop._read_metadata(f)
+            self.properties[cnt] = t_prop
+
+        self.properties = tuple(self.properties)
+        #log.debug("mxDAQ properties '%s'" %(repr(self.properties),))
+
+
 class _TdmsSegmentObject(object):
     """
     Describes an object in an individual TDMS file segment
@@ -772,7 +911,8 @@ class _TdmsSegmentObject(object):
 
     __slots__ = [
         'tdms_object', 'number_values', 'data_size',
-        'has_data', 'data_type', 'dimension']
+        'has_data', 'data_type', 'dimension',
+        'raw_data_width']
 
     def __init__(self, tdms_object):
         self.tdms_object = tdms_object
@@ -782,6 +922,36 @@ class _TdmsSegmentObject(object):
         self.has_data = True
         self.data_type = None
         self.dimension = 1
+        self.raw_data_width = 0
+
+    def _read_metadata_mx(self, f):
+
+        # Read the data type
+        s = f.read(4)
+
+        data_type_val, = struct.unpack("<L", s)
+        try:
+            self.data_type = tdsDataTypes[data_type_val]
+        except KeyError:
+            raise KeyError("Unrecognised data type")
+
+        if self.tdms_object.data_type is not None \
+           and self.data_type != self.tdms_object.data_type:
+
+            raise ValueError(
+                "Segment object doesn't have the same data "
+                "type as previous segments.")
+        else:
+            self.tdms_object.data_type = self.data_type
+
+        log.debug("mxDAQ Object data type: %s"
+                  % self.tdms_object.data_type.name)
+
+        info = _TdmsmxDAQInfo()
+        info._read_metadata(f)
+
+        log.debug("mxDAQ '%s' '%s'" % (info, info.info()))
+        return info
 
     def _read_metadata(self, f):
         """Read object metadata and update object information"""
@@ -802,6 +972,22 @@ class _TdmsSegmentObject(object):
             log.debug(
                 "Object has same data structure as in the previous segment")
             self.has_data = True
+        elif raw_data_index == 0x1269:
+            # mx data seem to be a lot different ... thus the information is
+            # handled currently in a separate class
+            info = self._read_metadata_mx(f)
+            self.has_data = True
+            self.tdms_object.has_data = True
+            self.dimension = info.dimension
+            self.data_type = info.data_type
+            self.data_size = info.chunk_size
+            self.number_values = info.chunk_size/info.data_type.length
+            # segment reading code relies on a single consistent data
+            # width so assert that there is only one.
+            assert(len(info.raw_data_widths) == 1)
+            self.raw_data_width = info.raw_data_widths[0]
+            return
+
         else:
             # raw_data_index gives the length of the index information.
             self.has_data = True
