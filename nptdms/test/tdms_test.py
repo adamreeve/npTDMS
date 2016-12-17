@@ -461,6 +461,50 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(data[0], 2)
         self.assertEqual(data[1], 4)
 
+    def test_less_data_than_expected(self):
+        """Add segment and then a repeated segment without
+        any lead in or metadata, so data is read in chunks,
+        but the extra chunk does not have as much data as expected."""
+
+        test_file = TestFile()
+        (metadata, data, toc) = basic_segment()
+        data = data + (
+            "05 00 00 00"
+            "06 00 00 00"
+        )
+        test_file.add_segment(metadata, data, toc)
+        tdmsData = test_file.load()
+
+        data = tdmsData.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 3)
+        self.assertTrue(all(data == [1, 2, 5]))
+        data = tdmsData.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 3)
+        self.assertTrue(all(data == [3, 4, 6]))
+
+    def test_less_data_than_expected_interleaved(self):
+        """Add segment and then a repeated segment without
+        any lead in or metadata, so data is read in chunks,
+        but the extra chunk does not have as much data as expected.
+        This also uses interleaved data"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = basic_segment()
+        toc = toc + ("kTocInterleavedData", )
+        data = data + (
+            "05 00 00 00"
+            "06 00 00 00"
+        )
+        test_file.add_segment(metadata, data, toc)
+        tdmsData = test_file.load()
+
+        data = tdmsData.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 3)
+        self.assertTrue(all(data == [1, 3, 5]))
+        data = tdmsData.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 3)
+        self.assertTrue(all(data == [2, 4, 6]))
+
     def test_timestamp_data(self):
         """Test reading contiguous and interleaved timestamp data,
         which isn't read by numpy"""
