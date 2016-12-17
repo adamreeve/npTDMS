@@ -796,7 +796,7 @@ class TdmsObject(object):
         if self._data_scaled is None:
             scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
             if scale_type == 'Polynomial':
-                coeff_names = ['NI_Scale[1]_Polynomial_Coefficients[%d]' % i 
+                coeff_names = ['NI_Scale[1]_Polynomial_Coefficients[%d]' % i
                                for i in range(4)]
                 scaled_data = np.zeros_like(self.data, dtype=np.float)
                 for i, scale_factor in enumerate([self.properties[s]
