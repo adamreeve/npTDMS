@@ -878,7 +878,10 @@ class _TdmsmxDAQMetadata(object):
             log.error("mxDAQ multiple format changing scalers not implemented")
 
         for idx in range(self.scaler_vector_length):
-            # tbd: implement format_changing_scaler vector here
+            # WARNING: This code overwrites previous values with new
+            # values.  At this time NI provides no documentation on
+            # how to use these scalers and sample TDMS files do not
+            # include more than one of these scalers.
             self.scaler_data_type_code = _read_long(f)
             self.scaler_data_type = tdsDataTypes[self.scaler_data_type_code]
             #log.debug(
