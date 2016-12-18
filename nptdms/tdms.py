@@ -852,8 +852,7 @@ class _TdmsmxDAQInfo(object):
         'scaler_data_type_code', 'scaler_data_type',
         'raw_buffer_index', 'raw_buffer_index', 'raw_byte_offset',
         'sample_format_bitmap', 'scale_id',
-        'raw_data_widths', 'properties',
-        '_property_names', '_values_check',
+        'raw_data_widths', 'properties'
         ]
 
     def info(self):
@@ -917,9 +916,6 @@ class _TdmsmxDAQInfo(object):
 
         num_properties = _read_long(f)
         self.properties = [None] * num_properties
-
-        self._property_names = self.__property_names[str(num_properties)]
-        self._values_check = self.__values_check[str(num_properties)]
 
         for cnt in range(num_properties):
             t_prop = _TdmsmxDAQPropertyInfo()
@@ -1005,7 +1001,6 @@ class _TdmsSegmentObject(object):
             self.has_data = True
             for property in info.properties:
                 self.tdms_object.properties[property.property_name] = property.value
-            self.has_data = True # Is that the correct idea
             self.tdms_object.has_data = True
             self.dimension = info.dimension
             self.data_type = info.data_type
