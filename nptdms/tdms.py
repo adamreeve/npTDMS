@@ -81,7 +81,7 @@ tdsDataTypes.update({
     0x20: DataType('tdsTypeString', None, None, None),
     0x21: DataType('tdsTypeBoolean', 'b', 1, np.bool8),
     0x44: DataType('tdsTypeTimeStamp', 'Qq', 16, None),
-    0xFFFFFFFF: DataType('tdsTypeDAQmxRawData', None, 2, np.uint16)
+    0xFFFFFFFF: DataType('tdsTypeDAQmxRawData', None, 2, np.int16)
 })
 
 
