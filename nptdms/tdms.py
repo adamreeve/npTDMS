@@ -46,6 +46,7 @@ except NameError:
     long = int
     zip_longest = itertools.zip_longest
 
+
 tds_data_type_dict = dict((dt.enum_value, dt) for dt in tds_data_types)
 
 
