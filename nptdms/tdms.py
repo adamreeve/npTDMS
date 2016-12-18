@@ -135,6 +135,23 @@ def read_type(file, data_type, endianness):
     else:
         raise ValueError("Unsupported data type to read, %s." % data_type.name)
 
+
+def read_property(f):
+    """ Read a property from a segment's metadata """
+    prop_name = read_string(f)
+
+    # Property data type
+    s = f.read(4)
+    prop_data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
+    if prop_data_type.name == 'tdsTypeString':
+        value = read_string(f)
+    else:
+        value = read_type(f, prop_data_type, '<')
+    log.debug("Property %s (%s): %s" % (
+        prop_name, prop_data_type.name, value))
+    return prop_name, value
+
+
 # Some simple speed optimisation; discussable if required
 _struct_unpack = struct.unpack
 
@@ -796,7 +813,7 @@ class TdmsObject(object):
         if self._data_scaled is None:
             scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
             if scale_type == 'Polynomial':
-                coeff_names = ['NI_Scale[1]_Polynomial_Coefficients[%d]' % i 
+                coeff_names = ['NI_Scale[1]_Polynomial_Coefficients[%d]' % i
                                for i in range(4)]
                 scaled_data = np.zeros_like(self.data, dtype=np.float)
                 for i, scale_factor in enumerate([self.properties[s]
@@ -813,46 +830,20 @@ class TdmsObject(object):
         return self._data_scaled
 
 
-class _TdmsmxDAQPropertyInfo(object):
-    """
-    Represents the mxDAQ Data
-    """
+class _TdmsmxDAQMetadata(object):
     __slots__ = [
-        'property_name', 'data_type_code', 'data_type', 'value',
-        ]
-
-    def __str__(self):
-        l = []
-        fmt = "%s: %s"
-        l = map(lambda name: fmt % (name, getattr(self, name)), self.__slots__)
-        txt = "%s : (%s)" % (self.__class__.__name__, ", ".join(l))
-        return txt
-
-    def _read_metadata(self, f):
-
-        length = _read_long(f)
-        self.property_name = f.read(length).decode()
-        self.data_type_code = _read_long(f)
-        self.data_type = tdsDataTypes[self.data_type_code]
-        if self.data_type.name == "tdsTypeString":
-            self.value = read_string(f)
-        else:
-            length = self.data_type.length
-            t_bytes = f.read(length)
-            self.value, = struct.unpack("<" + self.data_type.struct, t_bytes)
-
-        #msg = "mxDAQ property data_type '%s' value '%s'"
-        #log.debug(msg %(self.data_type.name, self.value))
-
-
-class _TdmsmxDAQInfo(object):
-    __slots__ = [
-        'dimension', 'chunk_size', 'scaler_vector_length',
+        'chunk_size',
         'data_type',
-        'scaler_data_type_code', 'scaler_data_type',
-        'raw_buffer_index', 'raw_buffer_index', 'raw_byte_offset',
-        'sample_format_bitmap', 'scale_id',
-        'raw_data_widths', 'properties'
+        'dimension',
+        'raw_data_widths',
+        'scale_id',
+        'scaler_data_type',
+        'scaler_data_type_code',
+        'scaler_raw_buffer_index',
+        'scaler_raw_buffer_index',
+        'scaler_raw_byte_offset',
+        'scaler_sample_format_bitmap',
+        'scaler_vector_length',
         ]
 
     def info(self):
@@ -873,18 +864,25 @@ class _TdmsmxDAQInfo(object):
         self.data_type = tdsDataTypes[0xFFFFFFFF]
         self.dimension = _read_long(f)
         # In TDMS format version 2.0, 1 is the only valid value for dimension
-        assert(self.dimension == 1)
+        if self.dimension != 1:
+            log.warning("Data dimension is not 1")
         self.chunk_size = _read_long_long(f)
         # size of vector of format changing scalers
         self.scaler_vector_length = _read_long(f)
         #log.debug("mxDAQ Data dimension '%d' n values '%d'"
         # %(self.dimension, self.chunk_size))
         # Size of the vector
-        log.debug("mxDAQ format scaaler vector size '%d'" %
+        log.debug("mxDAQ format scaler vector size '%d'" %
                   (self.scaler_vector_length,))
+        if self.scaler_vector_length > 1:
+            log.error("mxDAQ multiple 'format changing' "
+                      "scalers not implemented")
 
         for idx in range(self.scaler_vector_length):
-            # tbd: implement format_changing_scaler vector here
+            # WARNING: This code overwrites previous values with new
+            # values.  At this time NI provides no documentation on
+            # how to use these scalers and sample TDMS files do not
+            # include more than one of these scalers.
             self.scaler_data_type_code = _read_long(f)
             self.scaler_data_type = tdsDataTypes[self.scaler_data_type_code]
             #log.debug(
@@ -893,17 +891,17 @@ class _TdmsmxDAQInfo(object):
             # self.scaler_data_type.name))
 
             # more info for format changing scaler
-            self.raw_buffer_index = _read_long(f)
-            self.raw_byte_offset = _read_long(f)
-            self.sample_format_bitmap = _read_long(f)
+            self.scaler_raw_buffer_index = _read_long(f)
+            self.scaler_raw_byte_offset = _read_long(f)
+            self.scaler_sample_format_bitmap = _read_long(f)
             self.scale_id = _read_long(f)
 
         #msg = "raw buffer index '%d' raw byte offset '%d' "\
             #"sample_format_bitmap '%d' scale id '%d'"
         #log.debug(msg %(
-        #        self.raw_buffer_index,
-        #        self.raw_byte_offset,
-        #        self.sample_format_bitmap,
+        #        self.scaler_raw_buffer_index,
+        #        self.scaler_raw_byte_offset,
+        #        self.scaler_sample_format_bitmap,
         #        self.scale_id
         #))
 
@@ -913,17 +911,6 @@ class _TdmsmxDAQInfo(object):
             self.raw_data_widths[cnt] = _read_long(f)
         #log.debug("mxDAQ vector raw data width '%d': '%s"
         # %(raw_data_widths_length, self.raw_data_widths))
-
-        num_properties = _read_long(f)
-        self.properties = [None] * num_properties
-
-        for cnt in range(num_properties):
-            t_prop = _TdmsmxDAQPropertyInfo()
-            t_prop._read_metadata(f)
-            self.properties[cnt] = t_prop
-
-        self.properties = tuple(self.properties)
-        #log.debug("mxDAQ properties '%s'" %(repr(self.properties),))
 
 
 class _TdmsSegmentObject(object):
@@ -969,7 +956,7 @@ class _TdmsSegmentObject(object):
         log.debug("mxDAQ Object data type: %s"
                   % self.tdms_object.data_type.name)
 
-        info = _TdmsmxDAQInfo()
+        info = _TdmsmxDAQMetadata()
         info._read_metadata(f)
 
         log.debug("mxDAQ '%s' '%s'" % (info, info.info()))
@@ -994,25 +981,32 @@ class _TdmsSegmentObject(object):
             log.debug(
                 "Object has same data structure as in the previous segment")
             self.has_data = True
-        elif raw_data_index == 0x1269:
-            # mx data seem to be a lot different ... thus the information is
-            # handled currently in a separate class
-            info = self._read_metadata_mx(f)
-            for p in info.properties:
-                self.tdms_object.properties[p.property_name] = p.value
+        elif raw_data_index == 0x00001269 or raw_data_index == 0x00001369:
+            # This is a DAQmx raw data segment.
+            #    0x00001269 for segment containing Format Changing scaler.
+            #    0x00001369 for segment containing Digital Line scaler.
+            if raw_data_index == 0x00001369:
+                # Special scaling for DAQ's digital input lines?
+                # Undocumented functionality!
+                log.warning("DAQmx with Digital Line scaler not tested")
+
+            # DAQmx raw data format metadata has its own class
             self.has_data = True
             self.tdms_object.has_data = True
+
+            info = self._read_metadata_mx(f)
             self.dimension = info.dimension
             self.data_type = info.data_type
+            # DAQmx format has special chunking
             self.data_size = info.chunk_size
             self.number_values = info.chunk_size/info.data_type.length
-            # segment reading code relies on a single consistent data
-            # width so assert that there is only one.
+            # segment reading code relies on a single consistent raw
+            # data width so assert that there is only one.
             assert(len(info.raw_data_widths) == 1)
             self.raw_data_width = info.raw_data_widths[0]
-            return
-
+            # fall through and read properties
         else:
+            # Assume metadata format is legacy TDMS format.
             # raw_data_index gives the length of the index information.
             self.has_data = True
             self.tdms_object.has_data = True
@@ -1041,6 +1035,7 @@ class _TdmsSegmentObject(object):
             # Read data dimension
             s = f.read(4)
             self.dimension = struct.unpack("<L", s)[0]
+            # In TDMS version 2.0, 1 is only valid value for dimension
             if self.dimension != 1:
                 log.warning("Data dimension is not 1")
 
@@ -1065,17 +1060,7 @@ class _TdmsSegmentObject(object):
         num_properties = struct.unpack("<L", s)[0]
         log.debug("Reading %d properties" % num_properties)
         for i in range(num_properties):
-            prop_name = read_string(f)
-
-            # Property data type
-            s = f.read(4)
-            prop_data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
-            if prop_data_type.name == 'tdsTypeString':
-                value = read_string(f)
-            else:
-                value = read_type(f, prop_data_type, '<')
-            log.debug("Property %s (%s): %s" % (
-                prop_name, prop_data_type.name, value))
+            prop_name, value = read_property(f)
             self.tdms_object.properties[prop_name] = value
 
     @property
