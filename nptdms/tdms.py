@@ -622,6 +622,7 @@ class TdmsObject(object):
     def __init__(self, path):
         self.path = path
         self.data = None
+        self._data_scaled = None
         self.properties = OrderedDict()
         self.data_type = None
         self.dimension = 1
@@ -790,6 +791,27 @@ class TdmsObject(object):
 
         return pd.DataFrame(self.data, index=time, columns=[self.path])
 
+    @_property_builtin
+    def scaled(self):
+        if self._data_scaled is None:
+            scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
+            if scale_type == 'Polynomial':
+                scale_factors = (self.properties['NI_Scale[1]_Polynomial_Coefficients[0]'],
+                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[1]'],
+                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[2]'],
+                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[3]'])
+                scaled_data = np.zeros_like(self.data, dtype=np.float)
+                for i, scale_factor in enumerate(scale_factors):
+                    scaled_data += scale_factor * self.data**i
+            elif scale_type == 'Linear':
+                slope = self.properties["NI_Scale[1]_Linear_Slope"]
+                intercept = self.properties["NI_Scale[1]_Linear_Y_Intercept"]
+                scaled_data = self.data * slope + intercept
+            else:
+                scaled_data = self.data
+            self._data_scaled = scaled_data
+
+        return self._data_scaled
 
 class _TdmsmxDAQPropertyInfo(object):
     """
@@ -809,7 +831,7 @@ class _TdmsmxDAQPropertyInfo(object):
     def _read_metadata(self, f):
 
         length = _read_long(f)
-        self.property_name = f.read(length)
+        self.property_name = f.read(length).decode()
         self.data_type_code = _read_long(f)
         self.data_type = tdsDataTypes[self.data_type_code]
         if self.data_type.name == "tdsTypeString":
@@ -830,7 +852,8 @@ class _TdmsmxDAQInfo(object):
         'scaler_data_type_code', 'scaler_data_type',
         'raw_buffer_index', 'raw_buffer_index', 'raw_byte_offset',
         'sample_format_bitmap', 'scale_id',
-        'raw_data_widths', 'properties'
+        'raw_data_widths', 'properties',
+        '_property_names', '_values_check',
         ]
 
     def info(self):
@@ -894,6 +917,9 @@ class _TdmsmxDAQInfo(object):
 
         num_properties = _read_long(f)
         self.properties = [None] * num_properties
+
+        self._property_names = self.__property_names[str(num_properties)]
+        self._values_check = self.__values_check[str(num_properties)]
 
         for cnt in range(num_properties):
             t_prop = _TdmsmxDAQPropertyInfo()
@@ -977,6 +1003,9 @@ class _TdmsSegmentObject(object):
             # handled currently in a separate class
             info = self._read_metadata_mx(f)
             self.has_data = True
+            for property in info.properties:
+                self.tdms_object.properties[property.property_name] = property.value
+            self.has_data = True # Is that the correct idea
             self.tdms_object.has_data = True
             self.dimension = info.dimension
             self.data_type = info.data_type
