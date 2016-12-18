@@ -583,7 +583,10 @@ class _TdmsSegment(object):
 
         log.debug("Reading interleaved data all at once")
         # Read all data into 1 byte unsigned ints first
-        all_channel_bytes = sum((o.data_type.length for o in data_objects))
+        all_channel_bytes = data_objects[0].raw_data_width
+        if all_channel_bytes == 0:
+            all_channel_bytes = sum((o.data_type.length for o in data_objects))
+        log.debug("all_channel_bytes: %d" % all_channel_bytes)
         number_bytes = all_channel_bytes * data_objects[0].number_values
         combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
         # Reshape, so that one row is all bytes for all objects
@@ -595,7 +598,8 @@ class _TdmsSegment(object):
                 range(data_pos, obj.data_type.length + data_pos))
             log.debug("Byte columns for channel %d: %s" % (i, byte_columns))
             # Select columns for this channel, so that number of values will
-            # be number of bytes per point * number of data points
+            # be number of bytes per point * number of data points.
+            # Then use ravel to flatten the results into a vector.
             object_data = combined_data[:, byte_columns].ravel()
             # Now set correct data type, so that the array length should
             # be correct
@@ -603,7 +607,6 @@ class _TdmsSegment(object):
                 np.dtype(obj.data_type.nptype).newbyteorder(endianness))
             obj.tdms_object._update_data(object_data)
             data_pos += obj.data_type.length
-
     def _read_interleaved(self, f, data_objects, endianness):
         """Read interleaved data that doesn't have a numpy type"""
 
@@ -810,6 +813,9 @@ class TdmsObject(object):
 
     @_property_builtin
     def scaled(self):
+        if self.data is None:
+            # tbd: self.data is None if data segment is empty
+            return np.empty((0,1))
         if self._data_scaled is None:
             scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
             if scale_type == 'Polynomial':
