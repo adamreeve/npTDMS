@@ -25,6 +25,7 @@ except ImportError:
     pytz = None
 
 from nptdms.utils import Timer
+from nptdms.common import tds_data_types, toc_properties
 
 
 log = logging.getLogger(__name__)
@@ -44,45 +45,8 @@ except NameError:
     # Python 3
     long = int
     zip_longest = itertools.zip_longest
-tocProperties = {
-    'kTocMetaData': (long(1) << 1),
-    'kTocRawData': (long(1) << 3),
-    'kTocDAQmxRawData': (long(1) << 7),
-    'kTocInterleavedData': (long(1) << 5),
-    'kTocBigEndian': (long(1) << 6),
-    'kTocNewObjList': (long(1) << 2)
-}
 
-# Class for describing data types, with data type name,
-# identifier used by struct module, the size in bytes to read and the
-# numpy data type where applicable/implemented
-DataType = namedtuple(
-    "DataType", ('name', 'struct', 'length', 'nptype'))
-
-tdsDataTypes = dict(enumerate((
-    DataType('tdsTypeVoid', None, 0, None),
-    DataType('tdsTypeI8', 'b', 1, np.int8),
-    DataType('tdsTypeI16', 'h', 2, np.int16),
-    DataType('tdsTypeI32', 'l', 4, np.int32),
-    DataType('tdsTypeI64', 'q', 8, np.int64),
-    DataType('tdsTypeU8', 'B', 1, np.uint8),
-    DataType('tdsTypeU16', 'H', 2, np.uint16),
-    DataType('tdsTypeU32', 'L', 4, np.uint32),
-    DataType('tdsTypeU64', 'Q', 8, np.uint64),
-    DataType('tdsTypeSingleFloat', 'f', 4, np.single),
-    DataType('tdsTypeDoubleFloat', 'd', 8, np.double),
-    DataType('tdsTypeExtendedFloat', None, None, None),
-    DataType('tdsTypeDoubleFloatWithUnit', None, 8, None),
-    DataType('tdsTypeExtendedFloatWithUnit', None, None, None)
-)))
-
-tdsDataTypes.update({
-    0x19: DataType('tdsTypeSingleFloatWithUnit', None, 4, None),
-    0x20: DataType('tdsTypeString', None, None, None),
-    0x21: DataType('tdsTypeBoolean', 'b', 1, np.bool8),
-    0x44: DataType('tdsTypeTimeStamp', 'Qq', 16, None),
-    0xFFFFFFFF: DataType('tdsTypeDAQmxRawData', None, None, None)
-})
+tds_data_type_dict = dict((dt.enum_value, dt) for dt in tds_data_types)
 
 
 if pytz:
@@ -335,8 +299,8 @@ class _TdmsSegment(object):
         toc_mask = struct.unpack('<i', s)[0]
 
         self.toc = OrderedDict()
-        for property in tocProperties.keys():
-            self.toc[property] = (toc_mask & tocProperties[property]) != 0
+        for property in toc_properties.keys():
+            self.toc[property] = (toc_mask & toc_properties[property]) != 0
             log.debug("Property %s is %s" % (property, self.toc[property]))
 
         # Next four bytes are version number
@@ -810,7 +774,7 @@ class _TdmsSegmentObject(object):
             # Read the data type
             s = f.read(4)
             try:
-                self.data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
+                self.data_type = tds_data_type_dict[struct.unpack("<L", s)[0]]
             except KeyError:
                 raise KeyError("Unrecognised data type")
             if (self.tdms_object.data_type is not None and
@@ -859,7 +823,7 @@ class _TdmsSegmentObject(object):
 
             # Property data type
             s = f.read(4)
-            prop_data_type = tdsDataTypes[struct.unpack("<L", s)[0]]
+            prop_data_type = tds_data_type_dict[struct.unpack("<L", s)[0]]
             if prop_data_type.name == 'tdsTypeString':
                 value = read_string(f)
             else:
