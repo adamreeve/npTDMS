@@ -147,8 +147,8 @@ def read_property(f):
         value = read_string(f)
     else:
         value = read_type(f, prop_data_type, '<')
-    log.debug("Property %s (%s): %s" % (
-        prop_name, prop_data_type.name, value))
+    log.debug("Property %s (%s): %s",
+              prop_name, prop_data_type.name, value)
     return prop_name, value
 
 
@@ -360,7 +360,7 @@ class _TdmsSegment(object):
             raise ValueError(
                 "Segment does not start with TDSm, but with %s" % s)
 
-        log.debug("Reading segment at %d" % self.position)
+        log.debug("Reading segment at %d", self.position)
 
         # Next four bytes are table of contents mask
         s = f.read(4)
@@ -369,7 +369,7 @@ class _TdmsSegment(object):
         self.toc = OrderedDict()
         for property in tocProperties.keys():
             self.toc[property] = (toc_mask & tocProperties[property]) != 0
-            log.debug("Property %s is %s" % (property, self.toc[property]))
+            log.debug("Property %s is %s", property, self.toc[property])
 
         # Next four bytes are version number
         s = f.read(4)
@@ -421,7 +421,7 @@ class _TdmsSegment(object):
             self.ordered_objects = [
                 copy(o) for o in previous_segment.ordered_objects]
 
-        log.debug("Reading metadata at %d" % f.tell())
+        log.debug("Reading metadata at %d", f.tell())
 
         # First four bytes have number of objects in metadata
         s = f.read(4)
@@ -586,7 +586,7 @@ class _TdmsSegment(object):
         all_channel_bytes = data_objects[0].raw_data_width
         if all_channel_bytes == 0:
             all_channel_bytes = sum((o.data_type.length for o in data_objects))
-        log.debug("all_channel_bytes: %d" % all_channel_bytes)
+        log.debug("all_channel_bytes: %d", all_channel_bytes)
         number_bytes = all_channel_bytes * data_objects[0].number_values
         combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
         # Reshape, so that one row is all bytes for all objects
@@ -596,7 +596,7 @@ class _TdmsSegment(object):
         for (i, obj) in enumerate(data_objects):
             byte_columns = tuple(
                 range(data_pos, obj.data_type.length + data_pos))
-            log.debug("Byte columns for channel %d: %s" % (i, byte_columns))
+            log.debug("Byte columns for channel %d: %s", i, byte_columns)
             # Select columns for this channel, so that number of values will
             # be number of bytes per point * number of data points.
             # Then use ravel to flatten the results into a vector.
@@ -607,6 +607,7 @@ class _TdmsSegment(object):
                 np.dtype(obj.data_type.nptype).newbyteorder(endianness))
             obj.tdms_object._update_data(object_data)
             data_pos += obj.data_type.length
+
     def _read_interleaved(self, f, data_objects, endianness):
         """Read interleaved data that doesn't have a numpy type"""
 
@@ -771,10 +772,10 @@ class TdmsObject(object):
                     self.number_values, dtype=self.data_type.nptype)
             self._data_insert_position = 0
         if self.data is not None:
-            log.debug("Allocated %d sample slots for %s" % (len(self.data),
-                                                            self.path))
+            log.debug("Allocated %d sample slots for %s", len(self.data),
+                      self.path)
         else:
-            log.debug("Allocated no space for %s" % (self.path,))
+            log.debug("Allocated no space for %s", self.path)
 
     def _update_data(self, new_data):
         """Update the object data with a new array of data"""
@@ -815,7 +816,7 @@ class TdmsObject(object):
     def scaled(self):
         if self.data is None:
             # tbd: self.data is None if data segment is empty
-            return np.empty((0,1))
+            return np.empty((0, 1))
         if self._data_scaled is None:
             scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
             if scale_type == 'Polynomial':
@@ -875,8 +876,6 @@ class _TdmsmxDAQMetadata(object):
         self.chunk_size = _read_long_long(f)
         # size of vector of format changing scalers
         self.scaler_vector_length = _read_long(f)
-        #log.debug("mxDAQ Data dimension '%d' n values '%d'"
-        # %(self.dimension, self.chunk_size))
         # Size of the vector
         log.debug("mxDAQ format scaler vector size '%d'" %
                   (self.scaler_vector_length,))
@@ -890,10 +889,6 @@ class _TdmsmxDAQMetadata(object):
             # include more than one of these scalers.
             self.scaler_data_type_code = _read_long(f)
             self.scaler_data_type = tdsDataTypes[self.scaler_data_type_code]
-            #log.debug(
-            #    "mxDAQ scaler_vector_length '%d' data_type '%d' = '%s'"
-            #    %(self.scaler_vector_length, self.scaler_data_type_code,
-            # self.scaler_data_type.name))
 
             # more info for format changing scaler
             self.scaler_raw_buffer_index = _read_long(f)
@@ -901,21 +896,10 @@ class _TdmsmxDAQMetadata(object):
             self.scaler_sample_format_bitmap = _read_long(f)
             self.scale_id = _read_long(f)
 
-        #msg = "raw buffer index '%d' raw byte offset '%d' "\
-            #"sample_format_bitmap '%d' scale id '%d'"
-        #log.debug(msg %(
-        #        self.scaler_raw_buffer_index,
-        #        self.scaler_raw_byte_offset,
-        #        self.scaler_sample_format_bitmap,
-        #        self.scale_id
-        #))
-
         raw_data_widths_length = _read_long(f)
         self.raw_data_widths = np.zeros(raw_data_widths_length, dtype=np.int32)
         for cnt in range(raw_data_widths_length):
             self.raw_data_widths[cnt] = _read_long(f)
-        #log.debug("mxDAQ vector raw data width '%d': '%s"
-        # %(raw_data_widths_length, self.raw_data_widths))
 
 
 class _TdmsSegmentObject(object):
@@ -958,13 +942,13 @@ class _TdmsSegmentObject(object):
         else:
             self.tdms_object.data_type = self.data_type
 
-        log.debug("mxDAQ Object data type: %s"
-                  % self.tdms_object.data_type.name)
+        log.debug("mxDAQ Object data type: %s",
+                  self.tdms_object.data_type.name)
 
         info = _TdmsmxDAQMetadata()
         info._read_metadata(f)
 
-        log.debug("mxDAQ '%s' '%s'" % (info, info.info()))
+        log.debug("mxDAQ '%s' '%s'", info, info.info())
         return info
 
     def _read_metadata(self, f):
@@ -973,7 +957,7 @@ class _TdmsSegmentObject(object):
         s = f.read(4)
         raw_data_index = struct.unpack("<L", s)[0]
 
-        log.debug("Reading metadata for object %s" % self.tdms_object.path)
+        log.debug("Reading metadata for object %s", self.tdms_object.path)
 
         # Object has no data in this segment
         if raw_data_index == 0xFFFFFFFF:
@@ -1028,7 +1012,7 @@ class _TdmsSegmentObject(object):
                     "type as previous segments.")
             else:
                 self.tdms_object.data_type = self.data_type
-            log.debug("Object data type: %s" % self.tdms_object.data_type.name)
+            log.debug("Object data type: %s", self.tdms_object.data_type.name)
 
             if (self.tdms_object.data_type.length is None and
                     self.tdms_object.data_type.name != 'tdsTypeString'):
@@ -1057,12 +1041,12 @@ class _TdmsSegmentObject(object):
                     self.data_type.length * self.dimension)
 
             log.debug(
-                "Object number of values in segment: %d" % self.number_values)
+                "Object number of values in segment: %d", self.number_values)
 
         # Read data properties
         s = f.read(4)
         num_properties = struct.unpack("<L", s)[0]
-        log.debug("Reading %d properties" % num_properties)
+        log.debug("Reading %d properties", num_properties)
         for i in range(num_properties):
             prop_name, value = read_property(f)
             self.tdms_object.properties[prop_name] = value
