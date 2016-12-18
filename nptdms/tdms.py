@@ -813,6 +813,7 @@ class TdmsObject(object):
 
         return self._data_scaled
 
+
 class _TdmsmxDAQPropertyInfo(object):
     """
     Represents the mxDAQ Data
@@ -1003,9 +1004,8 @@ class _TdmsSegmentObject(object):
             # handled currently in a separate class
             info = self._read_metadata_mx(f)
             self.has_data = True
-            for property in info.properties:
-                self.tdms_object.properties[property.property_name] = property.value
-            self.has_data = True # Is that the correct idea
+            for p in info.properties:
+                self.tdms_object.properties[p.property_name] = p.value
             self.tdms_object.has_data = True
             self.dimension = info.dimension
             self.data_type = info.data_type
