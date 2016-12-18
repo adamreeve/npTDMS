@@ -796,12 +796,11 @@ class TdmsObject(object):
         if self._data_scaled is None:
             scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
             if scale_type == 'Polynomial':
-                scale_factors = (self.properties['NI_Scale[1]_Polynomial_Coefficients[0]'],
-                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[1]'],
-                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[2]'],
-                                 self.properties['NI_Scale[1]_Polynomial_Coefficients[3]'])
+                coeff_names = ['NI_Scale[1]_Polynomial_Coefficients[%d]' % i 
+                               for i in range(4)]
                 scaled_data = np.zeros_like(self.data, dtype=np.float)
-                for i, scale_factor in enumerate(scale_factors):
+                for i, scale_factor in enumerate([self.properties[s]
+                                                  for s in coeff_names]):
                     scaled_data += scale_factor * self.data**i
             elif scale_type == 'Linear':
                 slope = self.properties["NI_Scale[1]_Linear_Slope"]
@@ -812,6 +811,7 @@ class TdmsObject(object):
             self._data_scaled = scaled_data
 
         return self._data_scaled
+
 
 class _TdmsmxDAQPropertyInfo(object):
     """
@@ -998,9 +998,9 @@ class _TdmsSegmentObject(object):
             # mx data seem to be a lot different ... thus the information is
             # handled currently in a separate class
             info = self._read_metadata_mx(f)
+            for p in info.properties:
+                self.tdms_object.properties[p.property_name] = p.value
             self.has_data = True
-            for property in info.properties:
-                self.tdms_object.properties[property.property_name] = property.value
             self.tdms_object.has_data = True
             self.dimension = info.dimension
             self.data_type = info.data_type
