@@ -1,9 +1,18 @@
 """Test TdmsSegment"""
 
 import unittest
+from datetime import datetime
+try:
+    from collections import OrderedDict
+except ImportError:
+    OrderedDict = dict
+try:
+    import pytz
+except ImportError:
+    pytz = None
 
-from nptdms.writer import TdmsSegment
-from nptdms.value import Bytes, Int32, Uint64
+from nptdms.writer import TdmsSegment, read_properties
+from nptdms.value import *
 
 
 class TestObject(object):
@@ -58,18 +67,112 @@ class TDMSTestClass(unittest.TestCase):
 
         self.assert_sequence_equal(leadin, expected_values)
 
+    def test_write_metadata_with_properties(self):
+        data_type = TestObject(enum_value=3)
+
+        # Use an ordered dict for properties so that
+        # the order of properties in metadata is guaranteed
+        properties = OrderedDict()
+        properties["prop1"] = String("foo")
+        properties["prop2"] = Int32(42)
+
+        channel = TestObject(
+            path=lambda: "channel_path",
+            has_data=lambda: True,
+            data=[1] * 10,
+            data_type=lambda: data_type,
+            properties=properties)
+
+        segment = TdmsSegment([channel])
+        metadata = segment.metadata()
+
+        expected_values = [
+            Uint32(1),  # Number of objects
+            String("channel_path"),
+            Uint32(16),  # Length of raw data index in bytes
+            Int32(3),  # Data type
+            Uint32(1),  # Array dimension
+            Uint64(10),  # Number of values
+            Uint32(2),  # Number of properties
+            String("prop1"),  # Property name
+            Int32(0x20),
+            String("foo"),
+            String("prop2"),
+            Int32(3),
+            Int32(42),
+            ]
+
+        self.assert_sequence_equal(metadata, expected_values)
+
+    def test_write_metadata_with_no_data(self):
+        obj = TestObject(
+            path=lambda: "object_path",
+            has_data=lambda: False,
+            properties={})
+
+        segment = TdmsSegment([obj])
+        metadata = segment.metadata()
+
+        expected_values = [
+            Uint32(1),  # Number of objects
+            String("object_path"),
+            Bytes(b'\xFF\xFF\xFF\xFF'),  # Raw data index
+            Uint32(0),  # Number of properties
+            ]
+
+        self.assert_sequence_equal(metadata, expected_values)
+
+    def test_properties_are_converted_to_tdms_types(self):
+        test_time = datetime.utcnow()
+        if pytz:
+            test_time = test_time.replace(tzinfo=pytz.utc)
+
+        properties = {
+            "prop1": Int32(1),
+            "prop2": 2,
+            "prop3": "foo",
+            "prop4": True,
+            "prop5": 3.142,
+            "prop6": test_time,
+        }
+
+        tdms_properties = read_properties(properties)
+
+        self.assertEqual(len(tdms_properties), len(properties))
+        self.assertEqual(tdms_properties["prop1"], Int32(1))
+        self.assertEqual(tdms_properties["prop2"], Int32(2))
+        self.assertEqual(tdms_properties["prop3"], String("foo"))
+        self.assertEqual(tdms_properties["prop4"], Boolean(True))
+        self.assertEqual(tdms_properties["prop5"], DoubleFloat(3.142))
+        self.assertEqual(tdms_properties["prop6"], TimeStamp(test_time))
+
+    def test_error_raised_when_cannot_convert_property_value(self):
+        properties = {
+            "prop1": None
+        }
+
+        with self.assertRaises(TypeError):
+            tdms_properties = read_properties(properties)
+
     def assert_sequence_equal(self, values, expected_values):
+        position = 1
         expected_values = iter(expected_values)
         for val in values:
             try:
                 expected = next(expected_values)
             except StopIteration:
                 raise ValueError(
-                    "Expected end of sequence but found: %r" % val)
-            self.assertEqual(val, expected)
+                    "Expected end of sequence at position %d but found: %r" %
+                    (position, val))
+            self.assertEqual(
+                val, expected,
+                msg="Expected %r to equal %r at position %d" %
+                (val, expected, position))
+            position += 1
         try:
             expected = next(expected_values)
             raise ValueError(
-                "Expected %r but found end of sequence" % expected)
+                "Expected %r at position %d but found end of sequence" %
+                (expected, position))
         except StopIteration:
             pass

@@ -1,11 +1,16 @@
-"""Python module for writing TDMS files"""
+"""Module for writing TDMS files"""
 
 from collections import namedtuple
+try:
+    from collections import OrderedDict
+except ImportError:
+    OrderedDict = dict
+from datetime import datetime
 from io import BytesIO
 import logging
 import numpy as np
 from nptdms.common import toc_properties, tds_data_types
-from nptdms.value import Int32, Uint32, Uint64, String, Bytes
+from nptdms.value import *
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.WARNING)
@@ -103,12 +108,13 @@ class TdmsSegment(object):
         metadata.append(Uint32(len(self.objects)))
         for obj in self.objects:
             metadata.append(String(obj.path()))
-            channel_index = self.raw_data_index(obj)
-            metadata.append(Uint32(len(channel_index)))
-            metadata.extend(channel_index)
-            #TODO: Write properties
-            num_properties = 0
+            metadata.extend(self.raw_data_index(obj))
+            num_properties = len(obj.properties)
             metadata.append(Uint32(num_properties))
+            for prop_name, prop_value in obj.properties.items():
+                metadata.append(String(prop_name))
+                metadata.append(Int32(prop_value.enum_value))
+                metadata.append(prop_value)
         return metadata
 
     def raw_data_index(self, obj):
@@ -117,9 +123,9 @@ class TdmsSegment(object):
             dimension = Uint32(1)
             num_values = Uint64(len(obj.data))
 
-            return [data_type, dimension, num_values]
+            return [Uint32(16), data_type, dimension, num_values]
         else:
-            return [Int32(0xFFFFFFFF)]
+            return [Bytes(b'\xFF\xFF\xFF\xFF')]
 
     def leadin(self, toc, metadata_size):
         leadin = []
@@ -174,7 +180,7 @@ class RootObject(TdmsObject):
 
 
 class GroupObject(TdmsObject):
-    def __init__(self, group_name, properties=None):
+    def __init__(self, group, properties=None):
         self.group = group
         self.properties = read_properties(properties)
 
@@ -215,7 +221,28 @@ class ChannelObject(TdmsObject):
 
 
 def read_properties(properties_dict):
-    return None
+    if properties_dict is None:
+        return {}
+
+    return OrderedDict(
+        (key, _map_property_value(val))
+        for key, val in properties_dict.items())
+
+
+def _map_property_value(value):
+    if isinstance(value, TdmsValue):
+        return value
+    if isinstance(value, bool):
+        return Boolean(value)
+    if isinstance(value, int):
+        return Int32(value)
+    if isinstance(value, float):
+        return DoubleFloat(value)
+    if isinstance(value, datetime):
+        return TimeStamp(value)
+    if isinstance(value, str):
+        return String(value)
+    raise TypeError("Unsupported property value type for %r" % value)
 
 
 def to_file(file, array):

@@ -33,6 +33,8 @@ class Bytes(TdmsValue):
 
 
 class String(TdmsValue):
+    enum_value = 0x20
+
     def __init__(self, value):
         self.value = value
         content = value.encode('utf-8')
@@ -47,6 +49,8 @@ class String(TdmsValue):
 
 
 class TimeStamp(TdmsValue):
+    enum_value = 0x44
+
     # Time stamps are stored as number of seconds since
     # 01/01/1904 00:00:00.00 UTC, ignoring leap seconds,
     # and number of 2^-64 fractions of a second.
@@ -56,50 +60,74 @@ class TimeStamp(TdmsValue):
 
     def __init__(self, value):
         self.value = value
-        epoch_delta = value - _tdms_epoch
+        epoch_delta = value - self._tdms_epoch
         seconds_per_day = 86400
         seconds = epoch_delta.days * seconds_per_day + epoch_delta.seconds
         second_fractions = int(
-            epoch_delta.microseconds * _fractions_per_microsecond)
+            epoch_delta.microseconds * self._fractions_per_microsecond)
         self.bytes = _struct_pack('<Qq', second_fractions, seconds)
 
     @staticmethod
     def read(file):
         data = file.read(data_type.length)
         (second_fractions, seconds) = _struct_unpack('<Qq', data)
-        micro_seconds = float(second_fractions) / _fractions_per_microsecond
+        micro_seconds = (
+            float(second_fractions) / self._fractions_per_microsecond)
         # Adding timedelta with seconds ignores leap
         # seconds, so this is correct
-        return (_tdms_epoch + timedelta(seconds=seconds)
+        return (self._tdms_epoch + timedelta(seconds=seconds)
                 + timedelta(microseconds=micro_seconds))
 
 
 class StructValue(TdmsValue):
     def __init__(self, value):
         self.value = value
-        self.bytes = _struct_pack(self.struct_declaration, value)
+        self.bytes = _struct_pack("<" + self.struct_declaration, value)
 
     @staticmethod
     def read(file):
         bytes = file.read(self.size)
-        return _struct_unpack(self.struct_declaration, bytes)[0]
+        return _struct_unpack("<" + self.struct_declaration, bytes)[0]
 
 
 class Int32(StructValue):
+    enum_value = 3
     size = 4
-    struct_declaration = "<l"
+    struct_declaration = "l"
 
 
 class Uint32(StructValue):
+    enum_value = 7
     size = 4
-    struct_declaration = "<L"
+    size = 4
+    struct_declaration = "L"
 
 
 class Int64(StructValue):
+    enum_value = 4
     size = 8
-    struct_declaration = "<q"
+    struct_declaration = "q"
 
 
 class Uint64(StructValue):
+    enum_value = 8
     size = 8
-    struct_declaration = "<Q"
+    struct_declaration = "Q"
+
+
+class Boolean(StructValue):
+    enum_value = 0x21
+    size = 1
+    struct_declaration = "b"
+
+
+class SingleFloat(StructValue):
+    enum_value = 9
+    size = 4
+    struct_declaration = "f"
+
+
+class DoubleFloat(StructValue):
+    enum_value = 10
+    size = 8
+    struct_declaration = "d"
