@@ -4,8 +4,8 @@ from collections import namedtuple
 from io import BytesIO
 import logging
 import numpy as np
-import struct
 from nptdms.common import toc_properties, tds_data_types
+from nptdms.value import Int32, Uint32, Uint64, String, Bytes
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.WARNING)
@@ -76,80 +76,118 @@ class _TdmsSegment(object):
     """A segment of data to be written to a file
     """
 
-    def __init__(self, channel_segments):
+    def __init__(self, objects):
         """Initialise a new segment of TDMS data
 
-        :param channel_segments: A list of ChannelSegment objects.
+        :param objects: A list of TdmsObject objects.
         """
-        self.channel_segments = channel_segments
+        paths = set(obj.path() for obj in objects)
+        if len(paths) != len(objects):
+            raise ValueError("Duplicate object paths found")
+
+        self.objects = objects
 
     def write(self, file):
-        metadata = self._metadata()
-        data_size = self._data_size()
+        metadata = self.metadata()
+        metadata_size = sum(len(val.bytes) for val in metadata)
 
         toc = ["kTocMetaData", "kTocRawData", "kTocNewObjList"]
-        self._write_leadin(file, toc, len(metadata), data_size)
+        leadin = self.leadin(toc, metadata_size)
 
-        file.write(metadata)
-
+        file.write(b''.join(val.bytes for val in leadin))
+        file.write(b''.join(val.bytes for val in metadata))
         self._write_data(file)
 
-    def _metadata(self):
+    def metadata(self):
         metadata = []
-        metadata.append(struct.pack("<L", len(self.channel_segments)))
-        for channel in self.channel_segments:
-            metadata.append(string_bytes(
-                channel_path(channel.group, channel.channel)))
-            channel_index = self._raw_data_index(channel)
-            metadata.append(struct.pack('<L', len(channel_index)))
-            metadata.append(channel_index)
+        metadata.append(Uint32(len(self.objects)))
+        for obj in self.objects:
+            metadata.append(String(obj.path()))
+            channel_index = self.raw_data_index(obj)
+            metadata.append(Uint32(len(channel_index)))
+            metadata.extend(channel_index)
             #TODO: Write properties
             num_properties = 0
-            metadata.append(struct.pack('<L', num_properties))
-        return b''.join(metadata)
+            metadata.append(Uint32(num_properties))
+        return metadata
 
-    def _raw_data_index(self, channel):
-        data_type = struct.pack('<l', channel.data_type().enum_value)
-        dimension = struct.pack('<L', 1)
-        num_values = struct.pack('<Q', len(channel.data))
+    def raw_data_index(self, obj):
+        if obj.has_data():
+            data_type = Int32(obj.data_type().enum_value)
+            dimension = Uint32(1)
+            num_values = Uint64(len(obj.data))
 
-        return data_type + dimension + num_values
+            return [data_type, dimension, num_values]
+        else:
+            return [Int32(0xFFFFFFFF)]
 
-    def _data_size(self):
-        data_size = 0
-        for channel in self.channel_segments:
-            data_size += len(channel.data) * channel.data_type().length
-        return data_size
-
-    def _write_leadin(self, file, toc, metadata_size, data_size):
-        file.write(b'TDSm')
+    def leadin(self, toc, metadata_size):
+        leadin = []
+        leadin.append(Bytes(b'TDSm'))
 
         toc_mask = long(0)
         for toc_key, toc_val in toc_properties.items():
             if toc_key in toc:
                 toc_mask = toc_mask | toc_val
-        file.write(struct.pack('<l', toc_mask))
+        leadin.append(Int32(toc_mask))
 
         tdms_version = 4712
-        file.write(struct.pack('<l', tdms_version))
+        leadin.append(Int32(tdms_version))
 
-        next_segment_offset = metadata_size + data_size
+        next_segment_offset = metadata_size + self._data_size()
         raw_data_offset = metadata_size
+        leadin.append(Uint64(next_segment_offset))
+        leadin.append(Uint64(raw_data_offset))
 
-        file.write(struct.pack('<Q', next_segment_offset))
-        file.write(struct.pack('<Q', raw_data_offset))
+        return leadin
+
+    def _data_size(self):
+        data_size = 0
+        for obj in self.objects:
+            if obj.has_data():
+                data_size += len(obj.data) * obj.data_type().length
+        return data_size
 
     def _write_data(self, file):
-        for channel in self.channel_segments:
-            to_file(file, channel.data)
+        for obj in self.objects:
+            if obj.has_data():
+                to_file(file, obj.data)
 
 
-class ChannelSegment(object):
+class TdmsObject(object):
+    def has_data(self):
+        return False
+
+    def data_type(self):
+        return None
+
+    def path(self):
+        return None
+
+
+class RootObject(TdmsObject):
+    def __init__(self, properties=None):
+        self.properties = read_properties(properties)
+
+    def path(self):
+        return "/"
+
+
+class GroupObject(TdmsObject):
+    def __init__(self, group_name, properties=None):
+        self.group = group
+        self.properties = read_properties(properties)
+
+    def path(self):
+        return "/'%s'" % self.group.replace("'", "''")
+
+
+class ChannelObject(TdmsObject):
     """A segment of data for a single channel
     """
 
     def __init__(self, group, channel, data, properties=None):
-        """Initialise a new ChannelSegment
+        """Initialise a new ChannelObject
 
         :param group: The name of the group this channel is in.
         :param channel: The name of this channel.
@@ -162,24 +200,22 @@ class ChannelSegment(object):
         self.data = data
         self.properties = properties if properties is not None else {}
 
+    def has_data(self):
+        return True
+
     def data_type(self):
         return tds_data_type_dict[self.data.dtype.type]
 
+    def path(self):
+        """Return string representation of object path
+        """
+        return "/'%s'/'%s'" % (
+            self.group.replace("'", "''"),
+            self.channel.replace("'", "''"))
 
-def string_bytes(value):
-    """Get bytes representing a string value used in TDMS metadata
-    """
-    content = value.encode('utf-8')
-    length = struct.pack('<L', len(content))
-    return length + content
 
-
-def channel_path(group, channel):
-    """Return string representation of object path
-    """
-    return "/'%s'/'%s'" % (
-        group.replace("'", "''"),
-        channel.replace("'", "''"))
+def read_properties(properties_dict):
+    return None
 
 
 def to_file(file, array):

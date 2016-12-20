@@ -8,4 +8,4 @@ from .version import __version_info__, __version__
 
 # Export public objects
 from .tdms import TdmsFile, TdmsObject
-from .writer import TdmsWriter, ChannelSegment
+from .writer import TdmsWriter, RootObject, GroupObject, ChannelObject

@@ -17,8 +17,8 @@ class TDMSTestClass(unittest.TestCase):
         a_input = np.linspace(0.0, 1.0, 100)
         b_input = np.linspace(0.0, 100.0, 100)
 
-        a_segment = writer.ChannelSegment("group", "a", a_input)
-        b_segment = writer.ChannelSegment("group", "b", b_input)
+        a_segment = writer.ChannelObject("group", "a", a_input)
+        b_segment = writer.ChannelObject("group", "b", b_input)
 
         output_file = BytesIO()
         with writer.TdmsWriter(output_file) as tdms_writer:
