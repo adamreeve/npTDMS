@@ -13,7 +13,7 @@ class TDMSTestClass(unittest.TestCase):
         logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
         logging.getLogger(writer.__name__).setLevel(logging.DEBUG)
 
-    def test_data_write(self):
+    def test_can_read_tdms_file_after_writing(self):
         a_input = np.linspace(0.0, 1.0, 100)
         b_input = np.linspace(0.0, 100.0, 100)
 

@@ -61,7 +61,7 @@ class TdmsWriter(object):
 
         :param segments: A list of ChannelSegment objects to write
         """
-        segment = _TdmsSegment(segments)
+        segment = TdmsSegment(segments)
         segment.write(self._file)
 
     def __enter__(self):
@@ -72,7 +72,7 @@ class TdmsWriter(object):
         self.close()
 
 
-class _TdmsSegment(object):
+class TdmsSegment(object):
     """A segment of data to be written to a file
     """
 
