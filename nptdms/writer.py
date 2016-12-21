@@ -9,7 +9,7 @@ from datetime import datetime
 from io import BytesIO
 import logging
 import numpy as np
-from nptdms.common import toc_properties, tds_data_types
+from nptdms.common import toc_properties
 from nptdms.value import *
 
 log = logging.getLogger(__name__)
@@ -21,11 +21,6 @@ try:
 except NameError:
     # Python 3
     long = int
-
-
-tds_data_type_dict = dict(
-    (dt.nptype, dt) for dt in tds_data_types
-    if dt.nptype is not None)
 
 
 class TdmsWriter(object):
@@ -151,7 +146,7 @@ class TdmsSegment(object):
         data_size = 0
         for obj in self.objects:
             if obj.has_data():
-                data_size += len(obj.data) * obj.data_type().length
+                data_size += len(obj.data) * obj.data_type().size
         return data_size
 
     def _write_data(self, file):
@@ -210,7 +205,7 @@ class ChannelObject(TdmsObject):
         return True
 
     def data_type(self):
-        return tds_data_type_dict[self.data.dtype.type]
+        return numpy_data_types[self.data.dtype.type]
 
     def path(self):
         """Return string representation of object path

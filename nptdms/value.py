@@ -1,6 +1,7 @@
 """Conversions to and from bytes representation of values in TDMS files"""
 
 from datetime import datetime, timedelta
+import numpy as np
 import struct
 try:
     import pytz
@@ -18,6 +19,22 @@ else:
     timezone = None
 
 
+tds_data_types = {}
+numpy_data_types = {}
+
+
+def tds_data_type(enum_value, np_type):
+    def decorator(cls):
+        cls.enum_value = enum_value
+        cls.nptype = np_type
+        if enum_value is not None:
+            tds_data_types[enum_value] = cls
+        if np_type is not None:
+            numpy_data_types[np_type] = cls
+        return cls
+    return decorator
+
+
 class TdmsValue(object):
     def __eq__(self, other):
         return self.bytes == other.bytes and self.value == other.value
@@ -32,9 +49,8 @@ class Bytes(TdmsValue):
         self.bytes = value
 
 
+@tds_data_type(0x20, None)
 class String(TdmsValue):
-    enum_value = 0x20
-
     def __init__(self, value):
         self.value = value
         content = value.encode('utf-8')
@@ -48,9 +64,8 @@ class String(TdmsValue):
         return file.read(size).decode('utf-8')
 
 
+@tds_data_type(0x44, None)
 class TimeStamp(TdmsValue):
-    enum_value = 0x44
-
     # Time stamps are stored as number of seconds since
     # 01/01/1904 00:00:00.00 UTC, ignoring leap seconds,
     # and number of 2^-64 fractions of a second.
@@ -69,7 +84,7 @@ class TimeStamp(TdmsValue):
 
     @staticmethod
     def read(file):
-        data = file.read(data_type.length)
+        data = file.read(16)
         (second_fractions, seconds) = _struct_unpack('<Qq', data)
         micro_seconds = (
             float(second_fractions) / self._fractions_per_microsecond)
@@ -90,44 +105,43 @@ class StructValue(TdmsValue):
         return _struct_unpack("<" + self.struct_declaration, bytes)[0]
 
 
+@tds_data_type(3, np.int32)
 class Int32(StructValue):
-    enum_value = 3
     size = 4
     struct_declaration = "l"
 
 
+@tds_data_type(7, np.uint32)
 class Uint32(StructValue):
-    enum_value = 7
-    size = 4
     size = 4
     struct_declaration = "L"
 
 
+@tds_data_type(4, np.int64)
 class Int64(StructValue):
-    enum_value = 4
     size = 8
     struct_declaration = "q"
 
 
+@tds_data_type(8, np.uint64)
 class Uint64(StructValue):
-    enum_value = 8
     size = 8
     struct_declaration = "Q"
 
 
+@tds_data_type(0x21, np.bool8)
 class Boolean(StructValue):
-    enum_value = 0x21
     size = 1
     struct_declaration = "b"
 
 
+@tds_data_type(9, np.single)
 class SingleFloat(StructValue):
-    enum_value = 9
     size = 4
     struct_declaration = "f"
 
 
+@tds_data_type(10, np.double)
 class DoubleFloat(StructValue):
-    enum_value = 10
     size = 8
     struct_declaration = "d"

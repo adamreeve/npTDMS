@@ -22,7 +22,7 @@ class TestObject(object):
 
 class TDMSTestClass(unittest.TestCase):
     def test_write_leadin_with_one_channel(self):
-        data_type = TestObject(length=4)
+        data_type = TestObject(size=4)
 
         channel = TestObject(
             path=lambda: "",
