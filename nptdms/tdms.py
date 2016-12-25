@@ -501,7 +501,7 @@ class _TdmsSegment(object):
             return
         chunk_remainder = total_data_size % data_size
         if chunk_remainder == 0:
-            self.num_chunks = total_data_size // data_size
+            self.num_chunks = int(total_data_size // data_size)
 
             # Update data count for the overall tdms object
             # using the data count for this segment.
@@ -515,7 +515,7 @@ class _TdmsSegment(object):
                 "Data size %d is not a multiple of the "
                 "chunk size %d. Will attempt to read last chunk" %
                 (total_data_size, data_size))
-            self.num_chunks = 1 + total_data_size // data_size
+            self.num_chunks = 1 + int(total_data_size // data_size)
 
             self.final_chunk_proportion = (
                 float(chunk_remainder) / float(data_size))
@@ -587,7 +587,7 @@ class _TdmsSegment(object):
         if all_channel_bytes == 0:
             all_channel_bytes = sum((o.data_type.length for o in data_objects))
         log.debug("all_channel_bytes: %d", all_channel_bytes)
-        number_bytes = all_channel_bytes * data_objects[0].number_values
+        number_bytes = int(all_channel_bytes * data_objects[0].number_values)
         combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
         # Reshape, so that one row is all bytes for all objects
         combined_data = combined_data.reshape(-1, all_channel_bytes)
