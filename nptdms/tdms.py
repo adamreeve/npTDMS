@@ -636,13 +636,13 @@ class TdmsObject(object):
                       for example the start time and time increment for
                       waveforms.
     :ivar has_data: Boolean, true if there is data associated with the object.
-    :ivar data: NumPy array containing data if there is data, otherwise None.
+    :ivar _data: NumPy array containing data if there is data, otherwise None.
 
     """
 
     def __init__(self, path):
         self.path = path
-        self.data = None
+        self._data = None
         self._data_scaled = None
         self.properties = OrderedDict()
         self.data_type = None
@@ -719,7 +719,7 @@ class TdmsObject(object):
         except KeyError:
             raise KeyError("Object does not have time properties available.")
 
-        periods = len(self.data)
+        periods = len(self._data)
 
         relative_time = np.linspace(
             offset,
@@ -757,22 +757,22 @@ class TdmsObject(object):
         if self.number_values == 0:
             pass
         elif self.data_type.nptype is None:
-            self.data = []
+            self._data = []
         else:
             if memmap_dir:
                 memmap_file = tempfile.NamedTemporaryFile(
                     mode='w+b', prefix="nptdms_", dir=memmap_dir)
-                self.data = np.memmap(
+                self._data = np.memmap(
                     memmap_file.file,
                     mode='w+',
                     shape=(self.number_values,),
                     dtype=self.data_type.nptype)
             else:
-                self.data = np.zeros(
+                self._data = np.zeros(
                     self.number_values, dtype=self.data_type.nptype)
             self._data_insert_position = 0
-        if self.data is not None:
-            log.debug("Allocated %d sample slots for %s", len(self.data),
+        if self._data is not None:
+            log.debug("Allocated %d sample slots for %s", len(self._data),
                       self.path)
         else:
             log.debug("Allocated no space for %s", self.path)
@@ -782,17 +782,17 @@ class TdmsObject(object):
 
         log.debug("Adding %d data points to data for %s" %
                   (len(new_data), self.path))
-        if self.data is None:
-            self.data = new_data
+        if self._data is None:
+            self._data = new_data
         else:
             if self.data_type.nptype is not None:
                 data_pos = (
                     self._data_insert_position,
                     self._data_insert_position + len(new_data))
                 self._data_insert_position += len(new_data)
-                self.data[data_pos[0]:data_pos[1]] = new_data
+                self._data[data_pos[0]:data_pos[1]] = new_data
             else:
-                self.data.extend(new_data)
+                self._data.extend(new_data)
 
     def as_dataframe(self, absolute_time=False):
         """
@@ -810,31 +810,38 @@ class TdmsObject(object):
         # use the wf_start_time as offset for the time_track()
         time = self.time_track(absolute_time)
 
-        return pd.DataFrame(self.data, index=time, columns=[self.path])
+        return pd.DataFrame(self._data, index=time, columns=[self.path])
 
     @_property_builtin
-    def scaled(self):
-        if self.data is None:
-            # tbd: self.data is None if data segment is empty
+    def data(self):
+        if self._data is None:
+            # self._data is None if data segment is empty
             return np.empty((0, 1))
         if self._data_scaled is None:
             scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
             if scale_type == 'Polynomial':
                 coeff_names = ['NI_Scale[1]_Polynomial_Coefficients[%d]' % i
                                for i in range(4)]
-                scaled_data = np.zeros_like(self.data, dtype=np.float)
+                scaled_data = np.zeros_like(self._data, dtype=np.float)
                 for i, scale_factor in enumerate([self.properties[s]
                                                   for s in coeff_names]):
-                    scaled_data += scale_factor * self.data**i
+                    scaled_data += scale_factor * self._data**i
+                self._data_scaled = scaled_data
             elif scale_type == 'Linear':
                 slope = self.properties["NI_Scale[1]_Linear_Slope"]
                 intercept = self.properties["NI_Scale[1]_Linear_Y_Intercept"]
-                scaled_data = self.data * slope + intercept
+                self._data_scaled = self._data * slope + intercept
             else:
-                scaled_data = self.data
-            self._data_scaled = scaled_data
+                self._data_scaled = self._data
 
         return self._data_scaled
+
+    @_property_builtin
+    def raw_data(self):
+        if self._data is None:
+            # self._data is None if data segment is empty
+            return np.empty((0, 1))
+        return self._data
 
 
 class _TdmsmxDAQMetadata(object):
