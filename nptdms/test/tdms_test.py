@@ -910,14 +910,16 @@ class TDMSTestClass(unittest.TestCase):
         obj = tdmsData.object("Group", "Channel1")
         self.assertEqual(obj.group, "Group")
         self.assertEqual(obj.channel, "Channel1")
+
     def test_raw_format(self):
         tf = tdms.TdmsFile(_data_dir+'/raw1.tdms')
         objpath = tf.groups()[0]
         data = tf.object(objpath, 'First  Channel').data
-        np.testing.assert_almost_equal(data[:10], [-0.18402661, 0.14801477,-0.24506363,
-                                                   -0.29725028,-0.20020142 ,0.18158513,
-                                                   0.02380444, 0.20661031, 0.20447401,
-                                                   0.2517777])
+        np.testing.assert_almost_equal(data[:10],
+                                       [-0.18402661, 0.14801477, -0.24506363,
+                                        -0.29725028, -0.20020142, 0.18158513,
+                                        0.02380444, 0.20661031, 0.20447401,
+                                        0.2517777])
 
 
 if __name__ == '__main__':
