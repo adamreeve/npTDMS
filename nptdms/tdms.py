@@ -636,7 +636,6 @@ class TdmsObject(object):
                       for example the start time and time increment for
                       waveforms.
     :ivar has_data: Boolean, true if there is data associated with the object.
-    :ivar _data: NumPy array containing data if there is data, otherwise None.
 
     """
 
@@ -814,6 +813,10 @@ class TdmsObject(object):
 
     @_property_builtin
     def data(self):
+        """
+        NumPy array containing data if there is data for this object,
+        otherwise None.
+        """
         if self._data is None:
             # self._data is None if data segment is empty
             return np.empty((0, 1))
@@ -838,6 +841,10 @@ class TdmsObject(object):
 
     @_property_builtin
     def raw_data(self):
+        """
+        For objects that contain DAQmx raw data, this is the raw, unscaled data
+        array. For other objects this is the same as the data property.
+        """
         if self._data is None:
             # self._data is None if data segment is empty
             return np.empty((0, 1))
