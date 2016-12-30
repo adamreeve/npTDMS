@@ -35,7 +35,7 @@ tds_data_types = [
     DataType(0x20, 'tdsTypeString', None, None, None),
     DataType(0x21, 'tdsTypeBoolean', 'b', 1, np.bool8),
     DataType(0x44, 'tdsTypeTimeStamp', 'Qq', 16, None),
-    DataType(0xFFFFFFFF, 'tdsTypeDAQmxRawData', None, None, None),
+    DataType(0xFFFFFFFF, 'tdsTypeDAQmxRawData', None, 2, np.int16),
     ]
 
 

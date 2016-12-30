@@ -48,8 +48,6 @@ What Currently Doesn't Work
 This module doesn't support TDMS files with XML headers or with
 extended floating point data.
 
-Files with DAQmx raw data are not supported either.
-
 Contributors/Thanks
 -------------------
 
@@ -58,3 +56,6 @@ which helped when writing this module.
 
 Thanks to Tony Perkins, Ruben De Smet, Martin Hochwallner and Peter Duncan
 for contributing support for converting to Pandas DataFrames.
+
+Thanks to nmgeek and jshridha for implementing support for DAQmx raw data
+files.

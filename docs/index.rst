@@ -53,7 +53,6 @@ What Doesn't Work
 
 Reading TDMS files with XML headers or files with
 extended floating point data currently does not work.
-Files with DAQmx raw data are not supported either.
 
 Reference
 =========

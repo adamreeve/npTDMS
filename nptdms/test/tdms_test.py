@@ -7,9 +7,12 @@ import binascii
 import struct
 import tempfile
 from datetime import datetime
+import os
+import numpy as np
 
 from nptdms import tdms
 
+_data_dir = os.path.dirname(os.path.realpath(__file__)) + '/data'
 
 try:
     long
@@ -907,6 +910,28 @@ class TDMSTestClass(unittest.TestCase):
         obj = tdmsData.object("Group", "Channel1")
         self.assertEqual(obj.group, "Group")
         self.assertEqual(obj.channel, "Channel1")
+
+    def test_labview_file(self):
+        """Test reading a file that was created by LabVIEW"""
+        tf = tdms.TdmsFile(_data_dir + '/Digital_Input.tdms')
+        group = ("07/09/2012 06:58:23 PM - " +
+                 "Digital Input - Decimated Data_Level1")
+        channel = "Dev1_port3_line7 - line 0"
+        expected = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1], dtype=np.uint8)
+
+        data = tf.object(group, channel).data
+        np.testing.assert_almost_equal(data[:10], expected)
+
+    def test_raw_format(self):
+        """Test reading a file with DAQmx raw data"""
+        tf = tdms.TdmsFile(_data_dir + '/raw1.tdms')
+        objpath = tf.groups()[0]
+        data = tf.object(objpath, 'First  Channel').data
+        np.testing.assert_almost_equal(data[:10],
+                                       [-0.18402661, 0.14801477, -0.24506363,
+                                        -0.29725028, -0.20020142, 0.18158513,
+                                        0.02380444, 0.20661031, 0.20447401,
+                                        0.2517777])
 
 
 if __name__ == '__main__':
