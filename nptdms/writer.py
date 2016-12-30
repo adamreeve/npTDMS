@@ -26,7 +26,7 @@ except NameError:
 class TdmsWriter(object):
     """Writes to a TDMS file.
 
-    A TdmsWriter be used as a context manager, for example::
+    A TdmsWriter should be used as a context manager, for example::
 
         with TdmsWriter(path) as tdms_writer:
             tdms_writer.write_segment(segment_data)
@@ -56,12 +56,12 @@ class TdmsWriter(object):
             self._file.close()
             self._file = None
 
-    def write_segment(self, segments):
+    def write_segment(self, objects):
         """ Write a segment of data to a TDMS file
 
-        :param segments: A list of ChannelSegment objects to write
+        :param objects: A list of TdmsObject instances to write
         """
-        segment = TdmsSegment(segments)
+        segment = TdmsSegment(objects)
         segment.write(self._file)
 
     def __enter__(self):
@@ -79,7 +79,7 @@ class TdmsSegment(object):
     def __init__(self, objects):
         """Initialise a new segment of TDMS data
 
-        :param objects: A list of TdmsObject objects.
+        :param objects: A list of TdmsObject instances.
         """
         paths = set(obj.path() for obj in objects)
         if len(paths) != len(objects):
@@ -167,24 +167,44 @@ class TdmsObject(object):
 
 
 class RootObject(TdmsObject):
+    """The root TDMS object
+    """
     def __init__(self, properties=None):
+        """Initialise a new GroupObject
+
+        :param properties: A dictionary mapping property names to
+            their value.
+        """
         self.properties = read_properties(properties)
 
     def path(self):
+        """The string representation of the root path
+        """
         return "/"
 
 
 class GroupObject(TdmsObject):
+    """A TDMS object for a group
+    """
+
     def __init__(self, group, properties=None):
+        """Initialise a new GroupObject
+
+        :param group: The name of this group.
+        :param properties: A dictionary mapping property names to
+            their value.
+        """
         self.group = group
         self.properties = read_properties(properties)
 
     def path(self):
+        """The string representation of this group's path
+        """
         return "/'%s'" % self.group.replace("'", "''")
 
 
 class ChannelObject(TdmsObject):
-    """A segment of data for a single channel
+    """A TDMS object for a channel with data
     """
 
     def __init__(self, group, channel, data, properties=None):
@@ -194,12 +214,12 @@ class ChannelObject(TdmsObject):
         :param channel: The name of this channel.
         :param data: 1-D Numpy array of data to be written.
         :param properties: A dictionary mapping property names to
-            TdmsValue objects.
+            their value.
         """
         self.group = group
         self.channel = channel
         self.data = data
-        self.properties = properties if properties is not None else {}
+        self.properties = read_properties(properties)
 
     def has_data(self):
         return True
@@ -208,7 +228,7 @@ class ChannelObject(TdmsObject):
         return numpy_data_types[self.data.dtype.type]
 
     def path(self):
-        """Return string representation of object path
+        """The string representation of this channel's path
         """
         return "/'%s'/'%s'" % (
             self.group.replace("'", "''"),

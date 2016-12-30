@@ -666,11 +666,12 @@ class TdmsObject(object):
         For larger timespans, the accuracy setting should be set lower.
         The default setting is 'ns', which has a timespan of
         [1678 AD, 2262 AD]. For the exact ranges, refer to
-            http://docs.scipy.org/doc/numpy/reference/arrays.datetime.html
+        http://docs.scipy.org/doc/numpy/reference/arrays.datetime.html
         section "Datetime Units".
 
         :param absolute_time: Whether the returned time values are absolute
-            times rather than relative to the start time.
+            times rather than relative to the start time. If true, the
+            wf_start_time property must be set.
         :param accuracy: The accuracy of the returned datetime64 array.
         :rtype: NumPy array.
         :raises: KeyError if required properties aren't found
