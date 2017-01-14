@@ -111,6 +111,33 @@ class TDMSTestClass(unittest.TestCase):
                 os.remove(temppath)
             os.rmdir(tempdir)
 
+    def test_can_append_to_file_using_path(self):
+        input_1 = np.linspace(0.0, 1.0, 10)
+        input_2 = np.linspace(1.0, 2.0, 10)
+        segment_1 = ChannelObject("group", "a", input_1)
+        segment_2 = ChannelObject("group", "a", input_2)
+
+        tempdir = tempfile.mkdtemp()
+        temppath = "%s/test_file.tdms" % tempdir
+        try:
+            with TdmsWriter(temppath) as tdms_writer:
+                tdms_writer.write_segment([segment_1])
+            with TdmsWriter(temppath, 'a') as tdms_writer:
+                tdms_writer.write_segment([segment_2])
+
+            tdms_file = TdmsFile(temppath)
+
+            output = tdms_file.object("group", "a").data
+
+            self.assertEqual(len(output), 20)
+            np.testing.assert_almost_equal(
+                output, np.concatenate([input_1, input_2]))
+
+        finally:
+            if os.path.exists(temppath):
+                os.remove(temppath)
+            os.rmdir(tempdir)
+
     def test_can_write_to_file_using_open_file(self):
         input_1 = np.linspace(0.0, 1.0, 10)
         segment = ChannelObject("group", "a", input_1)

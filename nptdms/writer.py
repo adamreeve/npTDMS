@@ -32,14 +32,17 @@ class TdmsWriter(object):
             tdms_writer.write_segment(segment_data)
     """
 
-    def __init__(self, file):
+    def __init__(self, file, mode='w'):
         """Initialise a new TDMS writer
 
         :param file: Either the path to the tdms file to open or an already
             opened file.
+        :param mode: Either 'w' to open a new file or 'a' to append to an
+            existing TDMS file.
         """
         self._file = None
         self._file_path = None
+        self._file_mode = mode
 
         if hasattr(file, "read"):
             # Is a file
@@ -49,7 +52,7 @@ class TdmsWriter(object):
 
     def open(self):
         if self._file_path is not None:
-            self._file = open(self._file_path, 'wb')
+            self._file = open(self._file_path, self._file_mode + 'b')
 
     def close(self):
         if self._file_path is not None:
