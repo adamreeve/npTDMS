@@ -25,7 +25,7 @@ class TDMSTestClass(unittest.TestCase):
         data_type = TestObject(size=4)
 
         channel = TestObject(
-            path=lambda: "",
+            path="",
             has_data=lambda: True,
             data=[0] * 10,
             data_type=lambda: data_type)
@@ -48,7 +48,7 @@ class TDMSTestClass(unittest.TestCase):
 
     def test_write_leadin_with_object_without_data(self):
         channel = TestObject(
-            path=lambda: "",
+            path="",
             has_data=lambda: False)
 
         toc = ["kTocMetaData", "kTocRawData", "kTocNewObjList"]
@@ -77,7 +77,7 @@ class TDMSTestClass(unittest.TestCase):
         properties["prop2"] = Int32(42)
 
         channel = TestObject(
-            path=lambda: "channel_path",
+            path="channel_path",
             has_data=lambda: True,
             data=[1] * 10,
             data_type=lambda: data_type,
@@ -106,7 +106,7 @@ class TDMSTestClass(unittest.TestCase):
 
     def test_write_metadata_with_no_data(self):
         obj = TestObject(
-            path=lambda: "object_path",
+            path="object_path",
             has_data=lambda: False,
             properties={})
 

@@ -84,7 +84,7 @@ class TdmsSegment(object):
 
         :param objects: A list of TdmsObject instances.
         """
-        paths = set(obj.path() for obj in objects)
+        paths = set(obj.path for obj in objects)
         if len(paths) != len(objects):
             raise ValueError("Duplicate object paths found")
 
@@ -105,7 +105,7 @@ class TdmsSegment(object):
         metadata = []
         metadata.append(Uint32(len(self.objects)))
         for obj in self.objects:
-            metadata.append(String(obj.path()))
+            metadata.append(String(obj.path))
             metadata.extend(self.raw_data_index(obj))
             num_properties = len(obj.properties)
             metadata.append(Uint32(num_properties))
@@ -165,6 +165,7 @@ class TdmsObject(object):
     def data_type(self):
         return None
 
+    @property
     def path(self):
         return None
 
@@ -180,6 +181,7 @@ class RootObject(TdmsObject):
         """
         self.properties = read_properties(properties)
 
+    @property
     def path(self):
         """The string representation of the root path
         """
@@ -200,6 +202,7 @@ class GroupObject(TdmsObject):
         self.group = group
         self.properties = read_properties(properties)
 
+    @property
     def path(self):
         """The string representation of this group's path
         """
@@ -230,6 +233,7 @@ class ChannelObject(TdmsObject):
     def data_type(self):
         return numpy_data_types[self.data.dtype.type]
 
+    @property
     def path(self):
         """The string representation of this channel's path
         """
