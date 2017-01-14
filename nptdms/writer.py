@@ -21,6 +21,7 @@ try:
 except NameError:
     # Python 3
     long = int
+    unicode = str
 
 
 class TdmsWriter(object):
@@ -107,17 +108,18 @@ class TdmsSegment(object):
         for obj in self.objects:
             metadata.append(String(obj.path))
             metadata.extend(self.raw_data_index(obj))
-            num_properties = len(obj.properties)
+            properties = read_properties_dict(obj.properties)
+            num_properties = len(properties)
             metadata.append(Uint32(num_properties))
-            for prop_name, prop_value in obj.properties.items():
+            for prop_name, prop_value in properties.items():
                 metadata.append(String(prop_name))
                 metadata.append(Int32(prop_value.enum_value))
                 metadata.append(prop_value)
         return metadata
 
     def raw_data_index(self, obj):
-        if obj.has_data():
-            data_type = Int32(obj.data_type().enum_value)
+        if obj.has_data:
+            data_type = Int32(obj.data_type.enum_value)
             dimension = Uint32(1)
             num_values = Uint64(len(obj.data))
 
@@ -148,20 +150,22 @@ class TdmsSegment(object):
     def _data_size(self):
         data_size = 0
         for obj in self.objects:
-            if obj.has_data():
-                data_size += len(obj.data) * obj.data_type().size
+            if obj.has_data:
+                data_size += len(obj.data) * obj.data_type.size
         return data_size
 
     def _write_data(self, file):
         for obj in self.objects:
-            if obj.has_data():
+            if obj.has_data:
                 to_file(file, obj.data)
 
 
 class TdmsObject(object):
+    @property
     def has_data(self):
         return False
 
+    @property
     def data_type(self):
         return None
 
@@ -179,7 +183,7 @@ class RootObject(TdmsObject):
         :param properties: A dictionary mapping property names to
             their value.
         """
-        self.properties = read_properties(properties)
+        self.properties = properties
 
     @property
     def path(self):
@@ -200,7 +204,7 @@ class GroupObject(TdmsObject):
             their value.
         """
         self.group = group
-        self.properties = read_properties(properties)
+        self.properties = properties
 
     @property
     def path(self):
@@ -225,11 +229,13 @@ class ChannelObject(TdmsObject):
         self.group = group
         self.channel = channel
         self.data = data
-        self.properties = read_properties(properties)
+        self.properties = properties
 
+    @property
     def has_data(self):
         return True
 
+    @property
     def data_type(self):
         return numpy_data_types[self.data.dtype.type]
 
@@ -242,7 +248,7 @@ class ChannelObject(TdmsObject):
             self.channel.replace("'", "''"))
 
 
-def read_properties(properties_dict):
+def read_properties_dict(properties_dict):
     if properties_dict is None:
         return {}
 
@@ -263,6 +269,8 @@ def _map_property_value(value):
     if isinstance(value, datetime):
         return TimeStamp(value)
     if isinstance(value, str):
+        return String(value)
+    if isinstance(value, unicode):
         return String(value)
     raise TypeError("Unsupported property value type for %r" % value)
 

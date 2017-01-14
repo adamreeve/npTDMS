@@ -11,7 +11,7 @@ try:
 except ImportError:
     pytz = None
 
-from nptdms.writer import TdmsSegment, read_properties
+from nptdms.writer import TdmsSegment, read_properties_dict
 from nptdms.value import *
 
 
@@ -26,9 +26,9 @@ class TDMSTestClass(unittest.TestCase):
 
         channel = TestObject(
             path="",
-            has_data=lambda: True,
+            has_data=True,
             data=[0] * 10,
-            data_type=lambda: data_type)
+            data_type=data_type)
 
         toc = ["kTocMetaData", "kTocRawData", "kTocNewObjList"]
         metadata_size = 12
@@ -49,7 +49,7 @@ class TDMSTestClass(unittest.TestCase):
     def test_write_leadin_with_object_without_data(self):
         channel = TestObject(
             path="",
-            has_data=lambda: False)
+            has_data=False)
 
         toc = ["kTocMetaData", "kTocRawData", "kTocNewObjList"]
         metadata_size = 12
@@ -78,9 +78,9 @@ class TDMSTestClass(unittest.TestCase):
 
         channel = TestObject(
             path="channel_path",
-            has_data=lambda: True,
+            has_data=True,
             data=[1] * 10,
-            data_type=lambda: data_type,
+            data_type=data_type,
             properties=properties)
 
         segment = TdmsSegment([channel])
@@ -107,7 +107,7 @@ class TDMSTestClass(unittest.TestCase):
     def test_write_metadata_with_no_data(self):
         obj = TestObject(
             path="object_path",
-            has_data=lambda: False,
+            has_data=False,
             properties={})
 
         segment = TdmsSegment([obj])
@@ -136,7 +136,7 @@ class TDMSTestClass(unittest.TestCase):
             "prop6": test_time,
         }
 
-        tdms_properties = read_properties(properties)
+        tdms_properties = read_properties_dict(properties)
 
         self.assertEqual(len(tdms_properties), len(properties))
         self.assertEqual(tdms_properties["prop1"], Int32(1))
@@ -152,7 +152,7 @@ class TDMSTestClass(unittest.TestCase):
         }
 
         with self.assertRaises(TypeError):
-            tdms_properties = read_properties(properties)
+            tdms_properties = read_properties_dict(properties)
 
     def assert_sequence_equal(self, values, expected_values):
         position = 1

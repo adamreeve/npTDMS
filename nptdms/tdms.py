@@ -87,15 +87,15 @@ def read_type(file, data_type, endianness):
         # 01/01/1904 00:00:00.00 UTC, ignoring leap seconds,
         # and number of 2^-64 fractions of a second.
         # Note that the TDMS epoch is not the Unix epoch.
-        s = file.read(data_type.length)
+        s = file.read(data_type.size)
         (s_frac, s) = struct.unpack('%s%s' % (endianness, data_type.struct), s)
         tdms_start = datetime(1904, 1, 1, 0, 0, 0, tzinfo=timezone)
         ms = float(s_frac) * 5 ** 6 / 2 ** 58
         # Adding timedelta with seconds ignores leap
         # seconds, so this is correct
         return tdms_start + timedelta(seconds=s) + timedelta(microseconds=ms)
-    elif None not in (data_type.struct, data_type.length):
-        s = file.read(data_type.length)
+    elif None not in (data_type.struct, data_type.size):
+        s = file.read(data_type.size)
         return struct.unpack('%s%s' % (endianness, data_type.struct), s)[0]
     else:
         raise ValueError("Unsupported data type to read, %s." % data_type.name)
@@ -550,7 +550,7 @@ class _TdmsSegment(object):
         # Read all data into 1 byte unsigned ints first
         all_channel_bytes = data_objects[0].raw_data_width
         if all_channel_bytes == 0:
-            all_channel_bytes = sum((o.data_type.length for o in data_objects))
+            all_channel_bytes = sum((o.data_type.size for o in data_objects))
         log.debug("all_channel_bytes: %d", all_channel_bytes)
         number_bytes = int(all_channel_bytes * data_objects[0].number_values)
         combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
@@ -560,7 +560,7 @@ class _TdmsSegment(object):
         data_pos = 0
         for (i, obj) in enumerate(data_objects):
             byte_columns = tuple(
-                range(data_pos, obj.data_type.length + data_pos))
+                range(data_pos, obj.data_type.size + data_pos))
             log.debug("Byte columns for channel %d: %s", i, byte_columns)
             # Select columns for this channel, so that number of values will
             # be number of bytes per point * number of data points.
@@ -571,7 +571,7 @@ class _TdmsSegment(object):
             object_data.dtype = (
                 np.dtype(obj.data_type.nptype).newbyteorder(endianness))
             obj.tdms_object._update_data(object_data)
-            data_pos += obj.data_type.length
+            data_pos += obj.data_type.size
 
     def _read_interleaved(self, f, data_objects, endianness):
         """Read interleaved data that doesn't have a numpy type"""
@@ -968,7 +968,7 @@ class _TdmsSegmentObject(object):
             self.data_type = info.data_type
             # DAQmx format has special chunking
             self.data_size = info.chunk_size
-            self.number_values = info.chunk_size/info.data_type.length
+            self.number_values = info.chunk_size/info.data_type.size
             # segment reading code relies on a single consistent raw
             # data width so assert that there is only one.
             assert(len(info.raw_data_widths) == 1)
@@ -995,7 +995,7 @@ class _TdmsSegmentObject(object):
                 self.tdms_object.data_type = self.data_type
             log.debug("Object data type: %s", self.tdms_object.data_type.name)
 
-            if (self.tdms_object.data_type.length is None and
+            if (self.tdms_object.data_type.size is None and
                     self.tdms_object.data_type.name != 'tdsTypeString'):
                 raise ValueError(
                     "Unsupported data type: %s" %
@@ -1019,7 +1019,7 @@ class _TdmsSegmentObject(object):
             else:
                 self.data_size = (
                     self.number_values *
-                    self.data_type.length * self.dimension)
+                    self.data_type.size * self.dimension)
 
             log.debug(
                 "Object number of values in segment: %d", self.number_values)

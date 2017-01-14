@@ -145,3 +145,43 @@ class TDMSTestClass(unittest.TestCase):
         with tempfile.NamedTemporaryFile(delete=True) as output_file:
             with TdmsWriter(output_file.file) as tdms_writer:
                 tdms_writer.write_segment([segment])
+
+    def test_can_write_tdms_objects_read_from_file(self):
+        group_segment = GroupObject("group", properties={
+            "prop1": "bar"
+        })
+        input_data = np.linspace(0.0, 1.0, 10)
+        channel_segment = ChannelObject("group", "a", input_data, properties={
+            "prop1": "foo",
+            "prop2": 3,
+        })
+
+        tempdir = tempfile.mkdtemp()
+        temppath = "%s/test_file.tdms" % tempdir
+        try:
+            with TdmsWriter(temppath) as tdms_writer:
+                tdms_writer.write_segment([group_segment, channel_segment])
+
+            tdms_file = TdmsFile(temppath)
+            read_group = tdms_file.object("group")
+            read_channel = tdms_file.object("group", "a")
+
+            with TdmsWriter(temppath) as tdms_writer:
+                tdms_writer.write_segment([read_group, read_channel])
+
+            tdms_file = TdmsFile(temppath)
+            read_group = tdms_file.object("group")
+            read_channel = tdms_file.object("group", "a")
+
+            self.assertFalse(read_group.has_data)
+            self.assertEqual(read_group.properties["prop1"], "bar")
+
+            self.assertEqual(len(read_channel.data), 10)
+            np.testing.assert_almost_equal(read_channel.data, input_data)
+            self.assertEqual(read_channel.properties["prop1"], "foo")
+            self.assertEqual(read_channel.properties["prop2"], 3)
+
+        finally:
+            if os.path.exists(temppath):
+                os.remove(temppath)
+            os.rmdir(tempdir)

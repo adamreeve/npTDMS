@@ -13,7 +13,7 @@ except NameError:
 # identifier used by struct module, the size in bytes to read and the
 # numpy data type where applicable/implemented
 DataType = namedtuple(
-    "DataType", ('enum_value', 'name', 'struct', 'length', 'nptype'))
+    "DataType", ('enum_value', 'name', 'struct', 'size', 'nptype'))
 
 
 tds_data_types = [
