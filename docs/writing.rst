@@ -28,8 +28,10 @@ instance of one of:
 - :py:class:`nptdms.RootObject`. This is the TDMS root object, and there may only be one root object in a segment.
 - :py:class:`nptdms.GroupObject`. This is used to group the channel objects.
 - :py:class:`nptdms.ChannelObject`. An object that contains data.
+- :py:class:`nptdms.TdmsObject`. A TDMS object that was read from a TDMS file using :py:class:`nptdms.TdmsFile`.
 
-All three object types may optionally have properties associated with them, which
+Each of ``RootObject``, ``GroupObject`` and ``ChannelObject``
+may optionally have properties associated with them, which
 are passed into the ``__init__`` method as a dictionary.
 The data types supported as property values are:
 
@@ -64,3 +66,15 @@ is given below::
             root_object,
             group_object,
             channel_object])
+
+You could also read a TDMS file and then re-write it by passing :py:class:`nptdms.TdmsObject`
+instances to the ``write_segment`` method. If you want
+to only copy certain objects for example, you could do something like::
+
+    from nptdms import TdmsFile, TdmsWriter
+
+    original_file = TdmsFile("original_file.tdms")
+
+    with TdmsWriter("copied_file.tdms") as copied_file:
+        objects_to_copy = [obj for obj in original_file.objects.values() if include_object(obj)]
+        copied_file.write_segment(objects_to_copy)
