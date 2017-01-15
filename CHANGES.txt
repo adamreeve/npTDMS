@@ -1,3 +1,6 @@
+v0.9.0 2nd January 2017
+- Add support for reading DAQmx raw data files.
+
 v0.8.2 25th October 2016
 - Fix error reading truncated files, resulting in a message that
   the "Data size is not a multiple of the chunk size".
