@@ -36,6 +36,8 @@ def tds_data_type(enum_value, np_type):
 
 
 class TdmsType(object):
+    size = None
+
     def __init__(self):
         self.value = None
         self.bytes = None
@@ -48,6 +50,10 @@ class TdmsType(object):
             return "%s" % self.__class__.__name__
         return "%s(%r)" % (self.__class__.__name__, self.value)
 
+    @staticmethod
+    def read(file, endianness="<"):
+        raise TypeError("Unsupported data type to read: %r" % self)
+
 
 class Bytes(TdmsType):
     def __init__(self, value):
@@ -56,14 +62,14 @@ class Bytes(TdmsType):
 
 
 class StructType(TdmsType):
-    def __init__(self, value):
+    def __init__(self, value, endianness="<"):
         self.value = value
-        self.bytes = _struct_pack("<" + self.struct_declaration, value)
+        self.bytes = _struct_pack(endianness + self.struct_declaration, value)
 
-    @staticmethod
-    def read(file):
-        bytes = file.read(self.size)
-        return _struct_unpack("<" + self.struct_declaration, bytes)[0]
+    @classmethod
+    def read(cls, file, endianness="<"):
+        bytes = file.read(cls.size)
+        return _struct_unpack(endianness + cls.struct_declaration, bytes)[0]
 
 
 @tds_data_type(0, None)
@@ -162,9 +168,8 @@ class String(TdmsType):
         self.bytes = length + content
 
     @staticmethod
-    def read(file):
-        size_bytes = file.read(4)
-        size = _struct_unpack("<L", size_bytes)[0]
+    def read(file, endianness="<"):
+        size = Uint32.read(file)
         return file.read(size).decode('utf-8')
 
 
@@ -183,6 +188,8 @@ class TimeStamp(TdmsType):
     _tdms_epoch = datetime(1904, 1, 1, 0, 0, 0, tzinfo=timezone)
     _fractions_per_microsecond = float(10**-6) / 2**-64
 
+    size = 16
+
     def __init__(self, value):
         self.value = value
         epoch_delta = value - self._tdms_epoch
@@ -192,15 +199,15 @@ class TimeStamp(TdmsType):
             epoch_delta.microseconds * self._fractions_per_microsecond)
         self.bytes = _struct_pack('<Qq', second_fractions, seconds)
 
-    @staticmethod
-    def read(file):
+    @classmethod
+    def read(cls, file, endianness="<"):
         data = file.read(16)
         (second_fractions, seconds) = _struct_unpack('<Qq', data)
         micro_seconds = (
-            float(second_fractions) / self._fractions_per_microsecond)
+            float(second_fractions) / cls._fractions_per_microsecond)
         # Adding timedelta with seconds ignores leap
         # seconds, so this is correct
-        return (self._tdms_epoch + timedelta(seconds=seconds)
+        return (cls._tdms_epoch + timedelta(seconds=seconds)
                 + timedelta(microseconds=micro_seconds))
 
 

@@ -2,7 +2,6 @@
 
 import itertools
 import logging
-import struct
 import sys
 from collections import namedtuple
 try:
@@ -25,7 +24,8 @@ except ImportError:
     pytz = None
 
 from nptdms.utils import Timer
-from nptdms.common import tds_data_types, toc_properties
+from nptdms.common import toc_properties
+from nptdms import types
 
 
 log = logging.getLogger(__name__)
@@ -47,9 +47,6 @@ except NameError:
     zip_longest = itertools.zip_longest
 
 
-tds_data_type_dict = dict((dt.enum_value, dt) for dt in tds_data_types)
-
-
 if pytz:
     # Use UTC time zone if pytz is installed
     timezone = pytz.utc
@@ -68,69 +65,14 @@ def fromfile(file, dtype, count, *args, **kwargs):
         return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
 
 
-def read_string(file):
-    """Read a string from a tdms file
-
-    For reading strings in the meta data section that start with
-    the string length, will not work in the data section"""
-
-    s = file.read(4)
-    length = struct.unpack("<L", s)[0]
-    return file.read(length).decode('utf-8')
-
-
-def read_type(file, data_type, endianness):
-    """Read a value from the file of the specified data type"""
-
-    if data_type.name == 'tdsTypeTimeStamp':
-        # Time stamps are stored as number of seconds since
-        # 01/01/1904 00:00:00.00 UTC, ignoring leap seconds,
-        # and number of 2^-64 fractions of a second.
-        # Note that the TDMS epoch is not the Unix epoch.
-        s = file.read(data_type.size)
-        (s_frac, s) = struct.unpack('%s%s' % (endianness, data_type.struct), s)
-        tdms_start = datetime(1904, 1, 1, 0, 0, 0, tzinfo=timezone)
-        ms = float(s_frac) * 5 ** 6 / 2 ** 58
-        # Adding timedelta with seconds ignores leap
-        # seconds, so this is correct
-        return tdms_start + timedelta(seconds=s) + timedelta(microseconds=ms)
-    elif None not in (data_type.struct, data_type.size):
-        s = file.read(data_type.size)
-        return struct.unpack('%s%s' % (endianness, data_type.struct), s)[0]
-    else:
-        raise ValueError("Unsupported data type to read, %s." % data_type.name)
-
-
 def read_property(f):
     """ Read a property from a segment's metadata """
-    prop_name = read_string(f)
 
-    # Property data type
-    s = f.read(4)
-    prop_data_type = tds_data_type_dict[struct.unpack("<L", s)[0]]
-    if prop_data_type.name == 'tdsTypeString':
-        value = read_string(f)
-    else:
-        value = read_type(f, prop_data_type, '<')
-    log.debug("Property %s (%s): %s",
-              prop_name, prop_data_type.name, value)
+    prop_name = types.String.read(f)
+    prop_data_type = types.tds_data_types[types.Uint32.read(f)]
+    value = prop_data_type.read(f)
+    log.debug("Property %s: %r", prop_name, value)
     return prop_name, value
-
-
-# Some simple speed optimisation; discussable if required
-_struct_unpack = struct.unpack
-
-
-def _read_long(a_file):
-        t_bytes = a_file.read(4)
-        val, = _struct_unpack("<L", t_bytes)
-        return val
-
-
-def _read_long_long(a_file):
-        t_bytes = a_file.read(8)
-        val, = _struct_unpack("<Q", t_bytes)
-        return val
 
 
 class TdmsFile(object):
@@ -328,8 +270,7 @@ class _TdmsSegment(object):
         log.debug("Reading segment at %d", self.position)
 
         # Next four bytes are table of contents mask
-        s = f.read(4)
-        toc_mask = struct.unpack('<i', s)[0]
+        toc_mask = types.Int32.read(f)
 
         self.toc = OrderedDict()
         for property in toc_properties.keys():
@@ -337,20 +278,18 @@ class _TdmsSegment(object):
             log.debug("Property %s is %s", property, self.toc[property])
 
         # Next four bytes are version number
-        s = f.read(4)
-        self.version = struct.unpack('<i', s)[0]
+        self.version = types.Int32.read(f)
         if self.version not in (4712, 4713):
             log.warning("Unrecognised version number.")
 
         # Now 8 bytes each for the offset values
-        s = f.read(16)
-        (self.next_segment_offset, self.raw_data_offset) = (
-            struct.unpack('<QQ', s))
+        self.next_segment_offset = types.Uint64.read(f)
+        self.raw_data_offset = types.Uint64.read(f)
 
         # Calculate data and next segment position
         lead_size = 7 * 4
         self.data_position = self.position + lead_size + self.raw_data_offset
-        if self.next_segment_offset == struct.unpack('<Q', b'\xFF' * 8)[0]:
+        if self.next_segment_offset == 0xFFFFFFFFFFFFFFFF:
             # This can happen if Labview crashes
             log.warning(
                 "Last segment of file has unknown size, "
@@ -389,12 +328,11 @@ class _TdmsSegment(object):
         log.debug("Reading metadata at %d", f.tell())
 
         # First four bytes have number of objects in metadata
-        s = f.read(4)
-        num_objects = struct.unpack("<l", s)[0]
+        num_objects = types.Int32.read(f)
 
         for obj in range(num_objects):
             # Read the object path
-            object_path = read_string(f)
+            object_path = types.String.read(f)
 
             # If this is a new segment for an existing object,
             # reuse the existing object, otherwise,
@@ -848,14 +786,14 @@ class _TdmsmxDAQMetadata(object):
         Read the metadata for a DAQmx raw segment.  This is the raw
         DAQmx-specific portion of the raw data index.
         """
-        self.data_type = tds_data_type_dict[0xFFFFFFFF]
-        self.dimension = _read_long(f)
+        self.data_type = types.tds_data_types[0xFFFFFFFF]
+        self.dimension = types.Uint32.read(f)
         # In TDMS format version 2.0, 1 is the only valid value for dimension
         if self.dimension != 1:
             log.warning("Data dimension is not 1")
-        self.chunk_size = _read_long_long(f)
+        self.chunk_size = types.Uint64.read(f)
         # size of vector of format changing scalers
-        self.scaler_vector_length = _read_long(f)
+        self.scaler_vector_length = types.Uint32.read(f)
         # Size of the vector
         log.debug("mxDAQ format scaler vector size '%d'" %
                   (self.scaler_vector_length,))
@@ -867,20 +805,20 @@ class _TdmsmxDAQMetadata(object):
             # values.  At this time NI provides no documentation on
             # how to use these scalers and sample TDMS files do not
             # include more than one of these scalers.
-            self.scaler_data_type_code = _read_long(f)
+            self.scaler_data_type_code = types.Uint32.read(f)
             self.scaler_data_type = (
-                tds_data_type_dict[self.scaler_data_type_code])
+                types.tds_data_types[self.scaler_data_type_code])
 
             # more info for format changing scaler
-            self.scaler_raw_buffer_index = _read_long(f)
-            self.scaler_raw_byte_offset = _read_long(f)
-            self.scaler_sample_format_bitmap = _read_long(f)
-            self.scale_id = _read_long(f)
+            self.scaler_raw_buffer_index = types.Uint32.read(f)
+            self.scaler_raw_byte_offset = types.Uint32.read(f)
+            self.scaler_sample_format_bitmap = types.Uint32.read(f)
+            self.scale_id = types.Uint32.read(f)
 
-        raw_data_widths_length = _read_long(f)
+        raw_data_widths_length = types.Uint32.read(f)
         self.raw_data_widths = np.zeros(raw_data_widths_length, dtype=np.int32)
         for cnt in range(raw_data_widths_length):
-            self.raw_data_widths[cnt] = _read_long(f)
+            self.raw_data_widths[cnt] = types.Uint32.read(f)
 
 
 class _TdmsSegmentObject(object):
@@ -906,13 +844,11 @@ class _TdmsSegmentObject(object):
     def _read_metadata_mx(self, f):
 
         # Read the data type
-        s = f.read(4)
-
-        data_type_val, = struct.unpack("<L", s)
+        data_type_val = types.Uint32.read(f)
         try:
-            self.data_type = tds_data_type_dict[data_type_val]
+            self.data_type = types.tds_data_types[data_type_val]
         except KeyError:
-            raise KeyError("Unrecognised data type")
+            raise KeyError("Unrecognised data type: %s", data_type_val)
 
         if self.tdms_object.data_type is not None \
            and self.data_type != self.tdms_object.data_type:
@@ -923,8 +859,7 @@ class _TdmsSegmentObject(object):
         else:
             self.tdms_object.data_type = self.data_type
 
-        log.debug("mxDAQ Object data type: %s",
-                  self.tdms_object.data_type.name)
+        log.debug("mxDAQ Object data type: %r", self.tdms_object.data_type)
 
         info = _TdmsmxDAQMetadata()
         info._read_metadata(f)
@@ -935,8 +870,7 @@ class _TdmsSegmentObject(object):
     def _read_metadata(self, f):
         """Read object metadata and update object information"""
 
-        s = f.read(4)
-        raw_data_index = struct.unpack("<L", s)[0]
+        raw_data_index = types.Uint32.read(f)
 
         log.debug("Reading metadata for object %s", self.tdms_object.path)
 
@@ -981,9 +915,8 @@ class _TdmsSegmentObject(object):
             self.tdms_object.has_data = True
 
             # Read the data type
-            s = f.read(4)
             try:
-                self.data_type = tds_data_type_dict[struct.unpack("<L", s)[0]]
+                self.data_type = types.tds_data_types[types.Uint32.read(f)]
             except KeyError:
                 raise KeyError("Unrecognised data type")
             if (self.tdms_object.data_type is not None and
@@ -993,29 +926,25 @@ class _TdmsSegmentObject(object):
                     "type as previous segments.")
             else:
                 self.tdms_object.data_type = self.data_type
-            log.debug("Object data type: %s", self.tdms_object.data_type.name)
+            log.debug("Object data type: %r", self.tdms_object.data_type)
 
             if (self.tdms_object.data_type.size is None and
-                    self.tdms_object.data_type.name != 'tdsTypeString'):
+                    self.tdms_object.data_type != types.String):
                 raise ValueError(
-                    "Unsupported data type: %s" %
-                    self.tdms_object.data_type.name)
+                    "Unsupported data type: %r" % self.tdms_object.data_type)
 
             # Read data dimension
-            s = f.read(4)
-            self.dimension = struct.unpack("<L", s)[0]
+            self.dimension = types.Uint32.read(f)
             # In TDMS version 2.0, 1 is the only valid value for dimension
             if self.dimension != 1:
                 log.warning("Data dimension is not 1")
 
             # Read number of values
-            s = f.read(8)
-            self.number_values = struct.unpack("<Q", s)[0]
+            self.number_values = types.Uint64.read(f)
 
             # Variable length data types have total size
-            if self.data_type.name in ('tdsTypeString', ):
-                s = f.read(8)
-                self.data_size = struct.unpack("<Q", s)[0]
+            if self.data_type in (types.String, ):
+                self.data_size = types.Uint64.read(f)
             else:
                 self.data_size = (
                     self.number_values *
@@ -1025,8 +954,7 @@ class _TdmsSegmentObject(object):
                 "Object number of values in segment: %d", self.number_values)
 
         # Read data properties
-        s = f.read(4)
-        num_properties = struct.unpack("<L", s)[0]
+        num_properties = types.Uint32.read(f)
         log.debug("Reading %d properties", num_properties)
         for i in range(num_properties):
             prop_name, value = read_property(f)
@@ -1042,7 +970,7 @@ class _TdmsSegmentObject(object):
         if self.data_type.nptype is not None:
             dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
             return fromfile(file, dtype=dtype, count=1)
-        return read_type(file, self.data_type, endianness)
+        return self.data_type.read(file, endianness)
 
     def _read_values(self, file, endianness, number_values):
         """Read all values for this object from a contiguous segment"""
@@ -1050,11 +978,11 @@ class _TdmsSegmentObject(object):
         if self.data_type.nptype is not None:
             dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
             return fromfile(file, dtype=dtype, count=number_values)
-        elif self.data_type.name == "tdsTypeString":
+        elif self.data_type == types.String:
             return read_string_data(file, number_values)
         data = self._new_segment_data()
         for i in range(number_values):
-            data[i] = read_type(file, self.data_type, endianness)
+            data[i] = self.data_type.read(file, endianness)
         return data
 
     def _new_segment_data(self):
@@ -1074,9 +1002,7 @@ def read_string_data(file, number_values):
     """
     offsets = [0]
     for i in range(number_values):
-        s = file.read(4)
-        offset = struct.unpack("<L", s)[0]
-        offsets.append(offset)
+        offsets.append(types.Uint32.read(file))
     strings = []
     for i in range(number_values):
         s = file.read(offsets[i + 1] - offsets[i])
