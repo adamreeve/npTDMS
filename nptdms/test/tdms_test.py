@@ -10,7 +10,7 @@ from datetime import datetime
 import os
 import numpy as np
 
-from nptdms import tdms
+from nptdms import tdms, types
 
 _data_dir = os.path.dirname(os.path.realpath(__file__)) + '/data'
 
@@ -513,10 +513,10 @@ class TDMSTestClass(unittest.TestCase):
         which isn't read by numpy"""
 
         times = [
-            datetime(2012, 8, 23, 0, 0, 0, 123, tzinfo=tdms.timezone),
-            datetime(2012, 8, 23, 1, 2, 3, 456, tzinfo=tdms.timezone),
-            datetime(2012, 8, 23, 12, 0, 0, 0, tzinfo=tdms.timezone),
-            datetime(2012, 8, 23, 12, 2, 3, 9999, tzinfo=tdms.timezone),
+            datetime(2012, 8, 23, 0, 0, 0, 123, tzinfo=types.timezone),
+            datetime(2012, 8, 23, 1, 2, 3, 456, tzinfo=types.timezone),
+            datetime(2012, 8, 23, 12, 0, 0, 0, tzinfo=types.timezone),
+            datetime(2012, 8, 23, 12, 2, 3, 9999, tzinfo=types.timezone),
         ]
 
         def total_seconds(td):
@@ -525,7 +525,7 @@ class TDMSTestClass(unittest.TestCase):
 
         seconds = [
             total_seconds(
-                t - datetime(1904, 1, 1, 0, 0, 0, tzinfo=tdms.timezone))
+                t - datetime(1904, 1, 1, 0, 0, 0, tzinfo=types.timezone))
             for t in times]
         fractions = [
             int(float(t.microsecond) * 2 ** 58 / 5 ** 6)

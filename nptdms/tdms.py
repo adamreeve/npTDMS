@@ -2,8 +2,6 @@
 
 import itertools
 import logging
-import sys
-from collections import namedtuple
 try:
     from collections import OrderedDict
 except ImportError:
@@ -15,13 +13,8 @@ except ImportError:
         OrderedDict = dict
 from copy import copy
 import numpy as np
-from datetime import datetime, timedelta
 import tempfile
 from io import BytesIO
-try:
-    import pytz
-except ImportError:
-    pytz = None
 
 from nptdms.utils import Timer
 from nptdms.common import toc_properties
@@ -39,19 +32,10 @@ log.setLevel(logging.WARNING)
 _property_builtin = property
 
 try:
-    long
     zip_longest = itertools.izip_longest
-except NameError:
+except AttributeError:
     # Python 3
-    long = int
     zip_longest = itertools.zip_longest
-
-
-if pytz:
-    # Use UTC time zone if pytz is installed
-    timezone = pytz.utc
-else:
-    timezone = None
 
 
 def fromfile(file, dtype, count, *args, **kwargs):

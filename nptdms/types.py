@@ -62,9 +62,9 @@ class Bytes(TdmsType):
 
 
 class StructType(TdmsType):
-    def __init__(self, value, endianness="<"):
+    def __init__(self, value):
         self.value = value
-        self.bytes = _struct_pack(endianness + self.struct_declaration, value)
+        self.bytes = _struct_pack('<' + self.struct_declaration, value)
 
     @classmethod
     def read(cls, file, endianness="<"):
@@ -102,13 +102,13 @@ class Int64(StructType):
 
 
 @tds_data_type(5, np.uint8)
-class Int8(StructType):
+class Uint8(StructType):
     size = 1
     struct_declaration = "B"
 
 
 @tds_data_type(6, np.uint16)
-class Int16(StructType):
+class Uint16(StructType):
     size = 2
     struct_declaration = "H"
 

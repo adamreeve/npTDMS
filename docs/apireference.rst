@@ -42,23 +42,31 @@ Data Types for Property Values
 
 .. module:: nptdms.types
 
-.. autoclass:: String
+.. autoclass:: Int8
 
-.. autoclass:: TimeStamp
-
-.. autoclass:: Boolean
+.. autoclass:: Int16
 
 .. autoclass:: Int32
 
-.. autoclass:: Uint32
-
 .. autoclass:: Int64
+
+.. autoclass:: Uint8
+
+.. autoclass:: Uint16
+
+.. autoclass:: Uint32
 
 .. autoclass:: Uint64
 
 .. autoclass:: SingleFloat
 
 .. autoclass:: DoubleFloat
+
+.. autoclass:: String
+
+.. autoclass:: Boolean
+
+.. autoclass:: TimeStamp
 
 Indices and Tables
 ------------------
