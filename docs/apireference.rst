@@ -40,7 +40,7 @@ Writing TDMS Files
 Data Types for Property Values
 ------------------------------
 
-.. module:: nptdms.value
+.. module:: nptdms.types
 
 .. autoclass:: String
 

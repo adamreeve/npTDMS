@@ -43,7 +43,7 @@ The data types supported as property values are:
 
 For more control over the data type used to represent a property value, for example
 to use an unsigned integer type, you can pass an instance of one of the data types
-from the :py:mod:`nptdms.value` module.
+from the :py:mod:`nptdms.types` module.
 
 A complete example of writing a TDMS file with various object types and properties
 is given below::

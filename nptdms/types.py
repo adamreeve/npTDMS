@@ -35,22 +35,126 @@ def tds_data_type(enum_value, np_type):
     return decorator
 
 
-class TdmsValue(object):
+class TdmsType(object):
+    def __init__(self):
+        self.value = None
+        self.bytes = None
+
     def __eq__(self, other):
         return self.bytes == other.bytes and self.value == other.value
 
     def __repr__(self):
+        if self.value is None:
+            return "%s" % self.__class__.__name__
         return "%s(%r)" % (self.__class__.__name__, self.value)
 
 
-class Bytes(TdmsValue):
+class Bytes(TdmsType):
     def __init__(self, value):
         self.value = value
         self.bytes = value
 
 
+class StructType(TdmsType):
+    def __init__(self, value):
+        self.value = value
+        self.bytes = _struct_pack("<" + self.struct_declaration, value)
+
+    @staticmethod
+    def read(file):
+        bytes = file.read(self.size)
+        return _struct_unpack("<" + self.struct_declaration, bytes)[0]
+
+
+@tds_data_type(0, None)
+class Void(TdmsType):
+    pass
+
+
+@tds_data_type(1, np.int8)
+class Int8(StructType):
+    size = 1
+    struct_declaration = "b"
+
+
+@tds_data_type(2, np.int16)
+class Int16(StructType):
+    size = 2
+    struct_declaration = "h"
+
+
+@tds_data_type(3, np.int32)
+class Int32(StructType):
+    size = 4
+    struct_declaration = "l"
+
+
+@tds_data_type(4, np.int64)
+class Int64(StructType):
+    size = 8
+    struct_declaration = "q"
+
+
+@tds_data_type(5, np.uint8)
+class Int8(StructType):
+    size = 1
+    struct_declaration = "B"
+
+
+@tds_data_type(6, np.uint16)
+class Int16(StructType):
+    size = 2
+    struct_declaration = "H"
+
+
+@tds_data_type(7, np.uint32)
+class Uint32(StructType):
+    size = 4
+    struct_declaration = "L"
+
+
+@tds_data_type(8, np.uint64)
+class Uint64(StructType):
+    size = 8
+    struct_declaration = "Q"
+
+
+@tds_data_type(9, np.single)
+class SingleFloat(StructType):
+    size = 4
+    struct_declaration = "f"
+
+
+@tds_data_type(10, np.double)
+class DoubleFloat(StructType):
+    size = 8
+    struct_declaration = "d"
+
+
+@tds_data_type(11, None)
+class ExtendedFloat(TdmsType):
+    pass
+
+
+@tds_data_type(12, None)
+class DoubleFloatWithUnit(TdmsType):
+    size = 8
+    pass
+
+
+@tds_data_type(13, None)
+class ExtendedFloatWithUnit(TdmsType):
+    pass
+
+
+@tds_data_type(0x19, None)
+class SingleFloatWithUnit(TdmsType):
+    size = 4
+    pass
+
+
 @tds_data_type(0x20, None)
-class String(TdmsValue):
+class String(TdmsType):
     def __init__(self, value):
         self.value = value
         content = value.encode('utf-8')
@@ -64,8 +168,14 @@ class String(TdmsValue):
         return file.read(size).decode('utf-8')
 
 
+@tds_data_type(0x21, np.bool8)
+class Boolean(StructType):
+    size = 1
+    struct_declaration = "b"
+
+
 @tds_data_type(0x44, None)
-class TimeStamp(TdmsValue):
+class TimeStamp(TdmsType):
     # Time stamps are stored as number of seconds since
     # 01/01/1904 00:00:00.00 UTC, ignoring leap seconds,
     # and number of 2^-64 fractions of a second.
@@ -94,54 +204,6 @@ class TimeStamp(TdmsValue):
                 + timedelta(microseconds=micro_seconds))
 
 
-class StructValue(TdmsValue):
-    def __init__(self, value):
-        self.value = value
-        self.bytes = _struct_pack("<" + self.struct_declaration, value)
-
-    @staticmethod
-    def read(file):
-        bytes = file.read(self.size)
-        return _struct_unpack("<" + self.struct_declaration, bytes)[0]
-
-
-@tds_data_type(3, np.int32)
-class Int32(StructValue):
-    size = 4
-    struct_declaration = "l"
-
-
-@tds_data_type(7, np.uint32)
-class Uint32(StructValue):
-    size = 4
-    struct_declaration = "L"
-
-
-@tds_data_type(4, np.int64)
-class Int64(StructValue):
-    size = 8
-    struct_declaration = "q"
-
-
-@tds_data_type(8, np.uint64)
-class Uint64(StructValue):
-    size = 8
-    struct_declaration = "Q"
-
-
-@tds_data_type(0x21, np.bool8)
-class Boolean(StructValue):
-    size = 1
-    struct_declaration = "b"
-
-
-@tds_data_type(9, np.single)
-class SingleFloat(StructValue):
-    size = 4
-    struct_declaration = "f"
-
-
-@tds_data_type(10, np.double)
-class DoubleFloat(StructValue):
-    size = 8
-    struct_declaration = "d"
+@tds_data_type(0xFFFFFFFF, np.int16)
+class DaqMxRawData(TdmsType):
+    size = 2

@@ -10,7 +10,7 @@ from io import BytesIO
 import logging
 import numpy as np
 from nptdms.common import toc_properties
-from nptdms.value import *
+from nptdms.types import *
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.WARNING)
@@ -258,7 +258,7 @@ def read_properties_dict(properties_dict):
 
 
 def _map_property_value(value):
-    if isinstance(value, TdmsValue):
+    if isinstance(value, TdmsType):
         return value
     if isinstance(value, bool):
         return Boolean(value)
@@ -272,7 +272,7 @@ def _map_property_value(value):
         return String(value)
     if isinstance(value, unicode):
         return String(value)
-    raise TypeError("Unsupported property value type for %r" % value)
+    raise TypeError("Unsupported property type for %r" % value)
 
 
 def to_file(file, array):

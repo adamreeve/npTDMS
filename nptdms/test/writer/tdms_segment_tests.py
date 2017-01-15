@@ -12,7 +12,7 @@ except ImportError:
     pytz = None
 
 from nptdms.writer import TdmsSegment, read_properties_dict
-from nptdms.value import *
+from nptdms.types import *
 
 
 class TestObject(object):
