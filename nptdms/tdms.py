@@ -93,14 +93,14 @@ else:
 
 def fromfile(file, dtype, count, *args, **kwargs):
     """Wrapper around np.fromfile to support any file-like object"""
-    
+
     if isinstance(file, int) or (
         hasattr(file, 'fileno') and callable(file.fileno)):
         # satisfy criteria that 'argument must be an int, or 
         # have a fileno() method' - from numpy TypeError
         return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
     else:
-        return np.fromstring(
+        return np.frombuffer(
             file.read(count * np.dtype(dtype).itemsize),
             dtype=dtype, count=count, *args, **kwargs)
 
