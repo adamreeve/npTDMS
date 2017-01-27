@@ -7,9 +7,12 @@ import binascii
 import struct
 import tempfile
 from datetime import datetime
+import os
+import numpy as np
 
 from nptdms import tdms
 
+_data_dir = os.path.dirname(os.path.realpath(__file__)) + '/data'
 
 try:
     long
@@ -461,6 +464,50 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(data[0], 2)
         self.assertEqual(data[1], 4)
 
+    def test_less_data_than_expected(self):
+        """Add segment and then a repeated segment without
+        any lead in or metadata, so data is read in chunks,
+        but the extra chunk does not have as much data as expected."""
+
+        test_file = TestFile()
+        (metadata, data, toc) = basic_segment()
+        data = data + (
+            "05 00 00 00"
+            "06 00 00 00"
+        )
+        test_file.add_segment(metadata, data, toc)
+        tdmsData = test_file.load()
+
+        data = tdmsData.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 3)
+        self.assertTrue(all(data == [1, 2, 5]))
+        data = tdmsData.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 3)
+        self.assertTrue(all(data == [3, 4, 6]))
+
+    def test_less_data_than_expected_interleaved(self):
+        """Add segment and then a repeated segment without
+        any lead in or metadata, so data is read in chunks,
+        but the extra chunk does not have as much data as expected.
+        This also uses interleaved data"""
+
+        test_file = TestFile()
+        (metadata, data, toc) = basic_segment()
+        toc = toc + ("kTocInterleavedData", )
+        data = data + (
+            "05 00 00 00"
+            "06 00 00 00"
+        )
+        test_file.add_segment(metadata, data, toc)
+        tdmsData = test_file.load()
+
+        data = tdmsData.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 3)
+        self.assertTrue(all(data == [1, 3, 5]))
+        data = tdmsData.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 3)
+        self.assertTrue(all(data == [2, 4, 6]))
+
     def test_timestamp_data(self):
         """Test reading contiguous and interleaved timestamp data,
         which isn't read by numpy"""
@@ -863,6 +910,28 @@ class TDMSTestClass(unittest.TestCase):
         obj = tdmsData.object("Group", "Channel1")
         self.assertEqual(obj.group, "Group")
         self.assertEqual(obj.channel, "Channel1")
+
+    def test_labview_file(self):
+        """Test reading a file that was created by LabVIEW"""
+        tf = tdms.TdmsFile(_data_dir + '/Digital_Input.tdms')
+        group = ("07/09/2012 06:58:23 PM - " +
+                 "Digital Input - Decimated Data_Level1")
+        channel = "Dev1_port3_line7 - line 0"
+        expected = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1], dtype=np.uint8)
+
+        data = tf.object(group, channel).data
+        np.testing.assert_almost_equal(data[:10], expected)
+
+    def test_raw_format(self):
+        """Test reading a file with DAQmx raw data"""
+        tf = tdms.TdmsFile(_data_dir + '/raw1.tdms')
+        objpath = tf.groups()[0]
+        data = tf.object(objpath, 'First  Channel').data
+        np.testing.assert_almost_equal(data[:10],
+                                       [-0.18402661, 0.14801477, -0.24506363,
+                                        -0.29725028, -0.20020142, 0.18158513,
+                                        0.02380444, 0.20661031, 0.20447401,
+                                        0.2517777])
 
 
 if __name__ == '__main__':
