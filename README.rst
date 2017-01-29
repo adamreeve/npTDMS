@@ -5,20 +5,30 @@ npTDMS
     :alt: wercker status
     :target: https://app.wercker.com/project/bykey/446c67339f7d484188a35abc64dd3f51
 
-Cross-platform module for reading TDMS files as produced by LabView.
-Data is stored as a numpy array, and is loaded using numpy's fromfile routine
-so is very fast.
+npTDMS is a cross-platform Python package for reading and writing TDMS files as produced by LabVIEW,
+and is built on top of the `numpy <http://www.numpy.org/>`__ package.
+Data read from a TDMS file is stored in numpy arrays,
+and numpy arrays are also used when writing TDMS file.
 
-Typical usage might look like::
-
-    #!/usr/bin/env python
+Typical usage when reading a TDMS file might look like::
 
     from nptdms import TdmsFile
+
     tdms_file = TdmsFile("path_to_file.tdms")
     channel = tdms_file.object('Group', 'Channel1')
     data = channel.data
     time = channel.time_track()
     # do stuff with data
+
+And to write a file::
+
+    from nptdms import TdmsWriter, ChannelObject
+    import numpy
+
+    with TdmsWriter("path_to_file.tdms") as tdms_writer:
+        data_array = numpy.linspace(0, 1, 10)
+        channel = ChannelObject('Group', 'Channel1', data_array)
+        tdms_writer.write_segment([channel])
 
 For more information, see the `npTDMS documentation <http://nptdms.readthedocs.io>`__.
 
