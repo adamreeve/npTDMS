@@ -18,6 +18,7 @@ from copy import copy
 import numpy as np
 from datetime import datetime, timedelta
 import tempfile
+from io import BytesIO
 try:
     import pytz
 except ImportError:
@@ -92,17 +93,14 @@ else:
 
 
 def fromfile(file, dtype, count, *args, **kwargs):
-    """Wrapper around np.fromfile to support any file-like object"""
+    """ Wrapper around np.fromfile to support BytesIO fake files."""
 
-    if isinstance(file, int) or (
-            hasattr(file, 'fileno') and callable(file.fileno)):
-        # satisfy criteria that 'argument must be an int, or
-        # have a fileno() method' - from numpy TypeError
-        return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
-    else:
-        return np.frombuffer(
+    if isinstance(file, BytesIO):
+        return np.fromstring(
             file.read(count * np.dtype(dtype).itemsize),
             dtype=dtype, count=count, *args, **kwargs)
+    else:
+        return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
 
 
 def read_string(file):
