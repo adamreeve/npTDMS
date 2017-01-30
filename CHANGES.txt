@@ -1,3 +1,6 @@
+v0.10.0 29th January 2017
+- Add support for writing TDMS files.
+
 v0.9.0 2nd January 2017
 - Add support for reading DAQmx raw data files.
 

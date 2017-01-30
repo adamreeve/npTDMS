@@ -1,16 +1,17 @@
 """Test reading of example TDMS files"""
 
-import unittest
-import sys
-import logging
 import binascii
-import struct
-import tempfile
 from datetime import datetime
-import os
+from io import BytesIO
+import logging
 import numpy as np
+import os
+import struct
+import sys
+import tempfile
+import unittest
 
-from nptdms import tdms
+from nptdms import tdms, types
 
 _data_dir = os.path.dirname(os.path.realpath(__file__)) + '/data'
 
@@ -177,6 +178,12 @@ class TestFile(object):
         self.file.write(self.data)
         self.file.seek(0)
         return tdms.TdmsFile(self.file, *args, **kwargs)
+
+
+class BytesIoTestFile(TestFile):
+    def __init__(self):
+        self.file = BytesIO()
+        self.data = bytes()
 
 
 class TDMSTestClass(unittest.TestCase):
@@ -513,10 +520,10 @@ class TDMSTestClass(unittest.TestCase):
         which isn't read by numpy"""
 
         times = [
-            datetime(2012, 8, 23, 0, 0, 0, 123, tzinfo=tdms.timezone),
-            datetime(2012, 8, 23, 1, 2, 3, 456, tzinfo=tdms.timezone),
-            datetime(2012, 8, 23, 12, 0, 0, 0, tzinfo=tdms.timezone),
-            datetime(2012, 8, 23, 12, 2, 3, 9999, tzinfo=tdms.timezone),
+            datetime(2012, 8, 23, 0, 0, 0, 123, tzinfo=types.timezone),
+            datetime(2012, 8, 23, 1, 2, 3, 456, tzinfo=types.timezone),
+            datetime(2012, 8, 23, 12, 0, 0, 0, tzinfo=types.timezone),
+            datetime(2012, 8, 23, 12, 2, 3, 9999, tzinfo=types.timezone),
         ]
 
         def total_seconds(td):
@@ -525,7 +532,7 @@ class TDMSTestClass(unittest.TestCase):
 
         seconds = [
             total_seconds(
-                t - datetime(1904, 1, 1, 0, 0, 0, tzinfo=tdms.timezone))
+                t - datetime(1904, 1, 1, 0, 0, 0, tzinfo=types.timezone))
             for t in times]
         fractions = [
             int(float(t.microsecond) * 2 ** 58 / 5 ** 6)
@@ -932,6 +939,22 @@ class TDMSTestClass(unittest.TestCase):
                                         -0.29725028, -0.20020142, 0.18158513,
                                         0.02380444, 0.20661031, 0.20447401,
                                         0.2517777])
+
+    def test_data_read_from_bytes_io(self):
+        """Test reading data"""
+
+        test_file = BytesIoTestFile()
+        test_file.add_segment(*basic_segment())
+        tdmsData = test_file.load()
+
+        data = tdmsData.channel_data("Group", "Channel1")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 1)
+        self.assertEqual(data[1], 2)
+        data = tdmsData.channel_data("Group", "Channel2")
+        self.assertEqual(len(data), 2)
+        self.assertEqual(data[0], 3)
+        self.assertEqual(data[1], 4)
 
 
 if __name__ == '__main__':
