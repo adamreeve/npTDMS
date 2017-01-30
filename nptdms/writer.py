@@ -6,7 +6,7 @@ try:
 except ImportError:
     OrderedDict = dict
 from datetime import datetime
-from io import BytesIO
+from io import UnsupportedOperation
 import logging
 import numpy as np
 from nptdms.common import toc_properties
@@ -276,10 +276,10 @@ def _map_property_value(value):
 
 
 def to_file(file, array):
-    """Wrapper around ndarray.tofile to support BytesIO
-    """
-    if isinstance(file, BytesIO):
+    """Wrapper around ndarray.tofile to support any file-like object"""
+
+    try:
+        array.tofile(file)
+    except (TypeError, IOError, UnsupportedOperation):
         # tostring actually returns bytes
         file.write(array.tostring())
-    else:
-        array.tofile(file)

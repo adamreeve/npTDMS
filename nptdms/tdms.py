@@ -14,7 +14,7 @@ except ImportError:
 from copy import copy
 import numpy as np
 import tempfile
-from io import BytesIO
+from io import UnsupportedOperation
 
 from nptdms.utils import Timer
 from nptdms.common import toc_properties
@@ -39,14 +39,14 @@ except AttributeError:
 
 
 def fromfile(file, dtype, count, *args, **kwargs):
-    """ Wrapper around np.fromfile to support BytesIO fake files."""
+    """Wrapper around np.fromfile to support any file-like object"""
 
-    if isinstance(file, BytesIO):
-        return np.fromstring(
+    try:
+        return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
+    except (TypeError, IOError, UnsupportedOperation):
+        return np.frombuffer(
             file.read(count * np.dtype(dtype).itemsize),
             dtype=dtype, count=count, *args, **kwargs)
-    else:
-        return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
 
 
 def read_property(f):
