@@ -280,6 +280,6 @@ def to_file(file, array):
 
     try:
         array.tofile(file)
-    except (TypeError, UnsupportedOperation):
+    except (TypeError, IOError, UnsupportedOperation):
         # tostring actually returns bytes
         file.write(array.tostring())
