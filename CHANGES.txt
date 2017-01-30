@@ -1,3 +1,6 @@
+v0.10.1 30th January 2017
+- Allow read/write tdms for any file-like object.
+
 v0.10.0 29th January 2017
 - Add support for writing TDMS files.
 
