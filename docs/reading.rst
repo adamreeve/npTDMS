@@ -12,6 +12,8 @@ in the file can be accessed using the
 An object in a TDMS file is either the root object, a group object, or a channel
 object.
 Only channel objects contain data, but any object may have properties associated with it.
+For example, it is common to have properties stored against the root object such as the
+file title and author.
 
 The object returned by the ``object`` method is an instance of :py:class:`nptdms.TdmsObject`.
 If this is a channel containing data, you can access the data as a numpy array using its
@@ -26,12 +28,20 @@ properties, you can get an array of relative time values for the data using the
 
     time = channel_object.time_track()
 
-You can also access the properties of an object using the :py:meth:`nptdms.TdmsObject.property` method,
+You can access the properties of an object using the :py:meth:`nptdms.TdmsObject.property` method,
 or the :py:attr:`nptdms.TdmsObject.properties` dictionary, for example::
 
-    # Iterate over all properties and print them
-    for name, value in channel_object.properties.items():
+    root_object = tdms_file.object()
+
+    # Iterate over all items in the properties dictionary and print them
+    for name, value in root_object.properties.items():
         print("{0}: {1}".format(name, value))
 
     # Get a single property value
-    property_value = channel_object.property("my_property_name")
+    property_value = root_object.property("my_property_name")
+
+You may also have group objects in your TDMS files that do not contain
+channels but are only used to group properties, in which case you can access
+these objects in the same way as a normal group::
+
+    attributes = tdms_file.object("attributes").properties
