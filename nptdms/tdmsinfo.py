@@ -26,10 +26,14 @@ def main():
     tdmsfile = tdms.TdmsFile(args.tdms_file)
 
     level = 0
-    root = tdmsfile.object()
     display('/', level)
-    if args.properties:
-        display_properties(root, level)
+    try:
+        root = tdmsfile.object()
+        if args.properties:
+            display_properties(root, level)
+    except KeyError:
+        # Root object isn't present
+        pass
     for group in tdmsfile.groups():
         level = 1
         try:
