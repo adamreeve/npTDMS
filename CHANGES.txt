@@ -1,3 +1,9 @@
+v0.10.3 18th March 2017
+- Fix wrong column order in TdmsFile.as_dataframe
+
+v0.10.2 4th March 2017
+- Fix tdmsinfo when root object isn't present
+
 v0.10.1 30th January 2017
 - Allow read/write tdms for any file-like object.
 
