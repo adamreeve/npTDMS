@@ -216,12 +216,12 @@ class TdmsFile(object):
 
         import pandas as pd
 
-        temp = {}
+        temp = []
         for key, value in self.objects.items():
             if value.has_data:
                 index = value.time_track(absolute_time) if time_index else None
-                temp[key] = pd.Series(data=value.data, index=index)
-        return pd.DataFrame.from_dict(temp)
+                temp.append((key, pd.Series(data=value.data, index=index)))
+        return pd.DataFrame.from_items(temp)
 
 
 class _TdmsSegment(object):
