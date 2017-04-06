@@ -886,7 +886,7 @@ class _TdmsSegmentObject(object):
             self.data_type = info.data_type
             # DAQmx format has special chunking
             self.data_size = info.chunk_size
-            self.number_values = info.chunk_size/info.data_type.size
+            self.number_values = info.chunk_size//info.data_type.size
             # segment reading code relies on a single consistent raw
             # data width so assert that there is only one.
             assert(len(info.raw_data_widths) == 1)
