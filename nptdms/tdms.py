@@ -90,28 +90,28 @@ class TdmsFile(object):
             self._read_segments(file)
         else:
             # Is path to a file
-            with open(file, 'rb') as tdms_file:
-                self._read_segments(tdms_file)
+            with open(file, 'rb') as f:
+                self._read_segments(f)
 
-    def _read_segments(self, tdms_file):
+    def _read_segments(self, f):
         with Timer(log, "Read metadata"):
             # Read metadata first to work out how much space we need
             previous_segment = None
             while True:
                 try:
-                    segment = _TdmsSegment(tdms_file)
+                    segment = _TdmsSegment(f, self)
                 except EOFError:
                     # We've finished reading the file
                     break
                 segment.read_metadata(
-                    tdms_file, self.objects, previous_segment)
+                    f, self.objects, previous_segment)
 
                 self.segments.append(segment)
                 previous_segment = segment
                 if segment.next_segment_pos is None:
                     break
                 else:
-                    tdms_file.seek(segment.next_segment_pos)
+                    f.seek(segment.next_segment_pos)
 
         with Timer(log, "Allocate space"):
             # Allocate space for data
@@ -121,7 +121,7 @@ class TdmsFile(object):
         with Timer(log, "Read data"):
             # Now actually read all the data
             for segment in self.segments:
-                segment.read_raw_data(tdms_file)
+                segment.read_raw_data(f)
 
     def _path(self, *args):
         """Convert group and channel to object path"""
@@ -230,12 +230,13 @@ class _TdmsSegment(object):
 
     __slots__ = [
         'position', 'num_chunks', 'ordered_objects', 'toc', 'version',
-        'next_segment_offset', 'next_segment_pos',
+        'next_segment_offset', 'next_segment_pos', 'tdms_file',
         'raw_data_offset', 'data_position', 'final_chunk_proportion']
 
-    def __init__(self, f):
+    def __init__(self, f, tdms_file):
         """Read the lead in section of a segment"""
 
+        self.tdms_file = tdms_file
         self.position = f.tell()
         self.num_chunks = 0
         # A list of _TdmsSegmentObject
@@ -326,7 +327,7 @@ class _TdmsSegment(object):
             if object_path in objects:
                 obj = objects[object_path]
             else:
-                obj = TdmsObject(object_path)
+                obj = TdmsObject(object_path, self.tdms_file)
                 objects[object_path] = obj
 
             # Add this segment object to the list of segment objects,
@@ -528,8 +529,9 @@ class TdmsObject(object):
 
     """
 
-    def __init__(self, path):
+    def __init__(self, path, tdms_file=None):
         self.path = path
+        self.tdms_file = tdms_file
         self._data = None
         self._data_scaled = None
         self.properties = OrderedDict()
