@@ -13,6 +13,7 @@ except ImportError:
         OrderedDict = dict
 from copy import copy
 import numpy as np
+import re
 import tempfile
 from io import UnsupportedOperation
 
@@ -709,23 +710,40 @@ class TdmsObject(object):
             # self._data is None if data segment is empty
             return np.empty((0, 1))
         if self._data_scaled is None:
-            scale_type = self.properties.get('NI_Scale[1]_Scale_Type', None)
-            if scale_type == 'Polynomial':
-                coeff_names = ['NI_Scale[1]_Polynomial_Coefficients[%d]' % i
-                               for i in range(4)]
-                scaled_data = np.zeros_like(self._data, dtype=np.float)
-                for i, scale_factor in enumerate([self.properties[s]
-                                                  for s in coeff_names]):
-                    scaled_data += scale_factor * self._data**i
-                self._data_scaled = scaled_data
-            elif scale_type == 'Linear':
-                slope = self.properties["NI_Scale[1]_Linear_Slope"]
-                intercept = self.properties["NI_Scale[1]_Linear_Y_Intercept"]
-                self._data_scaled = self._data * slope + intercept
-            else:
+            scale_index = self._get_scale_index(self.properties)
+            if scale_index is None:
                 self._data_scaled = self._data
+            else:
+                scale_type = self.properties[
+                    'NI_Scale[%d]_Scale_Type' % scale_index]
+                if scale_type == 'Polynomial':
+                    coeff_names = [
+                        'NI_Scale[%d]_Polynomial_Coefficients[%d]' %
+                        (scale_index, i) for i in range(4)]
+                    scaled_data = np.zeros_like(self._data, dtype=np.float)
+                    for i, scale_factor in enumerate([self.properties[s]
+                                                      for s in coeff_names]):
+                        scaled_data += scale_factor * self._data**i
+                    self._data_scaled = scaled_data
+                elif scale_type == 'Linear':
+                    slope = self.properties[
+                        "NI_Scale[%d]_Linear_Slope" % scale_index]
+                    intercept = self.properties[
+                        "NI_Scale[%d]_Linear_Y_Intercept" % scale_index]
+                    self._data_scaled = self._data * slope + intercept
+                else:
+                    log.warning("Unsupported scale type: %s", scale_type)
+                    self._data_scaled = self._data
 
         return self._data_scaled
+
+    def _get_scale_index(self, properties):
+        scale_regex = re.compile(r"NI_Scale\[(\d+)\]_Scale_Type")
+        matches = (scale_regex.match(key) for key in properties.keys())
+        try:
+            return max(int(m.group(1)) for m in matches if m is not None)
+        except ValueError:
+            return None
 
     @_property_builtin
     def raw_data(self):
