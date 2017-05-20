@@ -27,6 +27,18 @@ class ScalingDataTests(unittest.TestCase):
 
         self.assertIs(expected_data, tdms_obj.data)
 
+    def test_unsupported_scaling_type(self):
+        """Raw data is returned unscaled when the scaling type is unsupported.
+        """
+
+        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        expected_data = np.array([1.0, 2.0, 3.0])
+        tdms_obj.properties["NI_Number_Of_Scales"] = 1
+        tdms_obj.properties["NI_Scale[1]_Scale_Type"] = "UnknownScaling"
+        tdms_obj._data = expected_data
+
+        self.assertIs(expected_data, tdms_obj.data)
+
     def test_linear_scaling(self):
         """Test linear scaling"""
 

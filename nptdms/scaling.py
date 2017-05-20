@@ -3,6 +3,10 @@ import numpy as np
 import re
 
 
+log = logging.getLogger(__name__)
+log.setLevel(logging.WARNING)
+
+
 class LinearScaling(object):
     def __init__(self, intercept, slope):
         self.intercept = intercept
