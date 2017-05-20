@@ -17,10 +17,7 @@ class PolynomialScaling(object):
         self.coefficients = coefficients
 
     def scale(self, data):
-        scaled_data = np.zeros_like(data, dtype=np.double)
-        for i, scale_factor in enumerate(self.coefficients):
-            scaled_data += scale_factor * data ** i
-        return scaled_data
+        return np.polynomial.polynomial.polyval(data, self.coefficients)
 
 
 def get_scaling(channel):
