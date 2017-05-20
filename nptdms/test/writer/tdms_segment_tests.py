@@ -146,6 +146,18 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(tdms_properties["prop5"], DoubleFloat(3.142))
         self.assertEqual(tdms_properties["prop6"], TimeStamp(test_time))
 
+    def test_writing_long_integer_properties(self):
+        properties = {
+            "prop1": 2147483647,
+            "prop2": 2147483648,
+        }
+
+        tdms_properties = read_properties_dict(properties)
+
+        self.assertEqual(len(tdms_properties), len(properties))
+        self.assertEqual(tdms_properties["prop1"], Int32(2147483647))
+        self.assertEqual(tdms_properties["prop2"], Int64(2147483648))
+
     def test_error_raised_when_cannot_convert_property_value(self):
         properties = {
             "prop1": None

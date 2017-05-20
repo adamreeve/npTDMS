@@ -263,7 +263,7 @@ def _map_property_value(value):
     if isinstance(value, bool):
         return Boolean(value)
     if isinstance(value, int):
-        return Int32(value)
+        return to_int_property_value(value)
     if isinstance(value, float):
         return DoubleFloat(value)
     if isinstance(value, datetime):
@@ -273,6 +273,12 @@ def _map_property_value(value):
     if isinstance(value, unicode):
         return String(value)
     raise TypeError("Unsupported property type for %r" % value)
+
+
+def to_int_property_value(value):
+    if value >= 2 ** 31:
+        return Int64(value)
+    return Int32(value)
 
 
 def to_file(file, array):
