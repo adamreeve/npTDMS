@@ -225,6 +225,46 @@ class TdmsFile(object):
                 temp.append((key, pd.Series(data=value.data, index=index)))
         return pd.DataFrame.from_items(temp)
 
+    def as_hdf(self, filepath):
+        import h5py
+        """
+        Converts the TDMS file into an HDF5 file
+
+        :param filepath: The path of the HDF5 file you want to write to.
+        """
+        # Groups in TDMS are mapped to the first level of the HDF5 hierarchy
+
+        # Channels in TDMS are then mapped to the second level of the HDF5
+        # hierarchy, under the appropriate groups.
+
+        # Properties in TDMS are mapped to attributes in HDF5.
+        # These all exist under the appropriate, channel group etc.
+
+        h5file = h5py.File(filepath, 'w')
+
+        # First right the properties at the root level
+        for property_name, property_value in self.Object().properties.items():
+            h5file['/'].attrs[property_name] = property_value
+
+        # Now iterate through groups and channels, 
+        # writing the properties and data
+        for group_name in self.group_channels():
+
+            group = self.object(group_name)
+
+            # Write the group's properties
+            for property_name, property_value in group.properties.items():
+                h5file['/'+group_name].attrs[property_name] = property_value
+
+            # Write properties and data for each channel
+            for channel in group.group_channels(group_name):
+                for property_name, property_value in channel.properties.items():
+                    h5file['/'].attrs[property_name] = property_value
+
+                h5file['/'+group_name+'/'+channel.channel()] = channel.data()
+
+        return h5file
+
 
 class _TdmsSegment(object):
 
