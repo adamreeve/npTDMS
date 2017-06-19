@@ -246,7 +246,7 @@ class TdmsFile(object):
         for property_name, property_value in self.object().properties.items():
             h5file['/'].attrs[property_name] = property_value
 
-        # Now iterate through groups and channels, 
+        # Now iterate through groups and channels,
         # writing the properties and data
         for group_name in self.groups():
 
@@ -258,7 +258,8 @@ class TdmsFile(object):
 
             # Write properties and data for each channel
             for channel in self.group_channels(group_name):
-                for property_name, property_value in channel.properties.items():
+                for property_name, property_value in \
+                    channel.properties.items():
                     h5file['/'].attrs[property_name] = property_value
 
                 h5file['/'+group_name+'/'+channel.channel] = channel.data
