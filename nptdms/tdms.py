@@ -242,26 +242,34 @@ class TdmsFile(object):
 
         h5file = h5py.File(filepath, 'w')
 
-        # First right the properties at the root level
-        for property_name, property_value in self.object().properties.items():
-            h5file['/'].attrs[property_name] = property_value
+        # First write the properties at the root level
+        try:
+            root = self.object()
+            for property_name, property_value in root.properties.items():
+                h5file['/'].attrs[property_name] = property_value
+        except KeyError:
+            # No root object present
+            pass
 
         # Now iterate through groups and channels,
         # writing the properties and data
         for group_name in self.groups():
+            try:
+                group = self.object(group_name)
 
-            group = self.object(group_name)
+                # Write the group's properties
+                for prop_name, prop_value in group.properties.items():
+                    h5file['/'+group_name].attrs[prop_name] = prop_value
 
-            # Write the group's properties
-            for property_name, property_value in group.properties.items():
-                h5file['/'+group_name].attrs[property_name] = property_value
+                # Write properties and data for each channel
+                for channel in self.group_channels(group_name):
+                    for prop_name, prop_value in channel.properties.items():
+                        h5file['/'].attrs[prop_name] = prop_value
 
-            # Write properties and data for each channel
-            for channel in self.group_channels(group_name):
-                for prop_name, prop_value in channel.properties.items():
-                    h5file['/'].attrs[prop_name] = prop_value
-
-                h5file['/'+group_name+'/'+channel.channel] = channel.data
+                    h5file['/'+group_name+'/'+channel.channel] = channel.data
+            except KeyError:
+                # No group object present
+                pass
 
         return h5file
 
