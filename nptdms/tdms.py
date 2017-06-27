@@ -260,7 +260,7 @@ class TdmsFile(object):
                 # Write the group's properties
                 for prop_name, prop_value in group.properties.items():
                     h5file['/'+group_name].attrs[prop_name] = prop_value
-                    
+
             except KeyError:
                 # No group object present
                 pass
