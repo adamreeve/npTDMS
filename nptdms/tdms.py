@@ -260,16 +260,17 @@ class TdmsFile(object):
                 # Write the group's properties
                 for prop_name, prop_value in group.properties.items():
                     h5file['/'+group_name].attrs[prop_name] = prop_value
-
-                # Write properties and data for each channel
-                for channel in self.group_channels(group_name):
-                    for prop_name, prop_value in channel.properties.items():
-                        h5file['/'].attrs[prop_name] = prop_value
-
-                    h5file['/'+group_name+'/'+channel.channel] = channel.data
+                    
             except KeyError:
                 # No group object present
                 pass
+
+            # Write properties and data for each channel
+            for channel in self.group_channels(group_name):
+                for prop_name, prop_value in channel.properties.items():
+                    h5file['/'].attrs[prop_name] = prop_value
+
+                h5file['/'+group_name+'/'+channel.channel] = channel.data
 
         return h5file
 
