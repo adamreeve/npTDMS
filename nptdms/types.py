@@ -191,6 +191,10 @@ class TimeStamp(TdmsType):
     size = 16
 
     def __init__(self, value):
+        if isinstance(value, np.datetime64):
+            value = value.astype(datetime)
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone)
         self.value = value
         epoch_delta = value - self._tdms_epoch
         seconds_per_day = 86400

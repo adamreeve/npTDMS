@@ -157,7 +157,7 @@ class TdmsSegment(object):
     def _write_data(self, file):
         for obj in self.objects:
             if obj.has_data:
-                to_file(file, obj.data)
+                write_data(file, obj)
 
 
 class TdmsObject(object):
@@ -274,6 +274,8 @@ def _to_tdms_value(value):
         return DoubleFloat(value)
     if isinstance(value, datetime):
         return TimeStamp(value)
+    if isinstance(value, np.datetime64):
+        return TimeStamp(value)
     if isinstance(value, str):
         return String(value)
     if isinstance(value, unicode):
@@ -287,6 +289,20 @@ def to_int_property_value(value):
     return Int32(value)
 
 
+def write_data(file, tdms_object):
+    if (tdms_object).data_type == TimeStamp:
+        # Numpy's datetime format isn't compatible with TDMS,
+        # so can't use data.tofile
+        write_values(file, tdms_object.data)
+    else:
+        try:
+            to_file(file, tdms_object.data)
+        except (AttributeError):
+            # Need to also handle lists of data,
+            # to handle timestamp data for example.
+            write_values(file, tdms_object.data)
+
+
 def to_file(file, array):
     """Wrapper around ndarray.tofile to support any file-like object"""
 
@@ -295,7 +311,7 @@ def to_file(file, array):
     except (TypeError, IOError, UnsupportedOperation):
         # tostring actually returns bytes
         file.write(array.tostring())
-    except (AttributeError):
-        # Need to also handle lists of data,
-        # to handle timestamp data for example.
-        file.write(b''.join(_to_tdms_value(val).bytes for val in array))
+
+
+def write_values(file, array):
+    file.write(b''.join(_to_tdms_value(val).bytes for val in array))
