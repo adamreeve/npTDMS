@@ -290,7 +290,7 @@ def to_int_property_value(value):
 
 
 def write_data(file, tdms_object):
-    if (tdms_object).data_type == TimeStamp:
+    if tdms_object.data_type == TimeStamp:
         # Numpy's datetime format isn't compatible with TDMS,
         # so can't use data.tofile
         write_values(file, tdms_object.data)
