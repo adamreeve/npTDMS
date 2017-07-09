@@ -237,7 +237,13 @@ class ChannelObject(TdmsObject):
 
     @property
     def data_type(self):
-        return numpy_data_types[self.data.dtype.type]
+        try:
+            return numpy_data_types[self.data.dtype.type]
+        except (AttributeError, KeyError):
+            try:
+                return _to_tdms_value(self.data[0]).__class__
+            except IndexError:
+                return Void
 
     @property
     def path(self):
@@ -253,11 +259,11 @@ def read_properties_dict(properties_dict):
         return {}
 
     return OrderedDict(
-        (key, _map_property_value(val))
+        (key, _to_tdms_value(val))
         for key, val in properties_dict.items())
 
 
-def _map_property_value(value):
+def _to_tdms_value(value):
     if isinstance(value, TdmsType):
         return value
     if isinstance(value, bool):
@@ -289,3 +295,7 @@ def to_file(file, array):
     except (TypeError, IOError, UnsupportedOperation):
         # tostring actually returns bytes
         file.write(array.tostring())
+    except (AttributeError):
+        # Need to also handle lists of data,
+        # to handle timestamp data for example.
+        file.write(b''.join(_to_tdms_value(val).bytes for val in array))

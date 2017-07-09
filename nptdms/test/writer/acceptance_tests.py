@@ -185,3 +185,29 @@ class TDMSTestClass(unittest.TestCase):
             if os.path.exists(temppath):
                 os.remove(temppath)
             os.rmdir(tempdir)
+
+    def test_can_write_timestamp_data(self):
+        tzinfo = None
+        if pytz:
+            tzinfo = pytz.utc
+        input_data = [
+            datetime(2017, 7, 9, 12, 35, 0, 0, tzinfo),
+            datetime(2017, 7, 9, 12, 36, 0, 0, tzinfo),
+            datetime(2017, 7, 9, 12, 37, 0, 0, tzinfo),
+            ]
+
+        segment = ChannelObject("group", "timedata", input_data)
+
+        output_file = BytesIO()
+        with TdmsWriter(output_file) as tdms_writer:
+            tdms_writer.write_segment([segment])
+
+        output_file.seek(0)
+        tdms_file = TdmsFile(output_file)
+
+        output_data = tdms_file.object("group", "timedata").data
+
+        self.assertEqual(len(output_data), 3)
+        self.assertEqual(output_data[0], input_data[0])
+        self.assertEqual(output_data[1], input_data[1])
+        self.assertEqual(output_data[2], input_data[2])
