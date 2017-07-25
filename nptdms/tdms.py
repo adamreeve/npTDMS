@@ -754,12 +754,14 @@ class TdmsObject(object):
         # When absolute_time is True,
         # use the wf_start_time as offset for the time_track()
         try:
-            time = self.time_track(absolute_time) 
+            time = self.time_track(absolute_time)
         except KeyError:
             time = None
         if self.channel is None:
-            return pd.DataFrame.from_items([(ch.channel, pd.Series(ch.data)) \
-                        for ch in self.tdms_file.group_channels(self.group)])
+            return pd.DataFrame.from_items(
+                [
+                 (ch.channel, pd.Series(ch.data))
+                 for ch in self.tdms_file.group_channels(self.group)])
         else:
             return pd.DataFrame(self._data, index=time, columns=[self.path])
 
