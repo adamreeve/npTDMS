@@ -215,20 +215,26 @@ class TDMSTestClass(unittest.TestCase):
         tdmsData = test_file.load()
 
         df = tdmsData.object("Group", "Channel2").as_dataframe()
+
         self.assertEqual(len(df.index), 2)
         self.assertTrue(within_tol(df.index[0], 2.0))
         self.assertTrue(within_tol(df.index[1], 2.1))
 
     def test_channel_as_dataframe_without_time(self):
-        """Converting channel to dataframe should raise when
-        time properties aren't present"""
+        """Converting channel to dataframe should work correctly"""
 
         test_file = TestFile()
         test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
-        with self.assertRaises(KeyError):
-            df = tdmsData.object("Group", "Channel1").as_dataframe()
+        df = tdmsData.object("Group", "Channel2").as_dataframe()
+
+        self.assertEqual(len(df.index), 2)
+        self.assertEqual(len(df.values), 2)
+        self.assertTrue(within_tol(df.index[0], 0.0))
+        self.assertTrue(within_tol(df.index[1], 0.1))
+        self.assertTrue(within_tol(df.values[0], 3.0))
+        self.assertTrue(within_tol(df.values[1], 4.0))
 
     def test_channel_as_dataframe_with_absolute_time(self):
         """Convert channel to Pandas dataframe with absolute time index"""
