@@ -467,8 +467,8 @@ class _TdmsSegment(object):
             for obj in self.ordered_objects:
                 if obj.has_data:
                     obj.tdms_object.number_values += (
-                        obj.number_values * (self.num_chunks - 1)
-                        + int(obj.number_values * self.final_chunk_proportion))
+                        obj.number_values * (self.num_chunks - 1) + int(
+                            obj.number_values * self.final_chunk_proportion))
 
     def read_raw_data(self, f):
         """Read signal data from file"""
@@ -693,8 +693,8 @@ class TdmsObject(object):
         # Because numpy only knows ints as its date datatype,
         # convert to accuracy.
         time_type = "timedelta64[{0}]".format(accuracy)
-        return (np.datetime64(start_time)
-                + (relative_time * unit_correction).astype(time_type))
+        return (np.datetime64(start_time) +
+                (relative_time * unit_correction).astype(time_type))
 
     def _initialise_data(self, memmap_dir=None):
         """Initialise data array to zeros"""

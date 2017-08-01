@@ -211,8 +211,8 @@ class TimeStamp(TdmsType):
             float(second_fractions) / cls._fractions_per_microsecond)
         # Adding timedelta with seconds ignores leap
         # seconds, so this is correct
-        return (cls._tdms_epoch + timedelta(seconds=seconds)
-                + timedelta(microseconds=micro_seconds))
+        return (cls._tdms_epoch + timedelta(seconds=seconds) +
+                timedelta(microseconds=micro_seconds))
 
 
 @tds_data_type(0xFFFFFFFF, np.int16)
