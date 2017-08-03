@@ -22,9 +22,11 @@ deploy:
     - script:
         name: Deploy to pypi
         code: |
-          echo "[pypirc]
-          servers = pypi
-          [server-login]
+          echo "[distutils]
+          index-servers =
+              pypi
+
+          [pypi]
           username:$PYPI_USER
           password:$PYPI_PASSWORD" > ~/.pypirc
           python setup.py sdist upload || exit 1
