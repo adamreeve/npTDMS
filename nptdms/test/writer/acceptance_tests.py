@@ -239,3 +239,31 @@ class TDMSTestClass(unittest.TestCase):
             output_data[1], datetime(2017, 7, 9, 12, 36, 0, 0, tzinfo))
         self.assertEqual(
             output_data[2], datetime(2017, 7, 9, 12, 37, 0, 0, tzinfo))
+
+    def test_can_write_numpy_timestamp_data_with_dates(self):
+        tzinfo = None
+        if pytz:
+            tzinfo = pytz.utc
+        input_data = np.array([
+            '2017-07-09',
+            '2017-07-09',
+            '2017-07-09'], dtype='datetime64')
+
+        segment = ChannelObject("group", "timedata", input_data)
+
+        output_file = BytesIO()
+        with TdmsWriter(output_file) as tdms_writer:
+            tdms_writer.write_segment([segment])
+
+        output_file.seek(0)
+        tdms_file = TdmsFile(output_file)
+
+        output_data = tdms_file.object("group", "timedata").data
+
+        self.assertEqual(len(output_data), 3)
+        self.assertEqual(
+            output_data[0], datetime(2017, 7, 9, 0, 0, 0, 0, tzinfo))
+        self.assertEqual(
+            output_data[1], datetime(2017, 7, 9, 0, 0, 0, 0, tzinfo))
+        self.assertEqual(
+            output_data[2], datetime(2017, 7, 9, 0, 0, 0, 0, tzinfo))

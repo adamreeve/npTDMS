@@ -146,6 +146,22 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(tdms_properties["prop5"], DoubleFloat(3.142))
         self.assertEqual(tdms_properties["prop6"], TimeStamp(test_time))
 
+    def test_datetime_converted_when_it_only_has_date_part(self):
+        test_time = np.datetime64('2017-11-19')
+
+        properties = {
+            "time_prop": test_time,
+        }
+
+        tdms_properties = read_properties_dict(properties)
+
+        self.assertEqual(tdms_properties["time_prop"].value.year, 2017)
+        self.assertEqual(tdms_properties["time_prop"].value.month, 11)
+        self.assertEqual(tdms_properties["time_prop"].value.day, 19)
+        self.assertEqual(tdms_properties["time_prop"].value.hour, 0)
+        self.assertEqual(tdms_properties["time_prop"].value.minute, 0)
+        self.assertEqual(tdms_properties["time_prop"].value.second, 0)
+
     def test_writing_long_integer_properties(self):
         properties = {
             "prop1": 2147483647,

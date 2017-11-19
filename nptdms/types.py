@@ -193,6 +193,10 @@ class TimeStamp(TdmsType):
     def __init__(self, value):
         if isinstance(value, np.datetime64):
             value = value.astype(datetime)
+            # numpy converts a datetime with no time part to
+            # datetime.date instead of datetime.datetime
+            if not isinstance(value, datetime):
+                value = datetime.combine(value, datetime.min.time())
         if value.tzinfo is None:
             value = value.replace(tzinfo=timezone)
         self.value = value
