@@ -123,7 +123,7 @@ class TdmsSegment(object):
             dimension = Uint32(1)
             num_values = Uint64(len(obj.data))
 
-            return [Uint32(16), data_type, dimension, num_values]
+            return [Uint32(20), data_type, dimension, num_values]
         else:
             return [Bytes(b'\xFF\xFF\xFF\xFF')]
 

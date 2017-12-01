@@ -89,7 +89,7 @@ class TDMSTestClass(unittest.TestCase):
         expected_values = [
             Uint32(1),  # Number of objects
             String("channel_path"),
-            Uint32(16),  # Length of raw data index in bytes
+            Uint32(20),  # Length of raw data index in bytes
             Int32(3),  # Data type
             Uint32(1),  # Array dimension
             Uint64(10),  # Number of values
