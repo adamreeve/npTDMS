@@ -270,7 +270,10 @@ class TdmsFile(object):
                 for prop_name, prop_value in channel.properties.items():
                     h5file['/'].attrs[prop_name] = prop_value
 
-                h5file['/'+group_name+'/'+channel.channel] = channel.data
+                if channel.data_type is types.String:
+                    h5file['/'+group_name+'/'+channel.channel] = numpy.strings_(channel.data)
+                else:
+                    h5file['/'+group_name+'/'+channel.channel] = channel.data
 
         return h5file
 
