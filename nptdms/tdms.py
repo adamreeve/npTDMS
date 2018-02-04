@@ -439,8 +439,8 @@ class _TdmsSegment(object):
             # Sometimes kTocRawData is set, but there isn't actually any data
             if total_data_size != data_size:
                 raise ValueError(
-                    "Zero channel data size but non-zero data "
-                    "length based on segment offset.")
+                    "Zero channel data size but data length based on "
+                    "segment offset is %d." % total_data_size)
             self.num_chunks = 0
             return
         chunk_remainder = total_data_size % data_size
@@ -941,7 +941,7 @@ class _TdmsSegmentObject(object):
             self.data_type = info.data_type
             # DAQmx format has special chunking
             self.data_size = info.chunk_size
-            self.number_values = info.chunk_size//info.data_type.size
+            self.number_values = info.chunk_size
             # segment reading code relies on a single consistent raw
             # data width so assert that there is only one.
             assert(len(info.raw_data_widths) == 1)
