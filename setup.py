@@ -39,7 +39,7 @@ setup(
     'Intended Audience :: Science/Research',
     'Natural Language :: English',
   ],
-  install_requires = ['numpy'],
+  install_requires = ['numpy', 'h5py'],
   entry_points = """
   [console_scripts]
   tdmsinfo=nptdms.tdmsinfo:main
