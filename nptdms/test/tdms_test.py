@@ -10,6 +10,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from pathlib import Path
 
 from nptdms import tdms, types
 
@@ -955,6 +956,58 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(len(data), 2)
         self.assertEqual(data[0], 3)
         self.assertEqual(data[1], 4)
+
+    def test_as_hdf_string(self):
+        """Test HDF5 conversion for -most- datatypes"""
+
+        strings = ["abc123", "?<>~`!@#$%^&*()-=_+,.;'[]:{}|"]
+
+        test_file = TestFile()
+        toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+        metadata = (
+            # Number of objects
+            "01 00 00 00"
+            # Length of the object path
+            "11 00 00 00")
+        metadata += string_hexlify("/'Group'/'String'")
+        metadata += (
+            # Length of index information
+            "1C 00 00 00"
+            # Raw data data type
+            "20 00 00 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw data values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of bytes in data
+            "25 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = (
+            "06 00 00 00"  # index to after first string
+            "24 00 00 00"  # index to after second string
+        )
+        for string in strings:
+            data += string_hexlify(string)
+        test_file.add_segment(metadata, data, toc)
+        tdmsData = test_file.load()
+
+        data = tdmsData.channel_data("Group", "String")
+        self.assertEqual(len(data), len(strings))
+        for expected, read in zip(strings, data):
+            self.assertEqual(expected, read)
+
+        h5_path = Path.joinpath(Path(os.path.abspath(__file__)).parent, 'h5_test.h5')
+        h5 = tdmsData.as_hdf(h5_path)
+        h5_strings = h5['Group']['String']
+        self.assertEqual(h5_strings.dtype.kind, 'S')
+        self.assertEqual(len(h5_strings), len(strings))
+        for expected, read in zip(strings, h5_strings):
+            self.assertEqual(expected, read.astype(str))
+        h5.close()
+        os.remove(h5_path)
 
 
 if __name__ == '__main__':
