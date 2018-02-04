@@ -10,7 +10,6 @@ import struct
 import sys
 import tempfile
 import unittest
-from pathlib import Path
 
 from nptdms import tdms, types
 
@@ -999,7 +998,7 @@ class TDMSTestClass(unittest.TestCase):
         for expected, read in zip(strings, data):
             self.assertEqual(expected, read)
 
-        h5_path = Path.joinpath(Path(os.path.abspath(__file__)).parent, 'h5_test.h5')
+        h5_path = os.path.join(os.path.dirname(__file__), 'h5_test.h5')
         h5 = tdmsData.as_hdf(h5_path)
         h5_strings = h5['Group']['String']
         self.assertEqual(h5_strings.dtype.kind, 'S')

@@ -266,14 +266,14 @@ class TdmsFile(object):
                 pass
 
             # Write properties and data for each channel
-            for channel in self.group_channels(group_name):
-                for prop_name, prop_value in channel.properties.items():
+            for chan in self.group_channels(group_name):
+                for prop_name, prop_value in chan.properties.items():
                     h5file['/'].attrs[prop_name] = prop_value
 
-                if channel.data_type is types.String:
-                    h5file['/'+group_name+'/'+channel.channel] = np.string_(channel.data)
+                if chan.data_type is types.String:
+                    h5file['/'+group_name+'/'+chan.channel] = np.string_(chan.data)
                 else:
-                    h5file['/'+group_name+'/'+channel.channel] = channel.data
+                    h5file['/'+group_name+'/'+chan.channel] = chan.data
 
         return h5file
 
