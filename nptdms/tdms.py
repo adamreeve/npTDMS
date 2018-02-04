@@ -271,9 +271,11 @@ class TdmsFile(object):
                     h5file['/'].attrs[prop_name] = prop_value
 
                 if chan.data_type is types.String:
-                    h5file['/'+group_name+'/'+chan.channel] = np.string_(chan.data)
+                    chan_data = np.string_(chan.data)
                 else:
-                    h5file['/'+group_name+'/'+chan.channel] = chan.data
+                    chan_data = chan.data
+
+                h5file['/'+group_name+'/'+chan.channel] = chan_data
 
         return h5file
 
