@@ -39,10 +39,15 @@ def _get_object_scaling(obj):
 
     scale_type = obj.properties['NI_Scale[%d]_Scale_Type' % scale_index]
     if scale_type == 'Polynomial':
+        try:
+            number_of_coefficients = obj.properties[
+                'NI_Scale[%d]_Polynomial_Coefficients_Size' % (scale_index)]
+        except KeyError:
+            number_of_coefficients = 4
         coefficients = [
             obj.properties[
                 'NI_Scale[%d]_Polynomial_Coefficients[%d]' % (scale_index, i)]
-            for i in range(4)]
+            for i in range(number_of_coefficients)]
         return PolynomialScaling(coefficients)
     elif scale_type == 'Linear':
         return LinearScaling(

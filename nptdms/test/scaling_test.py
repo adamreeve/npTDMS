@@ -69,6 +69,22 @@ class ScalingDataTests(unittest.TestCase):
 
         np.testing.assert_almost_equal(expected_data, tdms_obj.data)
 
+    def test_polynomial_scaling_with_3_coefficients(self):
+        """Test polynomial scaling"""
+
+        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        tdms_obj._data = np.array([1.0, 2.0, 3.0])
+        tdms_obj.properties["NI_Number_Of_Scales"] = 1
+        tdms_obj.properties["NI_Scale[1]_Scale_Type"] = "Polynomial"
+        tdms_obj.properties["NI_Scale[1]_Polynomial_Coefficients_Size"] = 3
+        tdms_obj.properties["NI_Scale[1]_Polynomial_Coefficients[0]"] = 10.0
+        tdms_obj.properties["NI_Scale[1]_Polynomial_Coefficients[1]"] = 1.0
+        tdms_obj.properties["NI_Scale[1]_Polynomial_Coefficients[2]"] = 2.0
+
+        expected_data = np.array([13.0, 20.0, 31.0])
+
+        np.testing.assert_almost_equal(expected_data, tdms_obj.data)
+
     def test_multiple_scalings(self):
         """Test correct scaling selected from multiple scalings"""
 
