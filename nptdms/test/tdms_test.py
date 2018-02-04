@@ -958,7 +958,7 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(data[1], 4)
 
     def test_as_hdf_string(self):
-        """Test HDF5 conversion for -most- datatypes"""
+        """Test HDF5 conversion for string datatype"""
 
         strings = ["abc123", "?<>~`!@#$%^&*()-=_+,.;'[]:{}|"]
 
