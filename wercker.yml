@@ -9,7 +9,7 @@ build:
     - script:
         name: Test on Python 2.7
         code: |
-          sudo apt-get --yes --force-yes install libhdf5-dev
+          sudo apt-get --yes --force-yes install python-h5py
           python2.7 setup.py install
           nosetests
     - script:
