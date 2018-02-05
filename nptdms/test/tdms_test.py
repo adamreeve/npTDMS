@@ -1001,8 +1001,10 @@ class TDMSTestClass(unittest.TestCase):
         h5_path = os.path.join(os.path.dirname(__file__), 'h5_test.h5')
         h5 = tdmsData.as_hdf(h5_path)
         h5_strings = h5['Group']['String']
+        print(h5_strings.shape[0])
+        print(len(h5_strings))
         self.assertEqual(h5_strings.dtype.kind, 'S')
-        self.assertEqual(len(h5_strings), len(strings))
+        self.assertEqual(h5_strings.shape[0], len(strings))
         for expected, read in zip(strings, h5_strings.value):
             self.assertEqual(expected, read.decode('utf8'))
         h5.close()
