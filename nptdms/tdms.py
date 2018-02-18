@@ -225,13 +225,16 @@ class TdmsFile(object):
                 temp.append((key, pd.Series(data=value.data, index=index)))
         return pd.DataFrame.from_items(temp)
 
-    def as_hdf(self, filepath):
-        import h5py
+    def as_hdf(self, filepath, mode='w', group='/'):
         """
         Converts the TDMS file into an HDF5 file
 
         :param filepath: The path of the HDF5 file you want to write to.
+        :param mode: The write mode of the HDF5 file. This can be w, a ...
+        :param group: A group in the HDF5 file that will contain the TDMS data.
         """
+        import h5py
+
         # Groups in TDMS are mapped to the first level of the HDF5 hierarchy
 
         # Channels in TDMS are then mapped to the second level of the HDF5
@@ -240,13 +243,19 @@ class TdmsFile(object):
         # Properties in TDMS are mapped to attributes in HDF5.
         # These all exist under the appropriate, channel group etc.
 
-        h5file = h5py.File(filepath, 'w')
+        h5file = h5py.File(filepath, mode)
+
+        container_group = None
+        if group in h5file:
+            container_group = h5file[group]
+        else:
+            container_group = h5file.create_group(group)
 
         # First write the properties at the root level
         try:
             root = self.object()
             for property_name, property_value in root.properties.items():
-                h5file['/'].attrs[property_name] = property_value
+                container_group.attrs[property_name] = property_value
         except KeyError:
             # No root object present
             pass
@@ -259,7 +268,7 @@ class TdmsFile(object):
 
                 # Write the group's properties
                 for prop_name, prop_value in group.properties.items():
-                    h5file['/'+group_name].attrs[prop_name] = prop_value
+                    container_group[group_name].attrs[prop_name] = prop_value
 
             except KeyError:
                 # No group object present
@@ -268,9 +277,9 @@ class TdmsFile(object):
             # Write properties and data for each channel
             for channel in self.group_channels(group_name):
                 for prop_name, prop_value in channel.properties.items():
-                    h5file['/'].attrs[prop_name] = prop_value
+                    container_group.attrs[prop_name] = prop_value
 
-                h5file['/'+group_name+'/'+channel.channel] = channel.data
+                container_group[group_name+'/'+channel.channel] = channel.data
 
         return h5file
 
