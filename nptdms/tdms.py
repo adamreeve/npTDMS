@@ -218,12 +218,12 @@ class TdmsFile(object):
 
         import pandas as pd
 
-        temp = []
+        dataframe_dict = OrderedDict()
         for key, value in self.objects.items():
             if value.has_data:
                 index = value.time_track(absolute_time) if time_index else None
-                temp.append((key, pd.Series(data=value.data, index=index)))
-        return pd.DataFrame.from_items(temp)
+                dataframe_dict[key] = pd.Series(data=value.data, index=index)
+        return pd.DataFrame.from_dict(dataframe_dict)
 
     def as_hdf(self, filepath, mode='w', group='/'):
         """
