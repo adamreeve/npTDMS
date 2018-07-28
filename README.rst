@@ -36,7 +36,7 @@ Installation
 ------------
 
 npTDMS is available from the Python Package Index, so the easiest way to
-install it is by running (as root)::
+install it is by running::
 
     pip install npTDMS
 
