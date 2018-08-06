@@ -8,6 +8,10 @@ try:
     import pytz
 except ImportError:
     pytz = None
+try:
+    import pandas
+except ImportError:
+    pandas = None
 
 from nptdms import tdms
 from .tdms_test import (
@@ -16,7 +20,6 @@ from .tdms_test import (
     string_hexlify,
     hexlify_value
 )
-
 
 if pytz:
     timezone = pytz.utc
@@ -143,6 +146,7 @@ class TDMSTestClass(unittest.TestCase):
     def setUp(self):
         logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 
+    @unittest.skipIf(pandas is None, 'Pandas is not installed')
     def test_file_as_dataframe(self):
         """Test converting file to Pandas dataframe"""
 
@@ -158,6 +162,7 @@ class TDMSTestClass(unittest.TestCase):
 
         self.assertTrue((df["/'Group'/'Channel1'"] == [1, 2]).all())
 
+    @unittest.skipIf(pandas is None, 'Pandas is not installed')
     def test_file_as_dataframe_without_time(self):
         """Converting file to dataframe with time index should raise when
         time properties aren't present"""
@@ -169,6 +174,7 @@ class TDMSTestClass(unittest.TestCase):
         with self.assertRaises(KeyError):
             df = tdmsData.as_dataframe(time_index=True)
 
+    @unittest.skipIf(pandas is None, 'Pandas is not installed')
     def test_file_as_dataframe_with_time(self):
         """Test converting file to Pandas dataframe with a time index"""
 
@@ -182,6 +188,7 @@ class TDMSTestClass(unittest.TestCase):
         self.assertTrue(within_tol(df.index[0], 2.0))
         self.assertTrue(within_tol(df.index[1], 2.1))
 
+    @unittest.skipIf(pandas is None, 'Pandas is not installed')
     def test_file_as_dataframe_with_absolute_time(self):
         """Convert file to Pandas dataframe with absolute time index"""
 
@@ -194,6 +201,7 @@ class TDMSTestClass(unittest.TestCase):
         expected_start = datetime(2015, 9, 8, 10, 5, 49, tzinfo=timezone)
         self.assertTrue((df.index == expected_start)[0])
 
+    @unittest.skipIf(pandas is None, 'Pandas is not installed')
     def test_channel_as_dataframe(self):
         """Convert a channel to dataframe"""
 
@@ -207,6 +215,7 @@ class TDMSTestClass(unittest.TestCase):
         self.assertIn("/'Group'/'Channel2'", df.keys())
         self.assertTrue((df["/'Group'/'Channel2'"] == [3, 4]).all())
 
+    @unittest.skipIf(pandas is None, 'Pandas is not installed')
     def test_channel_as_dataframe_with_time(self):
         """Convert a channel to dataframe with a time index"""
 
@@ -220,6 +229,7 @@ class TDMSTestClass(unittest.TestCase):
         self.assertTrue(within_tol(df.index[0], 2.0))
         self.assertTrue(within_tol(df.index[1], 2.1))
 
+    @unittest.skipIf(pandas is None, 'Pandas is not installed')
     def test_channel_as_dataframe_without_time(self):
         """Converting channel to dataframe should work correctly"""
 
@@ -236,6 +246,7 @@ class TDMSTestClass(unittest.TestCase):
         self.assertTrue(within_tol(df.values[0], 3.0))
         self.assertTrue(within_tol(df.values[1], 4.0))
 
+    @unittest.skipIf(pandas is None, 'Pandas is not installed')
     def test_channel_as_dataframe_with_absolute_time(self):
         """Convert channel to Pandas dataframe with absolute time index"""
 
