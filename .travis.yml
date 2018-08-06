@@ -18,10 +18,8 @@ matrix:
     - python: 3.6
       env: TOXENV=pep8
   allow_failures:
-    - python: 2.6  # not supported by numpy
-      env: TOXENV=py26
-    - python: 3.3  # not supported by numpy or wheel
-      env: TOXENV=py33
+    - env: TOXENV=py26  # not supported by current numpy
+    - env: TOXENV=py33  # not supported by current numpy or wheel
 
 install:
   - pip install tox
