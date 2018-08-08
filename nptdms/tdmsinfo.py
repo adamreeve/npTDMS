@@ -23,13 +23,17 @@ def main():
     if args.debug:
         logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 
-    tdmsfile = tdms.TdmsFile(args.tdms_file)
+    tdmsinfo(args.tdms_file, args.properties)
+
+
+def tdmsinfo(file, show_properties=False):
+    tdmsfile = tdms.TdmsFile(file)
 
     level = 0
     display('/', level)
     try:
         root = tdmsfile.object()
-        if args.properties:
+        if show_properties:
             display_properties(root, level)
     except KeyError:
         # Root object isn't present
@@ -39,7 +43,7 @@ def main():
         try:
             group_obj = tdmsfile.object(group)
             display("%s" % group_obj.path, level)
-            if args.properties:
+            if show_properties:
                 display_properties(group_obj, level)
         except KeyError:
             # It is possible to have a group without an object
@@ -47,7 +51,7 @@ def main():
         for channel in tdmsfile.group_channels(group):
             level = 2
             display("%s" % channel.path, level)
-            if args.properties:
+            if show_properties:
                 level = 3
                 if channel.data_type is not None:
                     display("data type: %s" % channel.data_type.__name__,
