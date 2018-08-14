@@ -34,6 +34,8 @@ setup(
     'Programming Language :: Python :: 3.2',
     'Programming Language :: Python :: 3.3',
     'Programming Language :: Python :: 3.4',
+    'Programming Language :: Python :: 3.5',
+    'Programming Language :: Python :: 3.6',
     'Topic :: Scientific/Engineering',
     'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)',
     'Intended Audience :: Science/Research',
