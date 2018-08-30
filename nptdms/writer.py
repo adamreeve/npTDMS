@@ -123,7 +123,13 @@ class TdmsSegment(object):
             dimension = Uint32(1)
             num_values = Uint64(len(obj.data))
 
-            return [Uint32(20), data_type, dimension, num_values]
+            data_index = [Uint32(20), data_type, dimension, num_values]
+            # For strings, we also need to write the total data size in bytes
+            if obj.data_type == String:
+                total_size = object_data_size(obj.data_type, obj.data)
+                data_index.append(Uint64(total_size))
+
+            return data_index
         else:
             return [Bytes(b'\xFF\xFF\xFF\xFF')]
 
@@ -151,7 +157,7 @@ class TdmsSegment(object):
         data_size = 0
         for obj in self.objects:
             if obj.has_data:
-                data_size += len(obj.data) * obj.data_type.size
+                data_size += object_data_size(obj.data_type, obj.data)
         return data_size
 
     def _write_data(self, file):
@@ -280,6 +286,8 @@ def _to_tdms_value(value):
         return String(value)
     if isinstance(value, unicode):
         return String(value)
+    if isinstance(value, bytes):
+        return String(value)
     raise TypeError("Unsupported property type for %r" % value)
 
 
@@ -294,6 +302,9 @@ def write_data(file, tdms_object):
         # Numpy's datetime format isn't compatible with TDMS,
         # so can't use data.tofile
         write_values(file, tdms_object.data)
+    elif tdms_object.data_type == String:
+        # Strings are variable size so need to be treated specially
+        write_string_values(file, tdms_object.data)
     else:
         try:
             to_file(file, tdms_object.data)
@@ -315,3 +326,30 @@ def to_file(file, array):
 
 def write_values(file, array):
     file.write(b''.join(_to_tdms_value(val).bytes for val in array))
+
+
+def write_string_values(file, strings):
+    try:
+        encoded_strings = [s.encode("utf-8") for s in strings]
+    except AttributeError:
+        # Assume if we can't encode then we already have bytes
+        encoded_strings = strings
+    offset = 0
+    for s in encoded_strings:
+        offset += len(s)
+        file.write(Uint32(offset).bytes)
+    for s in encoded_strings:
+        file.write(s)
+
+
+def object_data_size(data_type, data_values):
+    if data_type == String:
+        # For string data, the total size is 8 bytes per string for the
+        # offsets to the start of each string, plus the length of each string.
+        try:
+            encoded_strings = [s.encode("utf-8") for s in data_values]
+        except AttributeError:
+            encoded_strings = data_values
+        return sum(4 + len(s) for s in encoded_strings)
+
+    return data_type.size * len(data_values)

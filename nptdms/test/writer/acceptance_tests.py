@@ -267,3 +267,23 @@ class TDMSTestClass(unittest.TestCase):
             output_data[1], datetime(2017, 7, 9, 0, 0, 0, 0, tzinfo))
         self.assertEqual(
             output_data[2], datetime(2017, 7, 9, 0, 0, 0, 0, tzinfo))
+
+    def test_can_write_string_data(self):
+        input_data = [
+            "hello world",
+            u"\u3053\u3093\u306b\u3061\u306f\u4e16\u754c"]
+
+        segment = ChannelObject("group", "string_data", input_data)
+
+        output_file = BytesIO()
+        with TdmsWriter(output_file) as tdms_writer:
+            tdms_writer.write_segment([segment])
+
+        output_file.seek(0)
+        tdms_file = TdmsFile(output_file)
+
+        output_data = tdms_file.object("group", "string_data").data
+
+        self.assertEqual(len(output_data), 2)
+        self.assertEqual(output_data[0], input_data[0])
+        self.assertEqual(output_data[1], input_data[1])

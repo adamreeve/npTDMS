@@ -50,9 +50,9 @@ class TdmsType(object):
             return "%s" % self.__class__.__name__
         return "%s(%r)" % (self.__class__.__name__, self.value)
 
-    @staticmethod
-    def read(file, endianness="<"):
-        raise TypeError("Unsupported data type to read: %r" % self)
+    @classmethod
+    def read(cls, file, endianness="<"):
+        raise TypeError("Unsupported data type to read: %r" % cls)
 
 
 class Bytes(TdmsType):
