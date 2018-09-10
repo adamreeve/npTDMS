@@ -2,3 +2,4 @@ include *.txt *.rst
 include docs/*.rst
 include docs/conf.py
 include docs/Makefile
+include COPYING COPYING.LESSER
