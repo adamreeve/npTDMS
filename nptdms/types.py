@@ -169,7 +169,7 @@ class String(TdmsType):
 
     @staticmethod
     def read(file, endianness="<"):
-        size = Uint32.read(file)
+        size = Uint32.read(file, endianness)
         return file.read(size).decode('utf-8')
 
 
@@ -210,7 +210,12 @@ class TimeStamp(TdmsType):
     @classmethod
     def read(cls, file, endianness="<"):
         data = file.read(16)
-        (second_fractions, seconds) = _struct_unpack('<Qq', data)
+        if endianness is "<":
+            (second_fractions, seconds) = _struct_unpack(
+                endianness + 'Qq', data)
+        else:
+            (seconds, second_fractions) = _struct_unpack(
+                 endianness + 'Qq', data)
         micro_seconds = (
             float(second_fractions) / cls._fractions_per_microsecond)
         # Adding timedelta with seconds ignores leap
