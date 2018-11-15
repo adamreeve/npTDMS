@@ -940,6 +940,16 @@ class TDMSTestClass(unittest.TestCase):
                                         0.02380444, 0.20661031, 0.20447401,
                                         0.2517777])
 
+    def test_bigendian_format(self):
+        """Test reading a file that encodes data in big endian mode"""
+        tf = tdms.TdmsFile(_data_dir + '/big_endian.tdms')
+        data = tf.object('Measured Data', 'Phase sweep').data
+        np.testing.assert_almost_equal(data[:10],
+                                       [0.0000000, 0.0634176, 0.1265799,
+                                        0.1892325, 0.2511234, 0.3120033,
+                                        0.3716271, 0.4297548, 0.4861524,
+                                        0.5405928])
+
     def test_data_read_from_bytes_io(self):
         """Test reading data"""
 

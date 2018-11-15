@@ -51,12 +51,12 @@ def fromfile(file, dtype, count, *args, **kwargs):
             dtype=dtype, count=count, *args, **kwargs)
 
 
-def read_property(f):
+def read_property(f, endianness="<"):
     """ Read a property from a segment's metadata """
 
-    prop_name = types.String.read(f)
-    prop_data_type = types.tds_data_types[types.Uint32.read(f)]
-    value = prop_data_type.read(f)
+    prop_name = types.String.read(f, endianness)
+    prop_data_type = types.tds_data_types[types.Uint32.read(f, endianness)]
+    value = prop_data_type.read(f, endianness)
     log.debug("Property %s: %r", prop_name, value)
     return prop_name, value
 
@@ -289,7 +289,8 @@ class _TdmsSegment(object):
     __slots__ = [
         'position', 'num_chunks', 'ordered_objects', 'toc', 'version',
         'next_segment_offset', 'next_segment_pos', 'tdms_file',
-        'raw_data_offset', 'data_position', 'final_chunk_proportion']
+        'raw_data_offset', 'data_position', 'final_chunk_proportion',
+        'endianness']
 
     def __init__(self, f, tdms_file):
         """Read the lead in section of a segment"""
@@ -297,6 +298,7 @@ class _TdmsSegment(object):
         self.tdms_file = tdms_file
         self.position = f.tell()
         self.num_chunks = 0
+        self.endianness = "<"
         # A list of _TdmsSegmentObject
         self.ordered_objects = []
         self.final_chunk_proportion = 1.0
@@ -322,14 +324,17 @@ class _TdmsSegment(object):
             self.toc[property] = (toc_mask & toc_properties[property]) != 0
             log.debug("Property %s is %s", property, self.toc[property])
 
+        if self.toc['kTocBigEndian']:
+            self.endianness = '>'
+
         # Next four bytes are version number
-        self.version = types.Int32.read(f)
+        self.version = types.Int32.read(f, self.endianness)
         if self.version not in (4712, 4713):
             log.warning("Unrecognised version number.")
 
         # Now 8 bytes each for the offset values
-        self.next_segment_offset = types.Uint64.read(f)
-        self.raw_data_offset = types.Uint64.read(f)
+        self.next_segment_offset = types.Uint64.read(f, self.endianness)
+        self.raw_data_offset = types.Uint64.read(f, self.endianness)
 
         # Calculate data and next segment position
         lead_size = 7 * 4
@@ -373,11 +378,11 @@ class _TdmsSegment(object):
         log.debug("Reading metadata at %d", f.tell())
 
         # First four bytes have number of objects in metadata
-        num_objects = types.Int32.read(f)
+        num_objects = types.Int32.read(f, self.endianness)
 
         for obj in range(num_objects):
             # Read the object path
-            object_path = types.String.read(f)
+            object_path = types.String.read(f, self.endianness)
 
             # If this is a new segment for an existing object,
             # reuse the existing object, otherwise,
@@ -408,7 +413,7 @@ class _TdmsSegment(object):
                     segment_obj = copy(obj._previous_segment_object)
                 else:
                     log.debug("Creating a new segment object")
-                    segment_obj = _TdmsSegmentObject(obj)
+                    segment_obj = _TdmsSegmentObject(obj, self.endianness)
                 self.ordered_objects.append(segment_obj)
             # Read the metadata for this object, updating any
             # data structure information and properties.
@@ -492,11 +497,6 @@ class _TdmsSegment(object):
             "Reading %d bytes of data at %d in %d chunks" %
             (total_data_size, f.tell(), self.num_chunks))
 
-        if self.toc['kTocBigEndian']:
-            endianness = '>'
-        else:
-            endianness = '<'
-
         for chunk in range(self.num_chunks):
             if self.toc["kTocInterleavedData"]:
                 log.debug("Data is interleaved")
@@ -509,9 +509,9 @@ class _TdmsSegment(object):
                 same_length = (len(
                     set((o.number_values for o in data_objects))) == 1)
                 if (all_numpy and same_length):
-                    self._read_interleaved_numpy(f, data_objects, endianness)
+                    self._read_interleaved_numpy(f, data_objects)
                 else:
-                    self._read_interleaved(f, data_objects, endianness)
+                    self._read_interleaved(f, data_objects)
             else:
                 object_data = {}
                 log.debug("Data is contiguous")
@@ -525,13 +525,13 @@ class _TdmsSegment(object):
                         else:
                             number_values = obj.number_values
                         object_data[obj.path] = (
-                            obj._read_values(f, endianness, number_values))
+                            obj._read_values(f, number_values))
 
                 for obj in self.ordered_objects:
                     if obj.has_data:
                         obj.tdms_object._update_data(object_data[obj.path])
 
-    def _read_interleaved_numpy(self, f, data_objects, endianness):
+    def _read_interleaved_numpy(self, f, data_objects):
         """Read interleaved data where all channels have a numpy type"""
 
         log.debug("Reading interleaved data all at once")
@@ -557,11 +557,11 @@ class _TdmsSegment(object):
             # Now set correct data type, so that the array length should
             # be correct
             object_data.dtype = (
-                np.dtype(obj.data_type.nptype).newbyteorder(endianness))
+                np.dtype(obj.data_type.nptype).newbyteorder(self.endianness))
             obj.tdms_object._update_data(object_data)
             data_pos += obj.data_type.size
 
-    def _read_interleaved(self, f, data_objects, endianness):
+    def _read_interleaved(self, f, data_objects):
         """Read interleaved data that doesn't have a numpy type"""
 
         log.debug("Reading interleaved data point by point")
@@ -575,7 +575,7 @@ class _TdmsSegment(object):
             for obj in data_objects:
                 if points_added[obj.path] < obj.number_values:
                     object_data[obj.path][points_added[obj.path]] = (
-                        obj._read_value(f, endianness))
+                        obj._read_value(f))
                     points_added[obj.path] += 1
         for obj in data_objects:
             obj.tdms_object._update_data(object_data[obj.path])
@@ -829,19 +829,19 @@ class _TdmsmxDAQMetadata(object):
         txt = fmt % (self.__class__.__name__, tmp)
         return txt
 
-    def _read_metadata(self, f):
+    def _read_metadata(self, f, endianness):
         """
         Read the metadata for a DAQmx raw segment.  This is the raw
         DAQmx-specific portion of the raw data index.
         """
         self.data_type = types.tds_data_types[0xFFFFFFFF]
-        self.dimension = types.Uint32.read(f)
+        self.dimension = types.Uint32.read(f, endianness)
         # In TDMS format version 2.0, 1 is the only valid value for dimension
         if self.dimension != 1:
             log.warning("Data dimension is not 1")
-        self.chunk_size = types.Uint64.read(f)
+        self.chunk_size = types.Uint64.read(f, endianness)
         # size of vector of format changing scalers
-        self.scaler_vector_length = types.Uint32.read(f)
+        self.scaler_vector_length = types.Uint32.read(f, endianness)
         # Size of the vector
         log.debug("mxDAQ format scaler vector size '%d'" %
                   (self.scaler_vector_length,))
@@ -853,20 +853,20 @@ class _TdmsmxDAQMetadata(object):
             # values.  At this time NI provides no documentation on
             # how to use these scalers and sample TDMS files do not
             # include more than one of these scalers.
-            self.scaler_data_type_code = types.Uint32.read(f)
+            self.scaler_data_type_code = types.Uint32.read(f, endianness)
             self.scaler_data_type = (
                 types.tds_data_types[self.scaler_data_type_code])
 
             # more info for format changing scaler
-            self.scaler_raw_buffer_index = types.Uint32.read(f)
-            self.scaler_raw_byte_offset = types.Uint32.read(f)
-            self.scaler_sample_format_bitmap = types.Uint32.read(f)
-            self.scale_id = types.Uint32.read(f)
+            self.scaler_raw_buffer_index = types.Uint32.read(f, endianness)
+            self.scaler_raw_byte_offset = types.Uint32.read(f, endianness)
+            self.scaler_sample_format_bitmap = types.Uint32.read(f, endianness)
+            self.scale_id = types.Uint32.read(f, endianness)
 
-        raw_data_widths_length = types.Uint32.read(f)
+        raw_data_widths_length = types.Uint32.read(f, endianness)
         self.raw_data_widths = np.zeros(raw_data_widths_length, dtype=np.int32)
         for cnt in range(raw_data_widths_length):
-            self.raw_data_widths[cnt] = types.Uint32.read(f)
+            self.raw_data_widths[cnt] = types.Uint32.read(f, endianness)
 
 
 class _TdmsSegmentObject(object):
@@ -876,11 +876,12 @@ class _TdmsSegmentObject(object):
 
     __slots__ = [
         'tdms_object', 'number_values', 'data_size',
-        'has_data', 'data_type', 'dimension',
+        'has_data', 'data_type', 'dimension', 'endianness',
         'raw_data_width']
 
-    def __init__(self, tdms_object):
+    def __init__(self, tdms_object, endianness):
         self.tdms_object = tdms_object
+        self.endianness = endianness
 
         self.number_values = 0
         self.data_size = 0
@@ -892,7 +893,7 @@ class _TdmsSegmentObject(object):
     def _read_metadata_mx(self, f):
 
         # Read the data type
-        data_type_val = types.Uint32.read(f)
+        data_type_val = types.Uint32.read(f, self.endianness)
         try:
             self.data_type = types.tds_data_types[data_type_val]
         except KeyError:
@@ -910,7 +911,7 @@ class _TdmsSegmentObject(object):
         log.debug("mxDAQ Object data type: %r", self.tdms_object.data_type)
 
         info = _TdmsmxDAQMetadata()
-        info._read_metadata(f)
+        info._read_metadata(f, self.endianness)
 
         log.debug("mxDAQ '%s' '%s'", info, info.info())
         return info
@@ -918,7 +919,7 @@ class _TdmsSegmentObject(object):
     def _read_metadata(self, f):
         """Read object metadata and update object information"""
 
-        raw_data_index = types.Uint32.read(f)
+        raw_data_index = types.Uint32.read(f, self.endianness)
 
         log.debug("Reading metadata for object %s", self.tdms_object.path)
 
@@ -964,7 +965,8 @@ class _TdmsSegmentObject(object):
 
             # Read the data type
             try:
-                self.data_type = types.tds_data_types[types.Uint32.read(f)]
+                self.data_type = types.tds_data_types[
+                    types.Uint32.read(f, self.endianness)]
             except KeyError:
                 raise KeyError("Unrecognised data type")
             if (self.tdms_object.data_type is not None and
@@ -982,17 +984,17 @@ class _TdmsSegmentObject(object):
                     "Unsupported data type: %r" % self.tdms_object.data_type)
 
             # Read data dimension
-            self.dimension = types.Uint32.read(f)
+            self.dimension = types.Uint32.read(f, self.endianness)
             # In TDMS version 2.0, 1 is the only valid value for dimension
             if self.dimension != 1:
                 log.warning("Data dimension is not 1")
 
             # Read number of values
-            self.number_values = types.Uint64.read(f)
+            self.number_values = types.Uint64.read(f, self.endianness)
 
             # Variable length data types have total size
             if self.data_type in (types.String, ):
-                self.data_size = types.Uint64.read(f)
+                self.data_size = types.Uint64.read(f, self.endianness)
             else:
                 self.data_size = (
                     self.number_values *
@@ -1002,35 +1004,37 @@ class _TdmsSegmentObject(object):
                 "Object number of values in segment: %d", self.number_values)
 
         # Read data properties
-        num_properties = types.Uint32.read(f)
+        num_properties = types.Uint32.read(f, self.endianness)
         log.debug("Reading %d properties", num_properties)
         for i in range(num_properties):
-            prop_name, value = read_property(f)
+            prop_name, value = read_property(f, self.endianness)
             self.tdms_object.properties[prop_name] = value
 
     @property
     def path(self):
         return self.tdms_object.path
 
-    def _read_value(self, file, endianness):
+    def _read_value(self, file):
         """Read a single value from the given file"""
 
         if self.data_type.nptype is not None:
-            dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
+            dtype = (np.dtype(self.data_type.nptype).newbyteorder(
+                self.endianness))
             return fromfile(file, dtype=dtype, count=1)
-        return self.data_type.read(file, endianness)
+        return self.data_type.read(file, self.endianness)
 
-    def _read_values(self, file, endianness, number_values):
+    def _read_values(self, file, number_values):
         """Read all values for this object from a contiguous segment"""
 
         if self.data_type.nptype is not None:
-            dtype = (np.dtype(self.data_type.nptype).newbyteorder(endianness))
+            dtype = (np.dtype(self.data_type.nptype).newbyteorder(
+                self.endianness))
             return fromfile(file, dtype=dtype, count=number_values)
         elif self.data_type == types.String:
-            return read_string_data(file, number_values)
+            return read_string_data(file, number_values, self.endianness)
         data = self._new_segment_data()
         for i in range(number_values):
-            data[i] = self.data_type.read(file, endianness)
+            data[i] = self.data_type.read(file, self.endianness)
         return data
 
     def _new_segment_data(self):
@@ -1042,7 +1046,7 @@ class _TdmsSegmentObject(object):
             return [None] * self.number_values
 
 
-def read_string_data(file, number_values):
+def read_string_data(file, number_values, endianness):
     """ Read string raw data
 
         This is stored as an array of offsets
@@ -1050,7 +1054,7 @@ def read_string_data(file, number_values):
     """
     offsets = [0]
     for i in range(number_values):
-        offsets.append(types.Uint32.read(file))
+        offsets.append(types.Uint32.read(file, endianness))
     strings = []
     for i in range(number_values):
         s = file.read(offsets[i + 1] - offsets[i])
