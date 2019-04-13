@@ -225,5 +225,6 @@ class TimeStamp(TdmsType):
 
 
 @tds_data_type(0xFFFFFFFF, None)
-class DaqMxRawData(TdmsType):
+class DaqMxRawData(StructType):
     size = 2
+    struct_declaration = 'h'
