@@ -23,17 +23,17 @@ tds_data_types = {}
 numpy_data_types = {}
 
 
-def tds_data_type(enum_value, np_type):
+def tds_data_type(enum_value, np_type, map_to_nptype=True):
     def decorator(cls):
         cls.enum_value = enum_value
         cls.nptype = np_type
         if enum_value is not None:
             tds_data_types[enum_value] = cls
-        if np_type is not None:
+        if np_type is not None and map_to_nptype:
             numpy_data_types[np_type] = cls
         return cls
     return decorator
-
+    
 
 class TdmsType(object):
     size = None
@@ -224,7 +224,6 @@ class TimeStamp(TdmsType):
                 timedelta(microseconds=micro_seconds))
 
 
-@tds_data_type(0xFFFFFFFF, None)
-class DaqMxRawData(StructType):
+@tds_data_type(0xFFFFFFFF, np.int16, map_to_nptype=False)
+class DaqMxRawData(TdmsType):
     size = 2
-    struct_declaration = 'h'
