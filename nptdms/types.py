@@ -178,6 +178,10 @@ class Boolean(StructType):
     size = 1
     struct_declaration = "b"
 
+    @classmethod
+    def read(cls, file, endianness="<"):
+        return bool(super(Boolean, cls).read(file, endianness))
+
 
 @tds_data_type(0x44, None)
 class TimeStamp(TdmsType):
