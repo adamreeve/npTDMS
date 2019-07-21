@@ -202,6 +202,22 @@ class TDMSTestClass(unittest.TestCase):
         self.assertTrue((df.index == expected_start)[0])
 
     @unittest.skipIf(pandas is None, 'Pandas is not installed')
+    def test_group_as_dataframe(self):
+        """Convert a group to dataframe"""
+
+        test_file = TestFile()
+        test_file.add_segment(*timed_segment())
+        tdmsData = test_file.load()
+
+        df = tdmsData.object("Group").as_dataframe()
+        self.assertEqual(len(df), 2)
+        self.assertEqual(len(df.keys()), 2)
+        self.assertIn("Channel1", df.keys())
+        self.assertIn("Channel2", df.keys())
+        self.assertTrue((df["Channel1"] == [1, 2]).all())
+        self.assertTrue((df["Channel2"] == [3, 4]).all())
+
+    @unittest.skipIf(pandas is None, 'Pandas is not installed')
     def test_channel_as_dataframe(self):
         """Convert a channel to dataframe"""
 

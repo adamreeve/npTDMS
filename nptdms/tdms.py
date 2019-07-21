@@ -767,9 +767,9 @@ class TdmsObject(object):
         except KeyError:
             time = None
         if self.channel is None:
-            return pd.DataFrame.from_items(
-                [(ch.channel, pd.Series(ch.data))
-                    for ch in self.tdms_file.group_channels(self.group)])
+            return pd.DataFrame.from_dict(OrderedDict(
+                (ch.channel, pd.Series(ch.data))
+                for ch in self.tdms_file.group_channels(self.group)))
         else:
             return pd.DataFrame(self._data, index=time, columns=[self.path])
 
