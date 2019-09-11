@@ -23,9 +23,26 @@ from nptdms import scaling
 from nptdms import types
 
 
+# log level
+log_level = logging.WARNING
+
+# create logger
 log = logging.getLogger(__name__)
-logging.basicConfig()
-log.setLevel(logging.WARNING)
+log.setLevel(log_level)
+
+# create console handler and set level to debug
+ch = logging.StreamHandler()
+ch.setLevel(log_level)
+
+# create formatter
+formatter = logging.Formatter('[%(name)s %(levelname)8s] %(message)s')
+
+# add formatter to ch
+ch.setFormatter(formatter)
+
+# add ch to logger
+log.addHandler(ch)
+
 # To adjust the log level for this module from a script, use eg:
 # logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 
