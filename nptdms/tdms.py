@@ -23,11 +23,22 @@ from nptdms import scaling
 from nptdms import types
 
 
+# log level
+log_level = logging.WARNING
+
 log = logging.getLogger(__name__)
-logging.basicConfig()
-log.setLevel(logging.WARNING)
+log.setLevel(log_level)
+
+console_handler = logging.StreamHandler()
+console_handler.setLevel(log_level)
+
+formatter = logging.Formatter('[%(name)s %(levelname)8s] %(message)s')
+console_handler.setFormatter(formatter)
+
+log.addHandler(console_handler)
+
 # To adjust the log level for this module from a script, use eg:
-# logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
+# logging.getLogger(__name__).setLevel(logging.DEBUG)
 
 # Have to get a reference to the builtin property decorator
 # so we can use it in TdmsObject, which has a property method.
