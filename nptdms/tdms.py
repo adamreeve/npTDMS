@@ -26,25 +26,19 @@ from nptdms import types
 # log level
 log_level = logging.WARNING
 
-# create logger
 log = logging.getLogger(__name__)
 log.setLevel(log_level)
 
-# create console handler and set level to debug
-ch = logging.StreamHandler()
-ch.setLevel(log_level)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(log_level)
 
-# create formatter
 formatter = logging.Formatter('[%(name)s %(levelname)8s] %(message)s')
+console_handler.setFormatter(formatter)
 
-# add formatter to ch
-ch.setFormatter(formatter)
-
-# add ch to logger
-log.addHandler(ch)
+log.addHandler(console_handler)
 
 # To adjust the log level for this module from a script, use eg:
-# logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
+# logging.getLogger(__name__).setLevel(logging.DEBUG)
 
 # Have to get a reference to the builtin property decorator
 # so we can use it in TdmsObject, which has a property method.
