@@ -553,8 +553,18 @@ class _TdmsSegment(object):
         log.debug("all_channel_bytes: %d", all_channel_bytes)
         number_bytes = int(all_channel_bytes * data_objects[0].number_values)
         combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
-        # Reshape, so that one row is all bytes for all objects
-        combined_data = combined_data.reshape(-1, all_channel_bytes)
+        try:
+            # Reshape, so that one row is all bytes for all objects
+            combined_data = combined_data.reshape(-1, all_channel_bytes)
+        except ValueError:
+            # Probably incomplete segment at the end => try to clip data
+            crop_len = (combined_data.shape[0] // all_channel_bytes)
+            crop_len *= all_channel_bytes
+            log.warning("Cropping data from %d to %d bytes to match segment "
+                        "size derived from channels",
+                        combined_data.shape[0], crop_len)
+            combined_data = combined_data[:crop_len].reshape(-1,
+                                                             all_channel_bytes)
         # Now set arrays for each channel
         data_pos = 0
         for (i, obj) in enumerate(data_objects):
