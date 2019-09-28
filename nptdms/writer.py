@@ -370,19 +370,19 @@ def _infer_dtype(data):
         max_value = max(data)
         min_value = min(data)
         if max_value >= 2**63 and min_value >= 0:
-            return np.uint64
+            return np.dtype('uint64')
         elif max_value >= 2**32 or min_value < -1 * 2**31:
-            return np.int64
+            return np.dtype('int64')
         elif max_value >= 2**31 and min_value >= 0:
-            return np.uint32
+            return np.dtype('uint32')
         elif max_value >= 2**16 or min_value < -1 * 2**15:
-            return np.int32
+            return np.dtype('int32')
         elif max_value >= 2**15 and min_value >= 0:
-            return np.uint16
+            return np.dtype('uint16')
         elif max_value >= 2**8 or min_value < -1 * 2**7:
-            return np.int16
+            return np.dtype('int16')
         elif max_value >= 2**7 and min_value >= 0:
-            return np.uint8
+            return np.dtype('uint8')
         else:
             return np.dtype('int8')
     return None
