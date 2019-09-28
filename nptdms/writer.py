@@ -234,7 +234,7 @@ class ChannelObject(TdmsObject):
         """
         self.group = group
         self.channel = channel
-        self.data = data
+        self.data = _to_np_array(data)
         self.properties = properties
 
     @property
@@ -244,7 +244,7 @@ class ChannelObject(TdmsObject):
     @property
     def data_type(self):
         try:
-            return numpy_data_types[self.data.dtype.type]
+            return numpy_data_types[self.data.dtype]
         except (AttributeError, KeyError):
             try:
                 return _to_tdms_value(self.data[0]).__class__
@@ -274,7 +274,7 @@ def _to_tdms_value(value):
         return value
     if isinstance(value, bool):
         return Boolean(value)
-    if isinstance(value, int):
+    if isinstance(value, (int, long)):
         return to_int_property_value(value)
     if isinstance(value, float):
         return DoubleFloat(value)
@@ -292,7 +292,9 @@ def _to_tdms_value(value):
 
 
 def to_int_property_value(value):
-    if value >= 2 ** 31:
+    if value >= 2 ** 63:
+        return Uint64(value)
+    if value >= 2 ** 31 or value < -2 ** 31:
         return Int64(value)
     return Int32(value)
 
@@ -353,3 +355,34 @@ def object_data_size(data_type, data_values):
         return sum(4 + len(s) for s in encoded_strings)
 
     return data_type.size * len(data_values)
+
+
+def _to_np_array(data):
+    if isinstance(data, np.ndarray):
+        return data
+
+    dtype = _infer_dtype(data)
+    return np.array(data, dtype=dtype)
+
+
+def _infer_dtype(data):
+    if data and isinstance(data[0], (int, long)):
+        max_value = max(data)
+        min_value = min(data)
+        if max_value >= 2**63 and min_value >= 0:
+            return np.dtype('uint64')
+        elif max_value >= 2**32 or min_value < -1 * 2**31:
+            return np.dtype('int64')
+        elif max_value >= 2**31 and min_value >= 0:
+            return np.dtype('uint32')
+        elif max_value >= 2**16 or min_value < -1 * 2**15:
+            return np.dtype('int32')
+        elif max_value >= 2**15 and min_value >= 0:
+            return np.dtype('uint16')
+        elif max_value >= 2**8 or min_value < -1 * 2**7:
+            return np.dtype('int16')
+        elif max_value >= 2**7 and min_value >= 0:
+            return np.dtype('uint8')
+        else:
+            return np.dtype('int8')
+    return None

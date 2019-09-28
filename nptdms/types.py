@@ -26,11 +26,11 @@ numpy_data_types = {}
 def tds_data_type(enum_value, np_type, default_for_nptype=True):
     def decorator(cls):
         cls.enum_value = enum_value
-        cls.nptype = np_type
+        cls.nptype = None if np_type is None else np.dtype(np_type)
         if enum_value is not None:
             tds_data_types[enum_value] = cls
         if np_type is not None and default_for_nptype:
-            numpy_data_types[np_type] = cls
+            numpy_data_types[np.dtype(np_type)] = cls
         return cls
     return decorator
 

@@ -287,3 +287,70 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(len(output_data), 2)
         self.assertEqual(output_data[0], input_data[0])
         self.assertEqual(output_data[1], input_data[1])
+
+    def test_can_write_floats_from_list(self):
+        input_data = [1.0, 2.0, 3.0]
+
+        segment = ChannelObject("group", "data", input_data)
+
+        output_file = BytesIO()
+        with TdmsWriter(output_file) as tdms_writer:
+            tdms_writer.write_segment([segment])
+
+        output_file.seek(0)
+        tdms_file = TdmsFile(output_file)
+
+        output_data = tdms_file.object("group", "data").data
+
+        self.assertEqual(output_data.dtype, np.float64)
+        self.assertEqual(len(output_data), 3)
+        self.assertEqual(output_data[0], input_data[0])
+        self.assertEqual(output_data[1], input_data[1])
+        self.assertEqual(output_data[2], input_data[2])
+
+    def test_can_write_ints_from_list(self):
+        test_cases = [
+            (np.int8, [0, 1]),
+            (np.int8, [-2 ** 7, 0]),
+            (np.int8, [0, 2 ** 7 - 1]),
+
+            (np.uint8, [0, 2 ** 7]),
+            (np.uint8, [0, 2 ** 8 - 1]),
+
+            (np.int16, [-2 ** 15, 0]),
+            (np.int16, [0, 2 ** 15 - 1]),
+
+            (np.uint16, [0, 2 ** 15]),
+            (np.uint16, [0, 2 ** 16 - 1]),
+
+            (np.int32, [-2 ** 31, 0]),
+            (np.int32, [0, 2 ** 31 - 1]),
+
+            (np.uint32, [0, 2 ** 31]),
+            (np.uint32, [0, 2 ** 32 - 1]),
+
+            (np.int64, [-2 ** 63, 0]),
+            (np.int64, [0, 2 ** 63 - 1]),
+
+            (np.uint64, [0, 2 ** 63]),
+            (np.uint64, [0, 2 ** 64 - 1]),
+        ]
+
+        for expected_type, input_data in test_cases:
+            test_case = "data = %s, expected_type = %s" % (
+                input_data, expected_type)
+            segment = ChannelObject("group", "data", input_data)
+
+            output_file = BytesIO()
+            with TdmsWriter(output_file) as tdms_writer:
+                tdms_writer.write_segment([segment])
+
+            output_file.seek(0)
+            tdms_file = TdmsFile(output_file)
+
+            output_data = tdms_file.object("group", "data").data
+
+            self.assertEqual(output_data.dtype, expected_type, test_case)
+            self.assertEqual(len(output_data), len(input_data), test_case)
+            for (input_val, output_val) in zip(input_data, output_data):
+                self.assertEqual(output_val, input_val, test_case)
