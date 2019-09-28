@@ -244,7 +244,7 @@ class ChannelObject(TdmsObject):
     @property
     def data_type(self):
         try:
-            return numpy_data_types[self.data.dtype.type]
+            return numpy_data_types[self.data.dtype]
         except (AttributeError, KeyError):
             try:
                 return _to_tdms_value(self.data[0]).__class__

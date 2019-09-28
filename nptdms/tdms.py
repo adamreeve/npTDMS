@@ -578,7 +578,7 @@ class _TdmsSegment(object):
             # Now set correct data type, so that the array length should
             # be correct
             object_data.dtype = (
-                np.dtype(obj.data_type.nptype).newbyteorder(self.endianness))
+                obj.data_type.nptype.newbyteorder(self.endianness))
             obj.tdms_object._update_data(object_data)
             data_pos += obj.data_type.size
 
@@ -1039,8 +1039,7 @@ class _TdmsSegmentObject(object):
         """Read a single value from the given file"""
 
         if self.data_type.nptype is not None:
-            dtype = (np.dtype(self.data_type.nptype).newbyteorder(
-                self.endianness))
+            dtype = self.data_type.nptype.newbyteorder(self.endianness)
             return fromfile(file, dtype=dtype, count=1)
         return self.data_type.read(file, self.endianness)
 
@@ -1048,8 +1047,7 @@ class _TdmsSegmentObject(object):
         """Read all values for this object from a contiguous segment"""
 
         if self.data_type.nptype is not None:
-            dtype = (np.dtype(self.data_type.nptype).newbyteorder(
-                self.endianness))
+            dtype = self.data_type.nptype.newbyteorder(self.endianness)
             return fromfile(file, dtype=dtype, count=number_values)
         elif self.data_type == types.String:
             return read_string_data(file, number_values, self.endianness)
