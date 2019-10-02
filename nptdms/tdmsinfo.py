@@ -21,7 +21,17 @@ def main():
     args = parser.parse_args()
 
     if args.debug:
-        logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
+        log_level = logging.DEBUG
+
+        log = logging.getLogger(tdms.__name__)
+        log.setLevel(log_level)
+
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(log_level)
+
+        formatter = logging.Formatter('[%(name)s %(levelname)s] %(message)s')
+        console_handler.setFormatter(formatter)
+        log.addHandler(console_handler)
 
     tdmsinfo(args.tdms_file, args.properties)
 
