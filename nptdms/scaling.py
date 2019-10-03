@@ -24,11 +24,6 @@ class PolynomialScaling(object):
         return np.polynomial.polynomial.polyval(data, self.coefficients)
 
 
-class NoScaling(object):
-    def scale(self, data):
-        return data
-
-
 class MultiScaling(object):
     def __init__(self, scalings):
         self.scalings = scalings
