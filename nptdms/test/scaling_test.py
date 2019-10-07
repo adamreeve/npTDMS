@@ -85,12 +85,15 @@ class ScalingDataTests(unittest.TestCase):
 
         np.testing.assert_almost_equal(expected_data, tdms_obj.data)
 
-    def test_multiple_scalings(self):
-        """Test all scalings applied from multiple scalings"""
+    def test_multiple_scalings_with_unscaled_status(self):
+        """Test all scalings applied from multiple scalings
+           when the scaling status is unscaled.
+        """
 
         tdms_obj = tdms.TdmsObject("/'group'/'channel'")
         tdms_obj._data = np.array([1.0, 2.0, 3.0])
         tdms_obj.properties["NI_Number_Of_Scales"] = 3
+        tdms_obj.properties["NI_Scaling_Status"] = "unscaled"
         tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "Linear"
         tdms_obj.properties["NI_Scale[0]_Linear_Slope"] = 1.0
         tdms_obj.properties["NI_Scale[0]_Linear_Y_Intercept"] = 1.0
@@ -102,6 +105,29 @@ class ScalingDataTests(unittest.TestCase):
         tdms_obj.properties["NI_Scale[2]_Linear_Y_Intercept"] = 3.0
 
         expected_data = np.array([21.0, 27.0, 33.0])
+
+        np.testing.assert_almost_equal(expected_data, tdms_obj.data)
+
+    def test_multiple_scalings_with_scaled_status(self):
+        """Test that only the last scaling is applied from multiple scalings
+           when the scaling status is scaled.
+        """
+
+        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        tdms_obj._data = np.array([1.0, 2.0, 3.0])
+        tdms_obj.properties["NI_Scaling_Status"] = "scaled"
+        tdms_obj.properties["NI_Number_Of_Scales"] = 3
+        tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "Linear"
+        tdms_obj.properties["NI_Scale[0]_Linear_Slope"] = 1.0
+        tdms_obj.properties["NI_Scale[0]_Linear_Y_Intercept"] = 1.0
+        tdms_obj.properties["NI_Scale[1]_Scale_Type"] = "Linear"
+        tdms_obj.properties["NI_Scale[1]_Linear_Slope"] = 2.0
+        tdms_obj.properties["NI_Scale[1]_Linear_Y_Intercept"] = 2.0
+        tdms_obj.properties["NI_Scale[2]_Scale_Type"] = "Linear"
+        tdms_obj.properties["NI_Scale[2]_Linear_Slope"] = 3.0
+        tdms_obj.properties["NI_Scale[2]_Linear_Y_Intercept"] = 3.0
+
+        expected_data = np.array([6.0, 9.0, 12.0])
 
         np.testing.assert_almost_equal(expected_data, tdms_obj.data)
 

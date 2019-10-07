@@ -47,9 +47,24 @@ def _get_object_scaling(obj):
     if num_scalings is None or num_scalings == 0:
         return None
 
-    scalings = []
+    try:
+        scaling_status = obj.properties["NI_Scaling_Status"]
+    except KeyError:
+        scaling_status = "unscaled"
 
-    for scale_index in range(num_scalings):
+    # NI documentation doesn't describe how the scaling status
+    # should be used, but based on the behaviour observed from the Excel
+    # plugin, when the scaling status is unscaled, all scalings are applied,
+    # but if it is scaled, only the last scale is used.
+    # See https://github.com/adamreeve/npTDMS/issues/64 and
+    # https://github.com/adamreeve/npTDMS/issues/120
+    if scaling_status == "scaled":
+        scale_indices = [num_scalings - 1]
+    else:
+        scale_indices = range(num_scalings)
+
+    scalings = []
+    for scale_index in scale_indices:
         type_property = 'NI_Scale[%d]_Scale_Type' % scale_index
         try:
             scale_type = obj.properties[type_property]
