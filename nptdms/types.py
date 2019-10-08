@@ -228,6 +228,16 @@ class TimeStamp(TdmsType):
                 timedelta(microseconds=micro_seconds))
 
 
+@tds_data_type(0x08000c, np.complex64)
+class ComplexSingleFloat(TdmsType):
+    size = 8
+
+
+@tds_data_type(0x10000d, np.complex128)
+class ComplexDoubleFloat(TdmsType):
+    size = 16
+
+
 @tds_data_type(0xFFFFFFFF, np.int16, default_for_nptype=False)
 class DaqMxRawData(TdmsType):
     size = 2

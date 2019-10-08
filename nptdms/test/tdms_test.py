@@ -824,6 +824,64 @@ class TDMSTestClass(unittest.TestCase):
         for expected, read in zip(strings, data):
             self.assertEqual(expected, read)
 
+    def test_complex_data(self):
+        """Test reading a file with complex numbers data"""
+
+        complex_single_arr = np.array([1+2j, 3+4j], dtype=np.complex64)
+        complex_double_arr = np.array([5+6j, 7+8j], dtype=np.complex128)
+        test_file = TestFile()
+        toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+        metadata = (
+            # Number of objects
+            "02 00 00 00"
+            # Length of the object path
+            "1F 00 00 00")
+        metadata += string_hexlify("/'Group'/'ComplexSingleChannel'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "0C 00 08 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        metadata += ("1F 00 00 00")
+        metadata += string_hexlify("/'Group'/'ComplexDoubleChannel'")
+        metadata += (
+            # Length of index information
+            "14 00 00 00"
+            # Raw data data type
+            "0D 00 10 00"
+            # Dimension
+            "01 00 00 00"
+            # Number of raw datata values
+            "02 00 00 00"
+            "00 00 00 00"
+            # Number of properties (0)
+            "00 00 00 00")
+        data = ""
+        for num in complex_single_arr:
+            data += hexlify_value("<f", num.real)
+            data += hexlify_value("<f", num.imag)
+        for num in complex_double_arr:
+            data += hexlify_value("<d", num.real)
+            data += hexlify_value("<d", num.imag)
+
+        test_file.add_segment(metadata, data, toc)
+        tdmsData = test_file.load()
+
+        data = tdmsData.channel_data("Group", "ComplexSingleChannel")
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(data == complex_single_arr))
+
+        data = tdmsData.channel_data("Group", "ComplexDoubleChannel")
+        self.assertEqual(len(data), 2)
+        self.assertTrue(all(data == complex_double_arr))
+
     def test_slash_and_space_in_name(self):
         """Test name like '01/02/03 something'"""
 

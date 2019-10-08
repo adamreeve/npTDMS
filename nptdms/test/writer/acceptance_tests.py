@@ -354,3 +354,32 @@ class TDMSTestClass(unittest.TestCase):
             self.assertEqual(len(output_data), len(input_data), test_case)
             for (input_val, output_val) in zip(input_data, output_data):
                 self.assertEqual(output_val, input_val, test_case)
+
+    def test_can_write_complex(self):
+        input_complex64_data = np.array([1+2j, 3+4j], np.complex64)
+        input_complex128_data = np.array([5+6j, 7+8j], np.complex128)
+
+        complex64_segment = ChannelObject(
+                "group", "complex64_data", input_complex64_data)
+        complex128_segment = ChannelObject(
+                "group", "complex128_data", input_complex128_data)
+
+        output_file = BytesIO()
+        with TdmsWriter(output_file) as tdms_writer:
+            tdms_writer.write_segment([complex64_segment])
+            tdms_writer.write_segment([complex128_segment])
+
+        output_file.seek(0)
+        tdms_file = TdmsFile(output_file)
+
+        output_data = tdms_file.object("group", "complex64_data").data
+        self.assertEqual(output_data.dtype, np.complex64)
+        self.assertEqual(len(output_data), 2)
+        self.assertEqual(output_data[0], input_complex64_data[0])
+        self.assertEqual(output_data[1], input_complex64_data[1])
+
+        output_data = tdms_file.object("group", "complex128_data").data
+        self.assertEqual(output_data.dtype, np.complex128)
+        self.assertEqual(len(output_data), 2)
+        self.assertEqual(output_data[0], input_complex128_data[0])
+        self.assertEqual(output_data[1], input_complex128_data[1])
