@@ -7,9 +7,19 @@ class Timer(object):
         self._description = description
 
     def __enter__(self):
-        self._start_time = time.clock()
+        try:
+            self._start_time = time.perf_counter()
+        except AttributeError:
+            # Python < 3.3
+            self._start_time = time.clock()
 
     def __exit__(self, exc_type, exc_val, exc_tb):
-        elapsed_time = (time.clock() - self._start_time) * 1.0e3
+        try:
+            end_time = time.perf_counter()
+        except AttributeError:
+            # Python < 3.3
+            end_time = time.clock()
+
+        elapsed_time = (end_time - self._start_time) * 1.0e3
         self._log.info("{0}: Took {1} ms".format(
             self._description, elapsed_time))
