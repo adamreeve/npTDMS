@@ -1,10 +1,24 @@
 import time
 
+try:
+    from collections import OrderedDict
+except ImportError:
+    try:
+        # ordereddict available on pypi for Python < 2.7
+        from ordereddict import OrderedDict
+    except ImportError:
+        # Otherwise fall back on normal dict
+        OrderedDict = dict
+
 
 class Timer(object):
+    """ Context manager for logging the  time taken  for an operation
+    """
+
     def __init__(self, log, description):
         self._log = log
         self._description = description
+        self._start_time = None
 
     def __enter__(self):
         try:
