@@ -1,7 +1,6 @@
 import numpy as np
 import re
 
-from nptdms.utils import OrderedDict
 from nptdms.log import log_manager
 
 

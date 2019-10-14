@@ -4,11 +4,11 @@ import logging
 import unittest
 import numpy as np
 
-from nptdms import tdms, TdmsObject
+from nptdms import TdmsFile, TdmsObject
 from nptdms.log import log_manager
 
 
-class TestTdmsFile(tdms.TdmsFile):
+class TestTdmsFile(TdmsFile):
     def __init__(self):
         self.segments = []
         self.objects = {}
