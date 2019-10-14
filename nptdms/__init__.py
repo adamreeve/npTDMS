@@ -7,5 +7,6 @@ from __future__ import absolute_import
 from .version import __version_info__, __version__
 
 # Export public objects
-from .tdms import TdmsFile, TdmsObject
+from .tdms import TdmsFile
+from .tdms_segment import TdmsObject
 from .writer import TdmsWriter, RootObject, GroupObject, ChannelObject

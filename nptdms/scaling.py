@@ -1,10 +1,10 @@
-import logging
 import numpy as np
 import re
 
+from nptdms.log import log_manager
 
-log = logging.getLogger(__name__)
-log.setLevel(logging.WARNING)
+
+log = log_manager.get_logger(__name__)
 
 
 class LinearScaling(object):

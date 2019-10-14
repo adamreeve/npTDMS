@@ -1,13 +1,14 @@
 """Test scaling data"""
 
 import logging
-import numpy as np
 import unittest
+import numpy as np
 
-from nptdms import tdms
+from nptdms import TdmsFile, TdmsObject
+from nptdms.log import log_manager
 
 
-class TestTdmsFile(tdms.TdmsFile):
+class TestTdmsFile(TdmsFile):
     def __init__(self):
         self.segments = []
         self.objects = {}
@@ -16,12 +17,12 @@ class TestTdmsFile(tdms.TdmsFile):
 
 class ScalingDataTests(unittest.TestCase):
     def setUp(self):
-        logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
+        log_manager.set_level(logging.DEBUG)
 
     def test_no_scaling(self):
         """Test that raw data is returned unscaled when there is no scaling"""
 
-        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        tdms_obj = TdmsObject("/'group'/'channel'")
         expected_data = np.array([1.0, 2.0, 3.0])
         tdms_obj._data = expected_data
 
@@ -31,7 +32,7 @@ class ScalingDataTests(unittest.TestCase):
         """Raw data is returned unscaled when the scaling type is unsupported.
         """
 
-        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        tdms_obj = TdmsObject("/'group'/'channel'")
         expected_data = np.array([1.0, 2.0, 3.0])
         tdms_obj.properties["NI_Number_Of_Scales"] = 1
         tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "UnknownScaling"
@@ -42,7 +43,7 @@ class ScalingDataTests(unittest.TestCase):
     def test_linear_scaling(self):
         """Test linear scaling"""
 
-        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        tdms_obj = TdmsObject("/'group'/'channel'")
         tdms_obj._data = np.array([1.0, 2.0, 3.0])
         tdms_obj.properties["NI_Number_Of_Scales"] = 1
         tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "Linear"
@@ -56,7 +57,7 @@ class ScalingDataTests(unittest.TestCase):
     def test_polynomial_scaling(self):
         """Test polynomial scaling"""
 
-        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        tdms_obj = TdmsObject("/'group'/'channel'")
         tdms_obj._data = np.array([1.0, 2.0, 3.0])
         tdms_obj.properties["NI_Number_Of_Scales"] = 1
         tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "Polynomial"
@@ -72,7 +73,7 @@ class ScalingDataTests(unittest.TestCase):
     def test_polynomial_scaling_with_3_coefficients(self):
         """Test polynomial scaling"""
 
-        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        tdms_obj = TdmsObject("/'group'/'channel'")
         tdms_obj._data = np.array([1.0, 2.0, 3.0])
         tdms_obj.properties["NI_Number_Of_Scales"] = 1
         tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "Polynomial"
@@ -90,7 +91,7 @@ class ScalingDataTests(unittest.TestCase):
            when the scaling status is unscaled.
         """
 
-        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        tdms_obj = TdmsObject("/'group'/'channel'")
         tdms_obj._data = np.array([1.0, 2.0, 3.0])
         tdms_obj.properties["NI_Number_Of_Scales"] = 3
         tdms_obj.properties["NI_Scaling_Status"] = "unscaled"
@@ -113,7 +114,7 @@ class ScalingDataTests(unittest.TestCase):
            when the scaling status is scaled.
         """
 
-        tdms_obj = tdms.TdmsObject("/'group'/'channel'")
+        tdms_obj = TdmsObject("/'group'/'channel'")
         tdms_obj._data = np.array([1.0, 2.0, 3.0])
         tdms_obj.properties["NI_Scaling_Status"] = "scaled"
         tdms_obj.properties["NI_Number_Of_Scales"] = 3
@@ -136,10 +137,10 @@ class ScalingDataTests(unittest.TestCase):
 
         tdms_file = TestTdmsFile()
 
-        tdms_channel = tdms.TdmsObject("/'group'/'channel'", tdms_file)
+        tdms_channel = TdmsObject("/'group'/'channel'", tdms_file)
         tdms_channel._data = np.array([1.0, 2.0, 3.0])
 
-        tdms_group = tdms.TdmsObject("/'group'", tdms_file)
+        tdms_group = TdmsObject("/'group'", tdms_file)
         tdms_group.properties["NI_Number_Of_Scales"] = 1
         tdms_group.properties["NI_Scale[0]_Scale_Type"] = "Linear"
         tdms_group.properties["NI_Scale[0]_Linear_Slope"] = 2.0
@@ -157,10 +158,10 @@ class ScalingDataTests(unittest.TestCase):
 
         tdms_file = TestTdmsFile()
 
-        tdms_channel = tdms.TdmsObject("/'group'/'channel'", tdms_file)
+        tdms_channel = TdmsObject("/'group'/'channel'", tdms_file)
         tdms_channel._data = np.array([1.0, 2.0, 3.0])
 
-        tdms_root = tdms.TdmsObject("/", tdms_file)
+        tdms_root = TdmsObject("/", tdms_file)
         tdms_root.properties["NI_Number_Of_Scales"] = 1
         tdms_root.properties["NI_Scale[0]_Scale_Type"] = "Linear"
         tdms_root.properties["NI_Scale[0]_Linear_Slope"] = 2.0
