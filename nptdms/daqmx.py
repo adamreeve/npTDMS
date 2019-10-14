@@ -20,7 +20,6 @@ class DaqMxMetadata(object):
         'scaler_data_type',
         'scaler_data_type_code',
         'scaler_raw_buffer_index',
-        'scaler_raw_buffer_index',
         'scaler_raw_byte_offset',
         'scaler_sample_format_bitmap',
         'scaler_vector_length',
