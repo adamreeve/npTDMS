@@ -17,7 +17,7 @@ class TdmsFile(object):
 
     """
 
-    def __init__(self, file, memmap_dir=None):
+    def __init__(self, file, memmap_dir=None, read_only_meta=False):
         """Initialise a new TDMS file object, reading all data.
 
         :param file: Either the path to the tdms file to read or an already
@@ -27,8 +27,11 @@ class TdmsFile(object):
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
+        :param read_only_meta: If this parameter is enabled then the metadata
+            of the TDMS file will only be read.
         """
 
+        self.read_only_meta = read_only_meta
         self.segments = []
         self.objects = OrderedDict()
         self.memmap_dir = memmap_dir
@@ -60,16 +63,17 @@ class TdmsFile(object):
                     break
                 else:
                     open_file.seek(segment.next_segment_pos)
+        if not self.read_only_meta:
 
-        with Timer(log, "Allocate space"):
-            # Allocate space for data
-            for obj in self.objects.values():
-                obj._initialise_data(memmap_dir=self.memmap_dir)
+            with Timer(log, "Allocate space"):
+                # Allocate space for data
+                for obj in self.objects.values():
+                    obj._initialise_data(memmap_dir=self.memmap_dir)
 
-        with Timer(log, "Read data"):
-            # Now actually read all the data
-            for segment in self.segments:
-                segment.read_raw_data(open_file)
+            with Timer(log, "Read data"):
+                # Now actually read all the data
+                for segment in self.segments:
+                    segment.read_raw_data(open_file)
 
     def object(self, *path):
         """Get a TDMS object from the file
