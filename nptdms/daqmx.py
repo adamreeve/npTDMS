@@ -72,8 +72,7 @@ class DaqMxScaler(object):
 
     def __init__(self, open_file, endianness):
         data_type_code = types.Uint32.read(open_file, endianness)
-        self.data_type = (
-            types.tds_data_types[data_type_code])
+        self.data_type = DAQMX_TYPES[data_type_code]
 
         # more info for format changing scaler
         self.raw_buffer_index = types.Uint32.read(open_file, endianness)
@@ -89,3 +88,15 @@ class DaqMxScaler(object):
 
         properties_list = ", ".join(properties)
         return "%s(%s)" % (self.__class__.__name__, properties_list)
+
+
+# Type codes for DAQmx scalers don't appear to match
+# the  normal TDMS type codes:
+DAQMX_TYPES = {
+    0: types.Uint8,
+    1: types.Int8,
+    2: types.Uint16,
+    3: types.Int16,
+    4: types.Uint32,
+    5: types.Int32,
+}
