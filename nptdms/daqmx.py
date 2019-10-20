@@ -12,17 +12,11 @@ class DaqMxMetadata(object):
     """
 
     __slots__ = [
-        'chunk_size',
         'data_type',
         'dimension',
+        'chunk_size',
         'raw_data_widths',
-        'scale_id',
-        'scaler_data_type',
-        'scaler_data_type_code',
-        'scaler_raw_buffer_index',
-        'scaler_raw_byte_offset',
-        'scaler_sample_format_bitmap',
-        'scaler_vector_length',
+        'scalers',
         ]
 
     def __init__(self, f, endianness):
@@ -36,40 +30,61 @@ class DaqMxMetadata(object):
         if self.dimension != 1:
             log.warning("Data dimension is not 1")
         self.chunk_size = types.Uint64.read(f, endianness)
+
         # size of vector of format changing scalers
-        self.scaler_vector_length = types.Uint32.read(f, endianness)
-        # Size of the vector
-        log.debug("mxDAQ format scaler vector size '%d'",
-                  self.scaler_vector_length)
-        if self.scaler_vector_length > 1:
+        scaler_vector_length = types.Uint32.read(f, endianness)
+        log.debug("mxDAQ format scaler vector size '%d'", scaler_vector_length)
+        if scaler_vector_length > 1:
             log.error("mxDAQ multiple format changing scalers not implemented")
 
-        for _ in range(self.scaler_vector_length):
-            # WARNING: This code overwrites previous values with new
-            # values.  At this time NI provides no documentation on
-            # how to use these scalers and sample TDMS files do not
-            # include more than one of these scalers.
-            self.scaler_data_type_code = types.Uint32.read(f, endianness)
-            self.scaler_data_type = (
-                types.tds_data_types[self.scaler_data_type_code])
-
-            # more info for format changing scaler
-            self.scaler_raw_buffer_index = types.Uint32.read(f, endianness)
-            self.scaler_raw_byte_offset = types.Uint32.read(f, endianness)
-            self.scaler_sample_format_bitmap = types.Uint32.read(f, endianness)
-            self.scale_id = types.Uint32.read(f, endianness)
+        self.scalers = [
+            DaqMxScaler(f, endianness)
+            for _ in range(scaler_vector_length)]
 
         raw_data_widths_length = types.Uint32.read(f, endianness)
         self.raw_data_widths = np.zeros(raw_data_widths_length, dtype=np.int32)
-        for cnt in range(raw_data_widths_length):
-            self.raw_data_widths[cnt] = types.Uint32.read(f, endianness)
+        for width_idx in range(raw_data_widths_length):
+            self.raw_data_widths[width_idx] = types.Uint32.read(f, endianness)
 
-    def __str__(self):
+    def __repr__(self):
         """ Return string representation of DAQmx metadata
         """
         properties = (
-            "%s: %s" % (name, getattr(self, name))
+            "%s=%s" % (name, getattr(self, name))
             for name in self.__slots__)
 
         properties_list = ", ".join(properties)
-        return "%s: ('%s')" % (self.__class__.__name__, properties_list)
+        return "%s(%s)" % (self.__class__.__name__, properties_list)
+
+
+class DaqMxScaler(object):
+    """ Details of a DAQmx raw data scaler read from a TDMS file
+    """
+
+    __slots__ = [
+        'scale_id',
+        'scaler_data_type',
+        'scaler_raw_buffer_index',
+        'scaler_raw_byte_offset',
+        'scaler_sample_format_bitmap',
+        ]
+
+    def __init__(self, open_file, endianness):
+        scaler_data_type_code = types.Uint32.read(open_file, endianness)
+        self.scaler_data_type = (
+            types.tds_data_types[scaler_data_type_code])
+
+        # more info for format changing scaler
+        self.scaler_raw_buffer_index = types.Uint32.read(open_file, endianness)
+        self.scaler_raw_byte_offset = types.Uint32.read(open_file, endianness)
+        self.scaler_sample_format_bitmap = types.Uint32.read(
+            open_file, endianness)
+        self.scale_id = types.Uint32.read(open_file, endianness)
+
+    def __repr__(self):
+        properties = (
+            "%s=%s" % (name, getattr(self, name))
+            for name in self.__slots__)
+
+        properties_list = ", ".join(properties)
+        return "%s(%s)" % (self.__class__.__name__, properties_list)

@@ -86,6 +86,10 @@ class TdmsSegment(object):
             # don't attempt to read last segment
             raise EOFError
         else:
+            log.debug("Next segment offset = %d, raw data offset = %d",
+                      self.next_segment_offset, self.raw_data_offset)
+            log.debug("Data size = %d b",
+                      self.next_segment_offset - self.raw_data_offset)
             self.next_segment_pos = (
                 self.position + self.next_segment_offset + lead_size)
 
@@ -145,10 +149,12 @@ class TdmsSegment(object):
                     segment_obj = self.ordered_objects[obj_index]
             if not updating_existing:
                 if obj._previous_segment_object is not None:
-                    log.debug("Copying previous segment object")
+                    log.debug("Copying previous segment object for %s",
+                              object_path)
                     segment_obj = copy(obj._previous_segment_object)
                 else:
-                    log.debug("Creating a new segment object")
+                    log.debug("Creating a new segment object for %s",
+                              object_path)
                     segment_obj = TdmsSegmentObject(obj, self.endianness)
                 self.ordered_objects.append(segment_obj)
             # Read the metadata for this object, updating any
@@ -591,7 +597,7 @@ class TdmsSegmentObject(object):
         log.debug("DAQmx object data type: %r", self.tdms_object.data_type)
 
         info = DaqMxMetadata(f, self.endianness)
-        log.debug("DAQmx metadata: %s", info)
+        log.debug("DAQmx metadata: %r", info)
 
         return info
 
