@@ -10,6 +10,8 @@ RAW_DATA_INPUT_SOURCE = 0xFFFFFFFF
 
 
 class LinearScaling(object):
+    """ Linear scaling with slope and intercept
+    """
     def __init__(self, intercept, slope, input_source):
         self.intercept = intercept
         self.slope = slope
@@ -20,6 +22,8 @@ class LinearScaling(object):
 
 
 class PolynomialScaling(object):
+    """ Polynomial scaling with an arbitrary number of coefficients
+    """
     def __init__(self, coefficients, input_source):
         self.coefficients = coefficients
         self.input_source = input_source
@@ -28,35 +32,55 @@ class PolynomialScaling(object):
         return np.polynomial.polynomial.polyval(data, self.coefficients)
 
 
+class DaqMxScalerScaling(object):
+    """ Reads scaler from DAQmx data
+    """
+    def __init__(self, scale_id):
+        self.scale_id = scale_id
+
+    def scale_daqmx(self, scaler_data):
+        return scaler_data[self.scale_id]
+
+
 class MultiScaling(object):
+    """ Computes scaled data from multiple scalings
+    """
     def __init__(self, scalings):
         self.scalings = scalings
 
     def scale(self, data):
         final_scale = self.scalings[-1]
-        return self._compute_scaled_data(final_scale, data)
+        return self._compute_scaled_data(final_scale, data, {})
 
-    def _compute_scaled_data(self, scaling, raw_data):
+    def scale_daqmx(self, scaler_data):
+        final_scale = self.scalings[-1]
+        return self._compute_scaled_data(final_scale, None, scaler_data)
+
+    def _compute_scaled_data(self, scaling, raw_data, scaler_data):
         """ Compute output data from a single scale in the set of all scalings,
             computing any required input scales recursively.
         """
         if scaling.input_source == RAW_DATA_INPUT_SOURCE:
+            if raw_data is None:
+                raise Exception("Invalid scaling input source for DAQmx data")
             return scaling.scale(raw_data)
-        elif scaling.input_source == 0 and self.scalings[0] is None:
-            # Special case where DAQmx data has a single scaler with id 0.
-            # This needs to be fixed to properly handle multiple scalers from
-            # DAQmx data.
-            return scaling.scale(raw_data)
+
+        input_scaling = self.scalings[scaling.input_source]
+        if input_scaling is None:
+            raise Exception(
+                "Cannot compute data for scale %d" % scaling.input_source)
+        elif isinstance(input_scaling, DaqMxScalerScaling):
+            input_data = input_scaling.scale_daqmx(scaler_data)
         else:
-            input_scaling = self.scalings[scaling.input_source]
-            if input_scaling is None:
-                raise Exception(
-                    "Cannot compute data for scale %d" % scaling.input_source)
-            input_data = self._compute_scaled_data(input_scaling, raw_data)
-            return scaling.scale(input_data)
+            input_data = self._compute_scaled_data(
+                input_scaling, raw_data, scaler_data)
+        return scaling.scale(input_data)
 
 
 def get_scaling(channel):
+    """ Get scaling for a channel from either the channel itself,
+        its group, or the whole TDMS file
+    """
     scalings = (_get_object_scaling(o) for o in _tdms_hierarchy(channel))
     try:
         return next(s for s in scalings if s is not None)
@@ -76,6 +100,7 @@ def _get_object_scaling(obj):
             scale_type = obj.properties[type_property]
         except KeyError:
             # Scalings are not in properties if they come from DAQmx scalers
+            scalings[scale_index] = DaqMxScalerScaling(scale_index)
             continue
         if scale_type == 'Polynomial':
             scalings[scale_index] = _read_polynomial_scaling(obj, scale_index)
