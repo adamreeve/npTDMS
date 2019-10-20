@@ -461,12 +461,10 @@ class TdmsObject(object):
         except KeyError:
             raise KeyError("Object does not have time properties available.")
 
-        periods = len(self._data)
-
         relative_time = np.linspace(
             offset,
-            offset + (periods - 1) * increment,
-            periods)
+            offset + (self.number_values - 1) * increment,
+            self.number_values)
 
         if not absolute_time:
             return relative_time
@@ -557,7 +555,7 @@ class TdmsObject(object):
         data_array[start_pos:end_pos] = new_data
         self._scaler_insert_positions[scale_id] += len(new_data)
 
-    def as_dataframe(self, absolute_time=False):
+    def as_dataframe(self, absolute_time=False, scaled_data=True):
         """
         Converts the TDMS object to a DataFrame
 
@@ -569,6 +567,12 @@ class TdmsObject(object):
 
         import pandas as pd
 
+        def get_data(chan):
+            if scaled_data:
+                return chan.data
+            else:
+                return chan.raw_data
+
         # When absolute_time is True,
         # use the wf_start_time as offset for the time_track()
         try:
@@ -577,10 +581,11 @@ class TdmsObject(object):
             time = None
         if self.channel is None:
             return pd.DataFrame.from_dict(OrderedDict(
-                (ch.channel, pd.Series(ch.data))
+                (ch.channel, pd.Series(get_data(ch)))
                 for ch in self.tdms_file.group_channels(self.group)))
         else:
-            return pd.DataFrame(self._data, index=time, columns=[self.path])
+            return pd.DataFrame(
+                get_data(self), index=time, columns=[self.path])
 
     @_property_builtin
     def data(self):
