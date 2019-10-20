@@ -6,19 +6,23 @@ from nptdms.log import log_manager
 
 log = log_manager.get_logger(__name__)
 
+RAW_DATA_INPUT_SOURCE = 0xFFFFFFFF
+
 
 class LinearScaling(object):
-    def __init__(self, intercept, slope):
+    def __init__(self, intercept, slope, input_source):
         self.intercept = intercept
         self.slope = slope
+        self.input_source = input_source
 
     def scale(self, data):
         return data * self.slope + self.intercept
 
 
 class PolynomialScaling(object):
-    def __init__(self, coefficients):
+    def __init__(self, coefficients, input_source):
         self.coefficients = coefficients
+        self.input_source = input_source
 
     def scale(self, data):
         return np.polynomial.polynomial.polyval(data, self.coefficients)
@@ -29,9 +33,27 @@ class MultiScaling(object):
         self.scalings = scalings
 
     def scale(self, data):
-        for scaling in self.scalings:
-            data = scaling.scale(data)
-        return data
+        final_scale = self.scalings[-1]
+        return self._compute_scaled_data(final_scale, data)
+
+    def _compute_scaled_data(self, scaling, raw_data):
+        """ Compute output data from a single scale in the set of all scalings,
+            computing any required input scales recursively.
+        """
+        if scaling.input_source == RAW_DATA_INPUT_SOURCE:
+            return scaling.scale(raw_data)
+        elif scaling.input_source == 0 and self.scalings[0] is None:
+            # Special case where DAQmx data has a single scaler with id 0.
+            # This needs to be fixed to properly handle multiple scalers from
+            # DAQmx data.
+            return scaling.scale(raw_data)
+        else:
+            input_scaling = self.scalings[scaling.input_source]
+            if input_scaling is None:
+                raise Exception(
+                    "Cannot compute data for scale %d" % scaling.input_source)
+            input_data = self._compute_scaled_data(input_scaling, raw_data)
+            return scaling.scale(input_data)
 
 
 def get_scaling(channel):
@@ -47,37 +69,20 @@ def _get_object_scaling(obj):
     if num_scalings is None or num_scalings == 0:
         return None
 
-    try:
-        scaling_status = obj.properties["NI_Scaling_Status"]
-    except KeyError:
-        scaling_status = "unscaled"
-
-    # NI documentation doesn't describe how the scaling status
-    # should be used, but based on the behaviour observed from the Excel
-    # plugin, when the scaling status is unscaled, all scalings are applied,
-    # but if it is scaled, only the last scale is used.
-    # See https://github.com/adamreeve/npTDMS/issues/64 and
-    # https://github.com/adamreeve/npTDMS/issues/120
-    if scaling_status == "scaled":
-        scale_indices = [num_scalings - 1]
-    else:
-        scale_indices = range(num_scalings)
-
-    scalings = []
-    for scale_index in scale_indices:
+    scalings = [None] * num_scalings
+    for scale_index in range(num_scalings):
         type_property = 'NI_Scale[%d]_Scale_Type' % scale_index
         try:
             scale_type = obj.properties[type_property]
         except KeyError:
-            # Sometimes num scalings is > 1 but some scalings are not provided
+            # Scalings are not in properties if they come from DAQmx scalers
             continue
         if scale_type == 'Polynomial':
-            scalings.append(_read_polynomial_scaling(obj, scale_index))
+            scalings[scale_index] = _read_polynomial_scaling(obj, scale_index)
         elif scale_type == 'Linear':
-            scalings.append(_read_linear_scaling(obj, scale_index))
+            scalings[scale_index] = _read_linear_scaling(obj, scale_index)
         else:
             log.warning("Unsupported scale type: %s", scale_type)
-            return None
 
     if not scalings:
         return None
@@ -87,9 +92,15 @@ def _get_object_scaling(obj):
 
 
 def _read_linear_scaling(obj, scale_index):
+    try:
+        input_source = obj.properties[
+            "NI_Scale[%d]_Linear_Input_Source" % scale_index]
+    except KeyError:
+        input_source = RAW_DATA_INPUT_SOURCE
     return LinearScaling(
         obj.properties["NI_Scale[%d]_Linear_Y_Intercept" % scale_index],
-        obj.properties["NI_Scale[%d]_Linear_Slope" % scale_index])
+        obj.properties["NI_Scale[%d]_Linear_Slope" % scale_index],
+        input_source)
 
 
 def _read_polynomial_scaling(obj, scale_index):
@@ -98,11 +109,16 @@ def _read_polynomial_scaling(obj, scale_index):
             'NI_Scale[%d]_Polynomial_Coefficients_Size' % (scale_index)]
     except KeyError:
         number_of_coefficients = 4
+    try:
+        input_source = obj.properties[
+            "NI_Scale[%d]_Polynomial_Input_Source" % scale_index]
+    except KeyError:
+        input_source = RAW_DATA_INPUT_SOURCE
     coefficients = [
         obj.properties[
             'NI_Scale[%d]_Polynomial_Coefficients[%d]' % (scale_index, i)]
         for i in range(number_of_coefficients)]
-    return PolynomialScaling(coefficients)
+    return PolynomialScaling(coefficients, input_source)
 
 
 def _tdms_hierarchy(tdms_channel):
