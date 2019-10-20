@@ -70,7 +70,7 @@ class MultiScaling(object):
             raise Exception(
                 "Cannot compute data for scale %d" % scaling.input_source)
         elif isinstance(input_scaling, DaqMxScalerScaling):
-            input_data = scaling.scale_daqmx(scaler_data)
+            input_data = input_scaling.scale_daqmx(scaler_data)
         else:
             input_data = self._compute_scaled_data(
                 input_scaling, raw_data, scaler_data)
@@ -100,7 +100,8 @@ def _get_object_scaling(obj):
             scale_type = obj.properties[type_property]
         except KeyError:
             # Scalings are not in properties if they come from DAQmx scalers
-            scalings[scale_indx] = DaqMxScalerScaling(scale_index)
+            scalings[scale_index] = DaqMxScalerScaling(scale_index)
+            continue
         if scale_type == 'Polynomial':
             scalings[scale_index] = _read_polynomial_scaling(obj, scale_index)
         elif scale_type == 'Linear':

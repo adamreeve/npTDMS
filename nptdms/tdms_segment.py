@@ -588,7 +588,7 @@ class TdmsObject(object):
         NumPy array containing data if there is data for this object,
         otherwise None.
         """
-        if self._data is None:
+        if self._data is None and not self._scaler_data:
             # self._data is None if data segment is empty
             return np.empty((0, 1))
         if self._data_scaled is None:
