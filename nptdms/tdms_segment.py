@@ -178,9 +178,10 @@ class TdmsSegment(object):
             # chunks defined differently for DAQmxRawData format
             try:
                 data_size = next(
-                    o.number_values * o.raw_data_width
+                    o.number_values * o.total_raw_data_width
                     for o in self.ordered_objects
-                    if o.has_data and o.number_values * o.raw_data_width > 0)
+                    if o.has_data and
+                    o.number_values * o.total_raw_data_width > 0)
             except StopIteration:
                 data_size = 0
         else:
@@ -240,14 +241,17 @@ class TdmsSegment(object):
             total_data_size, f.tell(), self.num_chunks)
 
         for chunk in range(self.num_chunks):
-            if self.toc["kTocInterleavedData"]:
+            if self.toc['kTocDAQmxRawData']:
+                data_objects = [o for o in self.ordered_objects if o.has_data]
+                self._read_interleaved_daqmx(f, data_objects)
+            elif self.toc["kTocInterleavedData"]:
                 log.debug("Data is interleaved")
                 data_objects = [o for o in self.ordered_objects if o.has_data]
                 # If all data types have numpy types and all the lengths are
                 # the same, then we can read all data at once with numpy,
                 # which is much faster
                 all_numpy = all(
-                    (o.data_type.nptype is not None for o in data_objects))
+                    o.data_type.nptype is not None for o in data_objects)
                 same_length = (len(
                     set((o.number_values for o in data_objects))) == 1)
                 if (all_numpy and same_length):
@@ -273,29 +277,58 @@ class TdmsSegment(object):
                     if obj.has_data:
                         obj.tdms_object._update_data(object_data[obj.path])
 
+    def _read_interleaved_daqmx(self, f, data_objects):
+        """Read data from DAQmx data segment"""
+
+        log.debug("Reading DAQmx data segment")
+
+        # If we have DAQmx data, we expect all objects to have matching
+        # raw data widths, and this gives the number of bytes to read:
+        all_daqmx = all(
+            o.data_type == types.DaqMxRawData for o in data_objects)
+        if not all_daqmx:
+            raise Exception("Cannot read a mix of DAQmx and "
+                            "non-DAQmx interleaved data")
+        all_channel_bytes = data_objects[0].total_raw_data_width
+
+        log.debug("all_channel_bytes: %d", all_channel_bytes)
+        # Read all data into 1 byte unsigned ints first
+        combined_data = read_interleaved_segment_bytes(
+            f, all_channel_bytes, data_objects[0].number_values)
+
+        # Now set arrays for each scaler of each channel
+        for (i, obj) in enumerate(data_objects):
+            for scaler in obj.daqmx_metadata.scalers:
+                offset = scaler.raw_byte_offset
+                scaler_size = scaler.data_type.size
+                byte_columns = tuple(
+                    range(offset, offset + scaler_size))
+                log.debug("Byte columns for channel %d scaler %d: %s",
+                          i, scaler.scale_id, byte_columns)
+                # Select columns for this scaler, so that number of values will
+                # be number of bytes per point * number of data points.
+                # Then use ravel to flatten the results into a vector.
+                object_data = combined_data[:, byte_columns].ravel()
+                # Now set correct data type, so that the array length should
+                # be correct
+                object_data.dtype = (
+                    scaler.data_type.nptype.newbyteorder(self.endianness))
+                obj.tdms_object._update_data_for_scaler(
+                    scaler.scale_id, object_data)
+
     def _read_interleaved_numpy(self, f, data_objects):
         """Read interleaved data where all channels have a numpy type"""
 
         log.debug("Reading interleaved data all at once")
-        # Read all data into 1 byte unsigned ints first
-        all_channel_bytes = data_objects[0].raw_data_width
-        if all_channel_bytes == 0:
-            all_channel_bytes = sum((o.data_type.size for o in data_objects))
+
+        # For non-DAQmx, simply use the data type sizes
+        all_channel_bytes = sum(o.data_type.size for o in data_objects)
         log.debug("all_channel_bytes: %d", all_channel_bytes)
-        number_bytes = int(all_channel_bytes * data_objects[0].number_values)
-        combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
-        try:
-            # Reshape, so that one row is all bytes for all objects
-            combined_data = combined_data.reshape(-1, all_channel_bytes)
-        except ValueError:
-            # Probably incomplete segment at the end => try to clip data
-            crop_len = (combined_data.shape[0] // all_channel_bytes)
-            crop_len *= all_channel_bytes
-            log.warning("Cropping data from %d to %d bytes to match segment "
-                        "size derived from channels",
-                        combined_data.shape[0], crop_len)
-            combined_data = combined_data[:crop_len].reshape(-1,
-                                                             all_channel_bytes)
+
+        # Read all data into 1 byte unsigned ints first
+        combined_data = read_interleaved_segment_bytes(
+            f, all_channel_bytes, data_objects[0].number_values)
+
         # Now set arrays for each channel
         data_pos = 0
         for (i, obj) in enumerate(data_objects):
@@ -348,6 +381,7 @@ class TdmsObject(object):
         self.path = path
         self.tdms_file = tdms_file
         self._data = None
+        self._scaler_data = {}
         self._data_scaled = None
         self.properties = OrderedDict()
         self.data_type = None
@@ -355,6 +389,8 @@ class TdmsObject(object):
         self.number_values = 0
         self.has_data = False
         self._previous_segment_object = None
+        self._data_insert_position = 0
+        self._scaler_insert_positions = {}
 
     def __repr__(self):
         return "<TdmsObject with path %s>" % self.path
@@ -462,32 +498,41 @@ class TdmsObject(object):
 
         if self.number_values == 0:
             pass
+        elif self.data_type == types.DaqMxRawData:
+            segment_obj = self._previous_segment_object
+            self._scaler_insert_positions = {}
+            for scaler in segment_obj.daqmx_metadata.scalers:
+                self._scaler_data[scaler.scale_id] = self._new_numpy_array(
+                    scaler.data_type.nptype, self.number_values, memmap_dir)
+                self._scaler_insert_positions[scaler.scale_id] = 0
         elif self.data_type.nptype is None:
             self._data = []
         else:
-            if memmap_dir:
-                memmap_file = tempfile.NamedTemporaryFile(
-                    mode='w+b', prefix="nptdms_", dir=memmap_dir)
-                self._data = np.memmap(
-                    memmap_file.file,
-                    mode='w+',
-                    shape=(self.number_values,),
-                    dtype=self.data_type.nptype)
-            else:
-                self._data = np.zeros(
-                    self.number_values, dtype=self.data_type.nptype)
+            self._data = self._new_numpy_array(
+                self.data_type.nptype, self.number_values, memmap_dir)
             self._data_insert_position = 0
-        if self._data is not None:
             log.debug("Allocated %d sample slots for %s", len(self._data),
                       self.path)
+
+    def _new_numpy_array(self, dtype, num_values, memmap_dir):
+        """Initialise numpy array for data
+        """
+        if memmap_dir:
+            memmap_file = tempfile.NamedTemporaryFile(
+                mode='w+b', prefix="nptdms_", dir=memmap_dir)
+            return np.memmap(
+                memmap_file.file,
+                mode='w+',
+                shape=(num_values,),
+                dtype=dtype)
         else:
-            log.debug("Allocated no space for %s", self.path)
+            return np.zeros(num_values, dtype=dtype)
 
     def _update_data(self, new_data):
         """Update the object data with a new array of data"""
 
-        log.debug("Adding %d data points to data for %s" %
-                  (len(new_data), self.path))
+        log.debug("Adding %d data points to data for %s",
+                  len(new_data), self.path)
         if self._data is None:
             self._data = new_data
         else:
@@ -499,6 +544,18 @@ class TdmsObject(object):
                 self._data[data_pos[0]:data_pos[1]] = new_data
             else:
                 self._data.extend(new_data)
+
+    def _update_data_for_scaler(self, scale_id, new_data):
+        """Append new DAQmx scaler data read from a segment
+        """
+
+        log.debug("Adding %d data points for object %s, scaler %d",
+                  len(new_data), self.path, scale_id)
+        data_array = self._scaler_data[scale_id]
+        start_pos = self._scaler_insert_positions[scale_id]
+        end_pos = start_pos + len(new_data)
+        data_array[start_pos:end_pos] = new_data
+        self._scaler_insert_positions[scale_id] += len(new_data)
 
     def as_dataframe(self, absolute_time=False):
         """
@@ -538,6 +595,8 @@ class TdmsObject(object):
             scale = scaling.get_scaling(self)
             if scale is None:
                 self._data_scaled = self._data
+            elif self._scaler_data:
+                self._data_scaled = scale.scale_daqmx(self._scaler_data)
             else:
                 self._data_scaled = scale.scale(self._data)
 
@@ -546,13 +605,27 @@ class TdmsObject(object):
     @_property_builtin
     def raw_data(self):
         """
-        For objects that contain DAQmx raw data, this is the raw, unscaled data
-        array. For other objects this is the same as the data property.
+        The raw, unscaled data array.
+        For unscaled objects this is the same as the data property.
         """
+        if self._scaler_data:
+            if len(self._scaler_data) == 1:
+                return next(v for v in self._scaler_data.values())
+            else:
+                raise Exception(
+                    "This object has data for multiple DAQmx scalers, "
+                    "use the raw_scaler_data method to get raw data "
+                    "for a scale_id")
         if self._data is None:
             # self._data is None if data segment is empty
             return np.empty((0, 1))
         return self._data
+
+    def raw_scaler_data(self, scale_id):
+        """
+        Raw DAQmx scaler data for the given scale id
+        """
+        return self._scaler_data[scale_id]
 
 
 class TdmsSegmentObject(object):
@@ -563,7 +636,7 @@ class TdmsSegmentObject(object):
     __slots__ = [
         'tdms_object', 'number_values', 'data_size',
         'has_data', 'data_type', 'dimension', 'endianness',
-        'raw_data_width']
+        'daqmx_metadata']
 
     def __init__(self, tdms_object, endianness):
         self.tdms_object = tdms_object
@@ -574,7 +647,6 @@ class TdmsSegmentObject(object):
         self.has_data = True
         self.data_type = None
         self.dimension = 1
-        self.raw_data_width = 0
 
     def _read_metadata_mx(self, f):
 
@@ -635,12 +707,12 @@ class TdmsSegmentObject(object):
             self.dimension = info.dimension
             self.data_type = info.data_type
             # DAQmx format has special chunking
-            self.data_size = info.chunk_size
+            self.data_size = info.chunk_size * sum(info.raw_data_widths)
             self.number_values = info.chunk_size
             # segment reading code relies on a single consistent raw
             # data width so assert that there is only one.
             assert(len(info.raw_data_widths) == 1)
-            self.raw_data_width = info.raw_data_widths[0]
+            self.daqmx_metadata = info
             # fall through and read properties
         else:
             # Assume metadata format is legacy TDMS format.
@@ -698,6 +770,13 @@ class TdmsSegmentObject(object):
     @property
     def path(self):
         return self.tdms_object.path
+
+    @property
+    def total_raw_data_width(self):
+        if self.data_type == types.DaqMxRawData:
+            return sum(self.daqmx_metadata.raw_data_widths)
+        else:
+            return self.data_type.size
 
     def _read_value(self, file):
         """Read a single value from the given file"""
@@ -764,3 +843,22 @@ def fromfile(file, dtype, count, *args, **kwargs):
         return np.frombuffer(
             file.read(count * np.dtype(dtype).itemsize),
             dtype=dtype, count=count, *args, **kwargs)
+
+
+def read_interleaved_segment_bytes(f, bytes_per_row, num_values):
+    """ Read a segment of interleaved data as rows of bytes
+    """
+    number_bytes = bytes_per_row * num_values
+    combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
+    try:
+        # Reshape, so that one row is all bytes for all objects
+        combined_data = combined_data.reshape(-1, bytes_per_row)
+    except ValueError:
+        # Probably incomplete segment at the end => try to clip data
+        crop_len = (combined_data.shape[0] // bytes_per_row)
+        crop_len *= bytes_per_row
+        log.warning("Cropping data from %d to %d bytes to match segment "
+                    "size derived from channels",
+                    combined_data.shape[0], crop_len)
+        combined_data = combined_data[:crop_len].reshape(-1, bytes_per_row)
+    return combined_data

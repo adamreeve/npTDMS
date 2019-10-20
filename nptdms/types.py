@@ -23,13 +23,13 @@ tds_data_types = {}
 numpy_data_types = {}
 
 
-def tds_data_type(enum_value, np_type, default_for_nptype=True):
+def tds_data_type(enum_value, np_type):
     def decorator(cls):
         cls.enum_value = enum_value
         cls.nptype = None if np_type is None else np.dtype(np_type)
         if enum_value is not None:
             tds_data_types[enum_value] = cls
-        if np_type is not None and default_for_nptype:
+        if np_type is not None:
             numpy_data_types[np.dtype(np_type)] = cls
         return cls
     return decorator
@@ -238,6 +238,6 @@ class ComplexDoubleFloat(TdmsType):
     size = 16
 
 
-@tds_data_type(0xFFFFFFFF, np.int16, default_for_nptype=False)
+@tds_data_type(0xFFFFFFFF, None)
 class DaqMxRawData(TdmsType):
-    size = 2
+    pass
