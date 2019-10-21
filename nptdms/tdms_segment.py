@@ -1,6 +1,7 @@
 from copy import copy
 from io import UnsupportedOperation
 import tempfile
+import os
 import numpy as np
 
 from nptdms import scaling
@@ -76,15 +77,18 @@ class TdmsSegment(object):
         lead_size = 7 * 4
         self.data_position = self.position + lead_size + self.raw_data_offset
         if self.next_segment_offset == 0xFFFFFFFFFFFFFFFF:
-            # This can happen if Labview crashes
+            # Segment size is unknown. This can happen if Labview crashes.
+            # Try to read until the end of the file.
             log.warning(
                 "Last segment of file has unknown size, "
-                "not attempting to read it")
-            self.next_segment_pos = None
-            self.next_segment_offset = None
-            # Could try to read as much as possible but for now
-            # don't attempt to read last segment
-            raise EOFError
+                "will attempt to read to the end of the file")
+            current_pos = f.tell()
+            f.seek(0, os.SEEK_END)
+            end_pos = f.tell()
+            f.seek(current_pos, os.SEEK_SET)
+
+            self.next_segment_pos = end_pos
+            self.next_segment_offset = end_pos - self.position - lead_size
         else:
             log.debug("Next segment offset = %d, raw data offset = %d",
                       self.next_segment_offset, self.raw_data_offset)

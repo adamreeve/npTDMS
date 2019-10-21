@@ -770,17 +770,12 @@ class TDMSTestClass(unittest.TestCase):
         test_file.add_segment(metadata, data, toc, incomplete=True)
         tdmsData = test_file.load()
 
-        # Eventually we might want to attempt to read the data
-        # from the incomplete segment, but for now just make
-        # sure we can read the data from previous segments
+        # We should be able to read the incomplete segment as well as
+        # previous segments
         data = tdmsData.channel_data("Group", "Channel1")
-        self.assertEqual(len(data), 2)
-        self.assertEqual(data[0], 1)
-        self.assertEqual(data[1], 2)
+        np.testing.assert_almost_equal(data, [1, 2, 1, 2])
         data = tdmsData.channel_data("Group", "Channel2")
-        self.assertEqual(len(data), 2)
-        self.assertEqual(data[0], 3)
-        self.assertEqual(data[1], 4)
+        np.testing.assert_almost_equal(data, [3, 4, 3, 4])
 
     def test_string_data(self):
         """Test reading a file with string data"""
