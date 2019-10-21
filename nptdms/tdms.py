@@ -27,8 +27,8 @@ class TdmsFile(object):
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
-        :param read_metadata_only: If this parameter is enabled then the metadata
-            of the TDMS file will only be read.
+        :param read_metadata_only: If this parameter is enabled then the
+            metadata of the TDMS file will only be read.
         """
 
         self.read_metadata_only = read_metadata_only
