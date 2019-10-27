@@ -133,6 +133,49 @@ class RtdScaling(object):
                 "RTD scaling for temperatures < 0 is not implemented")
 
 
+class TableScaling(object):
+    """ Scales data using a map from input to output values with
+        linear interpolation for points in between inputs.
+    """
+    def __init__(
+            self, input_values, output_values, input_source):
+        if not np.all(np.diff(input_values) > 0):
+            raise ValueError(
+                "Table input values must be monotonically increasing")
+
+        self.input_values = input_values
+        self.output_values = output_values
+        self.input_source = input_source
+
+    @staticmethod
+    def from_object(obj, scale_index):
+        prefix = "NI_Scale[%d]_Table_" % scale_index
+        try:
+            input_source = obj.properties[prefix + "Input_Source"]
+        except KeyError:
+            input_source = RAW_DATA_INPUT_SOURCE
+        num_pre_scaled_values = obj.properties[
+            prefix + "Pre_Scaled_Values_Size"]
+        num_scaled_values = obj.properties[
+            prefix + "Scaled_Values_Size"]
+        if num_pre_scaled_values != num_scaled_values:
+            raise ValueError(
+                "Number of pre-scaled values does not match "
+                "number of scaled values")
+        input_values = np.array([
+            obj.properties[prefix + "Pre_Scaled_Values[%d]" % i]
+            for i in range(num_pre_scaled_values)])
+        output_values = np.array([
+            obj.properties[prefix + "Scaled_Values[%d]" % i]
+            for i in range(num_scaled_values)])
+        return TableScaling(input_values, output_values, input_source)
+
+    def scale(self, data):
+        """ Calculate scaled data
+        """
+        return np.interp(data, self.input_values, self.output_values)
+
+
 class DaqMxScalerScaling(object):
     """ Reads scaler from DAQmx data
     """
@@ -210,6 +253,8 @@ def _get_object_scaling(obj):
             scalings[scale_index] = LinearScaling.from_object(obj, scale_index)
         elif scale_type == 'RTD':
             scalings[scale_index] = RtdScaling.from_object(obj, scale_index)
+        elif scale_type == 'Table':
+            scalings[scale_index] = TableScaling.from_object(obj, scale_index)
         else:
             log.warning("Unsupported scale type: %s", scale_type)
 
