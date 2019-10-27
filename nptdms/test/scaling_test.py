@@ -86,6 +86,27 @@ class ScalingDataTests(unittest.TestCase):
 
         np.testing.assert_almost_equal(expected_data, tdms_obj.data)
 
+    def test_rtd_scaling(self):
+        """Test RTD scaling"""
+
+        tdms_obj = TdmsObject("/'group'/'channel'")
+        tdms_obj._data = np.array([0.5, 0.6])
+
+        tdms_obj.properties["NI_Number_Of_Scales"] = 1
+        tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "RTD"
+        tdms_obj.properties["NI_Scale[0]_RTD_Current_Excitation"] = 0.001
+        tdms_obj.properties["NI_Scale[0]_RTD_R0_Nominal_Resistance"] = 100.0
+        tdms_obj.properties["NI_Scale[0]_RTD_A"] = 0.0039083
+        tdms_obj.properties["NI_Scale[0]_RTD_B"] = -5.775e-07
+        tdms_obj.properties["NI_Scale[0]_RTD_C"] = -4.183e-12
+        tdms_obj.properties["NI_Scale[0]_RTD_Lead_Wire_Resistance"] = 0.0
+        tdms_obj.properties["NI_Scale[0]_RTD_Resistance_Configuration"] = 3
+        tdms_obj.properties["NI_Scale[0]_RTD_Input_Source"] = 0xFFFFFFFF
+
+        expected_data = np.array([1256.89628, 1712.83429])
+
+        np.testing.assert_almost_equal(expected_data, tdms_obj.data, decimal=3)
+
     def test_multiple_scalings_applied_in_order(self):
         """Test all scalings applied from multiple scalings
         """

@@ -17,6 +17,18 @@ class LinearScaling(object):
         self.slope = slope
         self.input_source = input_source
 
+    @staticmethod
+    def from_object(obj, scale_index):
+        try:
+            input_source = obj.properties[
+                "NI_Scale[%d]_Linear_Input_Source" % scale_index]
+        except KeyError:
+            input_source = RAW_DATA_INPUT_SOURCE
+        return LinearScaling(
+            obj.properties["NI_Scale[%d]_Linear_Y_Intercept" % scale_index],
+            obj.properties["NI_Scale[%d]_Linear_Slope" % scale_index],
+            input_source)
+
     def scale(self, data):
         return data * self.slope + self.intercept
 
@@ -28,8 +40,97 @@ class PolynomialScaling(object):
         self.coefficients = coefficients
         self.input_source = input_source
 
+    @staticmethod
+    def from_object(obj, scale_index):
+        try:
+            number_of_coefficients = obj.properties[
+                'NI_Scale[%d]_Polynomial_Coefficients_Size' % (scale_index)]
+        except KeyError:
+            number_of_coefficients = 4
+        try:
+            input_source = obj.properties[
+                "NI_Scale[%d]_Polynomial_Input_Source" % scale_index]
+        except KeyError:
+            input_source = RAW_DATA_INPUT_SOURCE
+        coefficients = [
+            obj.properties[
+                'NI_Scale[%d]_Polynomial_Coefficients[%d]' % (scale_index, i)]
+            for i in range(number_of_coefficients)]
+        return PolynomialScaling(coefficients, input_source)
+
     def scale(self, data):
         return np.polynomial.polynomial.polyval(data, self.coefficients)
+
+
+class RtdScaling(object):
+    """ Converts a signal from a resitance temperature detector into
+        degrees celcius using the Callendar-Van Dusen equation
+    """
+    def __init__(
+            self, current_excitation, r0_nominal_resistance,
+            a, b, c,
+            lead_wire_resistance, resistance_configuration, input_source):
+        self.current_excitation = current_excitation
+        self.r0_nominal_resistance = r0_nominal_resistance
+        self.a = a
+        self.b = b
+        self.c = c
+        self.lead_wire_resistance = lead_wire_resistance
+        self.resistance_configuration = resistance_configuration
+        self.input_source = input_source
+
+    @staticmethod
+    def from_object(obj, scale_index):
+        prefix = "NI_Scale[%d]" % scale_index
+        current_excitation = obj.properties[
+            "%s_RTD_Current_Excitation" % prefix]
+        r0_nominal_resistance = obj.properties[
+            "%s_RTD_R0_Nominal_Resistance" % prefix]
+        a = obj.properties["%s_RTD_A" % prefix]
+        b = obj.properties["%s_RTD_B" % prefix]
+        c = obj.properties["%s_RTD_C" % prefix]
+        lead_wire_resistance = obj.properties[
+            "%s_RTD_Lead_Wire_Resistance" % prefix]
+        resistance_configuration = obj.properties[
+            "%s_RTD_Resistance_Configuration" % prefix]
+        input_source = obj.properties[
+            "%s_RTD_Input_Source" % prefix]
+        return RtdScaling(
+            current_excitation, r0_nominal_resistance, a, b, c,
+            lead_wire_resistance, resistance_configuration, input_source)
+
+    def scale(self, data):
+        """ Convert voltage data to temperature
+        """
+        r_0 = self.r0_nominal_resistance
+        a = self.a
+        b = self.b
+
+        # R(T) = R(0)[1 + A*T + B*T^2 + (T - 100)*C*T^3]
+        # R(T) = V/I
+
+        if self.lead_wire_resistance != 0.0:
+            # This is untested so throw an error.
+            # For 3 & 4 lead wire configuration the lead resistance should not
+            # be needed, but for configuration 2, we should have
+            # R_t = V/I - lead resistance
+            raise NotImplementedError(
+                "RTD scaling with non-zero lead wire resistance "
+                "is not implemented")
+
+        r_t = data / self.current_excitation
+
+        if np.all(r_t >= self.r0_nominal_resistance):
+            # For R(T) > R(0), temperature is positive and we can use the
+            # quadratic form of the equation without C:
+            return ((-a + np.sqrt(a ** 2 - 4.0 * b * (1.0 - r_t / r_0))) /
+                    (2.0 * self.b))
+        else:
+            # We would need to solve for the roots of the full quartic equation
+            # for any cases where R(T) < R(0), and work out which root is the
+            # correct solution. For R(T) > R(0) we set C to zero.
+            raise NotImplementedError(
+                "RTD scaling for temperatures < 0 is not implemented")
 
 
 class DaqMxScalerScaling(object):
@@ -103,9 +204,12 @@ def _get_object_scaling(obj):
             scalings[scale_index] = DaqMxScalerScaling(scale_index)
             continue
         if scale_type == 'Polynomial':
-            scalings[scale_index] = _read_polynomial_scaling(obj, scale_index)
+            scalings[scale_index] = PolynomialScaling.from_object(
+                obj, scale_index)
         elif scale_type == 'Linear':
-            scalings[scale_index] = _read_linear_scaling(obj, scale_index)
+            scalings[scale_index] = LinearScaling.from_object(obj, scale_index)
+        elif scale_type == 'RTD':
+            scalings[scale_index] = RtdScaling.from_object(obj, scale_index)
         else:
             log.warning("Unsupported scale type: %s", scale_type)
 
@@ -114,36 +218,6 @@ def _get_object_scaling(obj):
     if len(scalings) > 1:
         return MultiScaling(scalings)
     return scalings[0]
-
-
-def _read_linear_scaling(obj, scale_index):
-    try:
-        input_source = obj.properties[
-            "NI_Scale[%d]_Linear_Input_Source" % scale_index]
-    except KeyError:
-        input_source = RAW_DATA_INPUT_SOURCE
-    return LinearScaling(
-        obj.properties["NI_Scale[%d]_Linear_Y_Intercept" % scale_index],
-        obj.properties["NI_Scale[%d]_Linear_Slope" % scale_index],
-        input_source)
-
-
-def _read_polynomial_scaling(obj, scale_index):
-    try:
-        number_of_coefficients = obj.properties[
-            'NI_Scale[%d]_Polynomial_Coefficients_Size' % (scale_index)]
-    except KeyError:
-        number_of_coefficients = 4
-    try:
-        input_source = obj.properties[
-            "NI_Scale[%d]_Polynomial_Input_Source" % scale_index]
-    except KeyError:
-        input_source = RAW_DATA_INPUT_SOURCE
-    coefficients = [
-        obj.properties[
-            'NI_Scale[%d]_Polynomial_Coefficients[%d]' % (scale_index, i)]
-        for i in range(number_of_coefficients)]
-    return PolynomialScaling(coefficients, input_source)
 
 
 def _tdms_hierarchy(tdms_channel):
