@@ -127,6 +127,42 @@ class ScalingDataTests(unittest.TestCase):
 
         np.testing.assert_almost_equal(expected_scaled_data, tdms_obj.data)
 
+    def test_add_scaling(self):
+        """ Test scaling that adds two input scalings"""
+
+        tdms_obj = TdmsObject("/'group'/'channel'")
+        tdms_obj._scaler_data = {
+            0: np.array([1.0, 2.0, 3.0]),
+            1: np.array([2.0, 4.0, 6.0]),
+        }
+        expected_scaled_data = np.array([3.0, 6.0, 9.0])
+
+        tdms_obj.properties["NI_Number_Of_Scales"] = 3
+        tdms_obj.properties["NI_Scale[2]_Scale_Type"] = "Add"
+        tdms_obj.properties["NI_Scale[2]_Add_Left_Operand_Input_Source"] = 0
+        tdms_obj.properties["NI_Scale[2]_Add_Right_Operand_Input_Source"] = 1
+
+        np.testing.assert_almost_equal(expected_scaled_data, tdms_obj.data)
+
+    def test_subtract_scaling(self):
+        """ Test scaling that subtracts an input scaling from another"""
+
+        tdms_obj = TdmsObject("/'group'/'channel'")
+        tdms_obj._scaler_data = {
+            0: np.array([2.0, 4.0, 6.0]),
+            1: np.array([1.0, 2.0, 3.0]),
+        }
+        expected_scaled_data = np.array([1.0, 2.0, 3.0])
+
+        tdms_obj.properties["NI_Number_Of_Scales"] = 3
+        tdms_obj.properties["NI_Scale[2]_Scale_Type"] = "Subtract"
+        tdms_obj.properties[
+            "NI_Scale[2]_Subtract_Left_Operand_Input_Source"] = 0
+        tdms_obj.properties[
+            "NI_Scale[2]_Subtract_Right_Operand_Input_Source"] = 1
+
+        np.testing.assert_almost_equal(expected_scaled_data, tdms_obj.data)
+
     def test_multiple_scalings_applied_in_order(self):
         """Test all scalings applied from multiple scalings
         """
