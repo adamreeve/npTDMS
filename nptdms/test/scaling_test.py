@@ -7,6 +7,15 @@ import numpy as np
 from nptdms import TdmsFile, TdmsObject
 from nptdms.log import log_manager
 
+try:
+    import thermocouples_reference
+except ImportError:
+    thermocouples_reference = None
+try:
+    import scipy
+except ImportError:
+    scipy = None
+
 
 class TestTdmsFile(TdmsFile):
     def __init__(self):
@@ -162,6 +171,55 @@ class ScalingDataTests(unittest.TestCase):
             "NI_Scale[2]_Subtract_Right_Operand_Input_Source"] = 1
 
         np.testing.assert_almost_equal(expected_scaled_data, tdms_obj.data)
+
+    @unittest.skipIf(thermocouples_reference is None,
+                     "thermocouples_reference is not installed")
+    @unittest.skipIf(scipy is None, "scipy is not installed")
+    def test_thermocouple_scaling_voltage_to_temperature(self):
+        """Test thermocouple scaling from a voltage in uV to temperature"""
+
+        tdms_obj = TdmsObject("/'group'/'channel'")
+        tdms_obj._data = np.array([
+            0.0, 10.0, 100.0, 1000.0])
+        expected_scaled_data = np.array([
+            0.0, 0.2534448,  2.5309141, 24.9940185])
+
+        tdms_obj.properties["NI_Number_Of_Scales"] = 1
+        tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "Thermocouple"
+
+        tdms_obj.properties[
+            "NI_Scale[0]_Thermocouple_Thermocouple_Type"] = 10073
+        tdms_obj.properties[
+            "NI_Scale[0]_Thermocouple_Scaling_Direction"] = 0
+        tdms_obj.properties[
+            "NI_Scale[0]_Thermocouple_Input_Source"] = 0xFFFFFFFF
+
+        np.testing.assert_almost_equal(
+            expected_scaled_data, tdms_obj.data, decimal=3)
+
+    @unittest.skipIf(thermocouples_reference is None,
+                     "thermocouples_reference is not installed")
+    def test_thermocouple_scaling_temperature_to_voltage(self):
+        """Test thermocouple scaling from a temperature to voltage in uV"""
+
+        tdms_obj = TdmsObject("/'group'/'channel'")
+        tdms_obj._data = np.array([
+            0.0, 10.0, 50.0, 100.0])
+        expected_scaled_data = np.array([
+            0.0, 396.8619078, 2023.0778862, 4096.2302187])
+
+        tdms_obj.properties["NI_Number_Of_Scales"] = 1
+        tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "Thermocouple"
+
+        tdms_obj.properties[
+            "NI_Scale[0]_Thermocouple_Thermocouple_Type"] = 10073
+        tdms_obj.properties[
+            "NI_Scale[0]_Thermocouple_Scaling_Direction"] = 1
+        tdms_obj.properties[
+            "NI_Scale[0]_Thermocouple_Input_Source"] = 0xFFFFFFFF
+
+        np.testing.assert_almost_equal(
+            expected_scaled_data, tdms_obj.data, decimal=3)
 
     def test_multiple_scalings_applied_in_order(self):
         """Test all scalings applied from multiple scalings

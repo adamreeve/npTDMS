@@ -176,6 +176,72 @@ class TableScaling(object):
         return np.interp(data, self.input_values, self.output_values)
 
 
+class ThermocoupleScaling(object):
+    """ Convert between voltages in uV and degrees celcius for a Thermocouple.
+        Can convert in either direction depending on the scaling direction
+        parameter.
+    """
+    def __init__(self, type_code, scaling_direction, input_source):
+        from thermocouples_reference import thermocouples
+
+        # Thermocouple types from
+        # http://zone.ni.com/reference/en-XX/help/371361R-01/glang/tdms_create_scalinginfo/#instance2
+        thermocouple_type = {
+            10047: 'B',
+            10055: 'E',
+            10072: 'J',
+            10073: 'K',
+            10077: 'N',
+            10082: 'R',
+            10085: 'S',
+            10086: 'T',
+        }[type_code]
+        self.thermocouple = thermocouples[thermocouple_type]
+
+        self.scaling_direction = scaling_direction
+        self.input_source = input_source
+
+    @staticmethod
+    def from_object(obj, scale_index):
+        prefix = "NI_Scale[%d]_Thermocouple" % scale_index
+        input_source = obj.properties.get(
+            "%s_Input_Source" % prefix, RAW_DATA_INPUT_SOURCE)
+        type_code = obj.properties.get(
+            "%s_Thermocouple_Type" % prefix, 10072)
+        scaling_direction = obj.properties.get(
+            "%s_Scaling_Direction" % prefix, 0)
+        return ThermocoupleScaling(type_code, scaling_direction, input_source)
+
+    def scale(self, data):
+        """ Apply thermocouple scaling
+        """
+
+        # Note that the thermocouples_reference package uses mV for voltages,
+        # but TDMS uses uV.
+        nan = float('nan')
+
+        def scale_uv_to_c(micro_volts):
+            """Convert micro volts to degrees celcius"""
+            milli_volts = micro_volts / 1000.0
+            try:
+                return self.thermocouple.inverse_CmV(milli_volts, Tref=0.0)
+            except ValueError:
+                return nan
+
+        def scale_c_to_uv(temp):
+            """Convert degrees celcius to micro volts"""
+            try:
+                return 1000.0 * self.thermocouple.emf_mVC(temp, Tref=0.0)
+            except ValueError:
+                return nan
+
+        if self.scaling_direction == 1:
+            scaled = np.vectorize(scale_c_to_uv)(data)
+        else:
+            scaled = np.vectorize(scale_uv_to_c)(data)
+        return scaled
+
+
 class AddScaling(object):
     """ Adds two scalings
     """
@@ -305,6 +371,9 @@ def _get_object_scaling(obj):
             scalings[scale_index] = RtdScaling.from_object(obj, scale_index)
         elif scale_type == 'Table':
             scalings[scale_index] = TableScaling.from_object(obj, scale_index)
+        elif scale_type == 'Thermocouple':
+            scalings[scale_index] = ThermocoupleScaling.from_object(
+                obj, scale_index)
         elif scale_type == 'Add':
             scalings[scale_index] = AddScaling.from_object(obj, scale_index)
         elif scale_type == 'Subtract':
