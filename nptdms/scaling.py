@@ -133,6 +133,89 @@ class RtdScaling(object):
                 "RTD scaling for temperatures < 0 is not implemented")
 
 
+class TableScaling(object):
+    """ Scales data using a map from input to output values with
+        linear interpolation for points in between inputs.
+    """
+    def __init__(
+            self, input_values, output_values, input_source):
+        if not np.all(np.diff(input_values) > 0):
+            raise ValueError(
+                "Table input values must be monotonically increasing")
+
+        self.input_values = input_values
+        self.output_values = output_values
+        self.input_source = input_source
+
+    @staticmethod
+    def from_object(obj, scale_index):
+        prefix = "NI_Scale[%d]_Table_" % scale_index
+        try:
+            input_source = obj.properties[prefix + "Input_Source"]
+        except KeyError:
+            input_source = RAW_DATA_INPUT_SOURCE
+        num_pre_scaled_values = obj.properties[
+            prefix + "Pre_Scaled_Values_Size"]
+        num_scaled_values = obj.properties[
+            prefix + "Scaled_Values_Size"]
+        if num_pre_scaled_values != num_scaled_values:
+            raise ValueError(
+                "Number of pre-scaled values does not match "
+                "number of scaled values")
+        input_values = np.array([
+            obj.properties[prefix + "Pre_Scaled_Values[%d]" % i]
+            for i in range(num_pre_scaled_values)])
+        output_values = np.array([
+            obj.properties[prefix + "Scaled_Values[%d]" % i]
+            for i in range(num_scaled_values)])
+        return TableScaling(input_values, output_values, input_source)
+
+    def scale(self, data):
+        """ Calculate scaled data
+        """
+        return np.interp(data, self.input_values, self.output_values)
+
+
+class AddScaling(object):
+    """ Adds two scalings
+    """
+    def __init__(self, left_input_source, right_input_source):
+        self.left_input_source = left_input_source
+        self.right_input_source = right_input_source
+
+    @staticmethod
+    def from_object(obj, scale_index):
+        left_input_source = obj.properties[
+            "NI_Scale[%d]_Add_Left_Operand_Input_Source" % scale_index]
+        right_input_source = obj.properties[
+            "NI_Scale[%d]_Add_Right_Operand_Input_Source" % scale_index]
+        return AddScaling(left_input_source, right_input_source)
+
+    def scale(self, left_data, right_data):
+        return left_data + right_data
+
+
+class SubtractScaling(object):
+    """ Subtracts one scaling from another
+    """
+    def __init__(self, left_input_source, right_input_source):
+        self.left_input_source = left_input_source
+        self.right_input_source = right_input_source
+
+    @staticmethod
+    def from_object(obj, scale_index):
+        left_input_source = obj.properties[
+            "NI_Scale[%d]_Subtract_Left_Operand_Input_Source" % scale_index]
+        right_input_source = obj.properties[
+            "NI_Scale[%d]_Subtract_Right_Operand_Input_Source" % scale_index]
+        return SubtractScaling(left_input_source, right_input_source)
+
+    def scale(self, left_data, right_data):
+        """ Calculate scaled data
+        """
+        return left_data - right_data
+
+
 class DaqMxScalerScaling(object):
     """ Reads scaler from DAQmx data
     """
@@ -150,32 +233,42 @@ class MultiScaling(object):
         self.scalings = scalings
 
     def scale(self, data):
-        final_scale = self.scalings[-1]
+        final_scale = len(self.scalings) - 1
         return self._compute_scaled_data(final_scale, data, {})
 
     def scale_daqmx(self, scaler_data):
-        final_scale = self.scalings[-1]
+        final_scale = len(self.scalings) - 1
         return self._compute_scaled_data(final_scale, None, scaler_data)
 
-    def _compute_scaled_data(self, scaling, raw_data, scaler_data):
+    def _compute_scaled_data(self, scale_index, raw_data, scaler_data):
         """ Compute output data from a single scale in the set of all scalings,
             computing any required input scales recursively.
         """
-        if scaling.input_source == RAW_DATA_INPUT_SOURCE:
+        if scale_index == RAW_DATA_INPUT_SOURCE:
             if raw_data is None:
                 raise Exception("Invalid scaling input source for DAQmx data")
-            return scaling.scale(raw_data)
+            return raw_data
 
-        input_scaling = self.scalings[scaling.input_source]
-        if input_scaling is None:
+        scaling = self.scalings[scale_index]
+        if scaling is None:
             raise Exception(
-                "Cannot compute data for scale %d" % scaling.input_source)
-        elif isinstance(input_scaling, DaqMxScalerScaling):
-            input_data = input_scaling.scale_daqmx(scaler_data)
-        else:
+                "Cannot compute data for scale %d" % scale_index)
+
+        if isinstance(scaling, DaqMxScalerScaling):
+            return scaling.scale_daqmx(scaler_data)
+        elif hasattr(scaling, 'input_source'):
             input_data = self._compute_scaled_data(
-                input_scaling, raw_data, scaler_data)
-        return scaling.scale(input_data)
+                scaling.input_source, raw_data, scaler_data)
+            return scaling.scale(input_data)
+        elif (hasattr(scaling, 'left_input_source') and
+              hasattr(scaling, 'right_input_source')):
+            left_input_data = self._compute_scaled_data(
+                scaling.left_input_source, raw_data, scaler_data)
+            right_input_data = self._compute_scaled_data(
+                scaling.right_input_source, raw_data, scaler_data)
+            return scaling.scale(left_input_data, right_input_data)
+        else:
+            raise ValueError("Cannot compute scaled data for %r" % scaling)
 
 
 def get_scaling(channel):
@@ -210,6 +303,13 @@ def _get_object_scaling(obj):
             scalings[scale_index] = LinearScaling.from_object(obj, scale_index)
         elif scale_type == 'RTD':
             scalings[scale_index] = RtdScaling.from_object(obj, scale_index)
+        elif scale_type == 'Table':
+            scalings[scale_index] = TableScaling.from_object(obj, scale_index)
+        elif scale_type == 'Add':
+            scalings[scale_index] = AddScaling.from_object(obj, scale_index)
+        elif scale_type == 'Subtract':
+            scalings[scale_index] = SubtractScaling.from_object(
+                obj, scale_index)
         else:
             log.warning("Unsupported scale type: %s", scale_type)
 

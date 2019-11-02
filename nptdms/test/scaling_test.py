@@ -107,6 +107,62 @@ class ScalingDataTests(unittest.TestCase):
 
         np.testing.assert_almost_equal(expected_data, tdms_obj.data, decimal=3)
 
+    def test_table_scaling(self):
+        """Test table scaling"""
+
+        tdms_obj = TdmsObject("/'group'/'channel'")
+        tdms_obj._data = np.array([0.5, 1.0, 1.5, 2.5, 3.0, 3.5])
+        expected_scaled_data = np.array([2.0, 2.0, 3.0, 6.0, 8.0, 8.0])
+
+        tdms_obj.properties["NI_Number_Of_Scales"] = 1
+        tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "Table"
+        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values_Size"] = 3
+        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values[0]"] = 1.0
+        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values[1]"] = 2.0
+        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values[2]"] = 3.0
+        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values_Size"] = 3
+        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values[0]"] = 2.0
+        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values[1]"] = 4.0
+        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values[2]"] = 8.0
+
+        np.testing.assert_almost_equal(expected_scaled_data, tdms_obj.data)
+
+    def test_add_scaling(self):
+        """ Test scaling that adds two input scalings"""
+
+        tdms_obj = TdmsObject("/'group'/'channel'")
+        tdms_obj._scaler_data = {
+            0: np.array([1.0, 2.0, 3.0]),
+            1: np.array([2.0, 4.0, 6.0]),
+        }
+        expected_scaled_data = np.array([3.0, 6.0, 9.0])
+
+        tdms_obj.properties["NI_Number_Of_Scales"] = 3
+        tdms_obj.properties["NI_Scale[2]_Scale_Type"] = "Add"
+        tdms_obj.properties["NI_Scale[2]_Add_Left_Operand_Input_Source"] = 0
+        tdms_obj.properties["NI_Scale[2]_Add_Right_Operand_Input_Source"] = 1
+
+        np.testing.assert_almost_equal(expected_scaled_data, tdms_obj.data)
+
+    def test_subtract_scaling(self):
+        """ Test scaling that subtracts an input scaling from another"""
+
+        tdms_obj = TdmsObject("/'group'/'channel'")
+        tdms_obj._scaler_data = {
+            0: np.array([2.0, 4.0, 6.0]),
+            1: np.array([1.0, 2.0, 3.0]),
+        }
+        expected_scaled_data = np.array([1.0, 2.0, 3.0])
+
+        tdms_obj.properties["NI_Number_Of_Scales"] = 3
+        tdms_obj.properties["NI_Scale[2]_Scale_Type"] = "Subtract"
+        tdms_obj.properties[
+            "NI_Scale[2]_Subtract_Left_Operand_Input_Source"] = 0
+        tdms_obj.properties[
+            "NI_Scale[2]_Subtract_Right_Operand_Input_Source"] = 1
+
+        np.testing.assert_almost_equal(expected_scaled_data, tdms_obj.data)
+
     def test_multiple_scalings_applied_in_order(self):
         """Test all scalings applied from multiple scalings
         """
