@@ -279,7 +279,10 @@ class SubtractScaling(object):
     def scale(self, left_data, right_data):
         """ Calculate scaled data
         """
-        return left_data - right_data
+
+        # Subtracting the left operand from the right doesn't make much sense,
+        # but this does match the Excel TDMS plugin behaviour.
+        return right_data - left_data
 
 
 class DaqMxScalerScaling(object):

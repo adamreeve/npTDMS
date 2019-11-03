@@ -156,10 +156,12 @@ class ScalingDataTests(unittest.TestCase):
     def test_subtract_scaling(self):
         """ Test scaling that subtracts an input scaling from another"""
 
+        # This behaves the opposite to what you'd expect, the left operand
+        # is subtracted from the right operand.
         tdms_obj = TdmsObject("/'group'/'channel'")
         tdms_obj._scaler_data = {
-            0: np.array([2.0, 4.0, 6.0]),
-            1: np.array([1.0, 2.0, 3.0]),
+            0: np.array([1.0, 2.0, 3.0]),
+            1: np.array([2.0, 4.0, 6.0]),
         }
         expected_scaled_data = np.array([1.0, 2.0, 3.0])
 
