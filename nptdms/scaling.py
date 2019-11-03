@@ -138,13 +138,24 @@ class TableScaling(object):
         linear interpolation for points in between inputs.
     """
     def __init__(
-            self, input_values, output_values, input_source):
-        if not np.all(np.diff(input_values) > 0):
-            raise ValueError(
-                "Table input values must be monotonically increasing")
+            self, pre_scaled_values, scaled_values, input_source):
 
-        self.input_values = input_values
-        self.output_values = output_values
+        # This is a bit counterintuitive but the scaled values are the input
+        # values and the pre-scaled values are the output values for
+        # interpolation.
+
+        # Ensure values are monotonically increasing for interpolation to work
+        if not np.all(np.diff(scaled_values) > 0):
+            scaled_values = np.flip(scaled_values)
+            pre_scaled_values = np.flip(pre_scaled_values)
+        if not np.all(np.diff(scaled_values) > 0):
+            # Reversing didn't help
+            raise ValueError(
+                "Table scaled values must be monotonically "
+                "increasing or decreasing")
+
+        self.input_values = scaled_values
+        self.output_values = pre_scaled_values
         self.input_source = input_source
 
     @staticmethod
@@ -162,13 +173,13 @@ class TableScaling(object):
             raise ValueError(
                 "Number of pre-scaled values does not match "
                 "number of scaled values")
-        input_values = np.array([
+        pre_scaled_values = np.array([
             obj.properties[prefix + "Pre_Scaled_Values[%d]" % i]
             for i in range(num_pre_scaled_values)])
-        output_values = np.array([
+        scaled_values = np.array([
             obj.properties[prefix + "Scaled_Values[%d]" % i]
             for i in range(num_scaled_values)])
-        return TableScaling(input_values, output_values, input_source)
+        return TableScaling(pre_scaled_values, scaled_values, input_source)
 
     def scale(self, data):
         """ Calculate scaled data

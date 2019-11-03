@@ -123,16 +123,20 @@ class ScalingDataTests(unittest.TestCase):
         tdms_obj._data = np.array([0.5, 1.0, 1.5, 2.5, 3.0, 3.5])
         expected_scaled_data = np.array([2.0, 2.0, 3.0, 6.0, 8.0, 8.0])
 
+        # The scaled values are actually the range of inputs into the scaling,
+        # which are mapped to the pre-scaled values. This makes no sense but
+        # matches the behaviour of the Excel TDMS plugin.
+
         tdms_obj.properties["NI_Number_Of_Scales"] = 1
         tdms_obj.properties["NI_Scale[0]_Scale_Type"] = "Table"
-        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values_Size"] = 3
-        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values[0]"] = 1.0
-        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values[1]"] = 2.0
-        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values[2]"] = 3.0
         tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values_Size"] = 3
-        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values[0]"] = 2.0
-        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values[1]"] = 4.0
-        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values[2]"] = 8.0
+        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values[0]"] = 1.0
+        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values[1]"] = 2.0
+        tdms_obj.properties["NI_Scale[0]_Table_Scaled_Values[2]"] = 3.0
+        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values_Size"] = 3
+        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values[0]"] = 2.0
+        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values[1]"] = 4.0
+        tdms_obj.properties["NI_Scale[0]_Table_Pre_Scaled_Values[2]"] = 8.0
 
         np.testing.assert_almost_equal(expected_scaled_data, tdms_obj.data)
 
