@@ -138,13 +138,24 @@ class TableScaling(object):
         linear interpolation for points in between inputs.
     """
     def __init__(
-            self, input_values, output_values, input_source):
-        if not np.all(np.diff(input_values) > 0):
-            raise ValueError(
-                "Table input values must be monotonically increasing")
+            self, pre_scaled_values, scaled_values, input_source):
 
-        self.input_values = input_values
-        self.output_values = output_values
+        # This is a bit counterintuitive but the scaled values are the input
+        # values and the pre-scaled values are the output values for
+        # interpolation.
+
+        # Ensure values are monotonically increasing for interpolation to work
+        if not np.all(np.diff(scaled_values) > 0):
+            scaled_values = np.flip(scaled_values)
+            pre_scaled_values = np.flip(pre_scaled_values)
+        if not np.all(np.diff(scaled_values) > 0):
+            # Reversing didn't help
+            raise ValueError(
+                "Table scaled values must be monotonically "
+                "increasing or decreasing")
+
+        self.input_values = scaled_values
+        self.output_values = pre_scaled_values
         self.input_source = input_source
 
     @staticmethod
@@ -162,18 +173,84 @@ class TableScaling(object):
             raise ValueError(
                 "Number of pre-scaled values does not match "
                 "number of scaled values")
-        input_values = np.array([
+        pre_scaled_values = np.array([
             obj.properties[prefix + "Pre_Scaled_Values[%d]" % i]
             for i in range(num_pre_scaled_values)])
-        output_values = np.array([
+        scaled_values = np.array([
             obj.properties[prefix + "Scaled_Values[%d]" % i]
             for i in range(num_scaled_values)])
-        return TableScaling(input_values, output_values, input_source)
+        return TableScaling(pre_scaled_values, scaled_values, input_source)
 
     def scale(self, data):
         """ Calculate scaled data
         """
         return np.interp(data, self.input_values, self.output_values)
+
+
+class ThermocoupleScaling(object):
+    """ Convert between voltages in uV and degrees celcius for a Thermocouple.
+        Can convert in either direction depending on the scaling direction
+        parameter.
+    """
+    def __init__(self, type_code, scaling_direction, input_source):
+        from thermocouples_reference import thermocouples
+
+        # Thermocouple types from
+        # http://zone.ni.com/reference/en-XX/help/371361R-01/glang/tdms_create_scalinginfo/#instance2
+        thermocouple_type = {
+            10047: 'B',
+            10055: 'E',
+            10072: 'J',
+            10073: 'K',
+            10077: 'N',
+            10082: 'R',
+            10085: 'S',
+            10086: 'T',
+        }[type_code]
+        self.thermocouple = thermocouples[thermocouple_type]
+
+        self.scaling_direction = scaling_direction
+        self.input_source = input_source
+
+    @staticmethod
+    def from_object(obj, scale_index):
+        prefix = "NI_Scale[%d]_Thermocouple" % scale_index
+        input_source = obj.properties.get(
+            "%s_Input_Source" % prefix, RAW_DATA_INPUT_SOURCE)
+        type_code = obj.properties.get(
+            "%s_Thermocouple_Type" % prefix, 10072)
+        scaling_direction = obj.properties.get(
+            "%s_Scaling_Direction" % prefix, 0)
+        return ThermocoupleScaling(type_code, scaling_direction, input_source)
+
+    def scale(self, data):
+        """ Apply thermocouple scaling
+        """
+
+        # Note that the thermocouples_reference package uses mV for voltages,
+        # but TDMS uses uV.
+        nan = float('nan')
+
+        def scale_uv_to_c(micro_volts):
+            """Convert micro volts to degrees celcius"""
+            milli_volts = micro_volts / 1000.0
+            try:
+                return self.thermocouple.inverse_CmV(milli_volts, Tref=0.0)
+            except ValueError:
+                return nan
+
+        def scale_c_to_uv(temp):
+            """Convert degrees celcius to micro volts"""
+            try:
+                return 1000.0 * self.thermocouple.emf_mVC(temp, Tref=0.0)
+            except ValueError:
+                return nan
+
+        if self.scaling_direction == 1:
+            scaled = np.vectorize(scale_c_to_uv)(data)
+        else:
+            scaled = np.vectorize(scale_uv_to_c)(data)
+        return scaled
 
 
 class AddScaling(object):
@@ -213,7 +290,10 @@ class SubtractScaling(object):
     def scale(self, left_data, right_data):
         """ Calculate scaled data
         """
-        return left_data - right_data
+
+        # Subtracting the left operand from the right doesn't make much sense,
+        # but this does match the Excel TDMS plugin behaviour.
+        return right_data - left_data
 
 
 class DaqMxScalerScaling(object):
@@ -305,6 +385,9 @@ def _get_object_scaling(obj):
             scalings[scale_index] = RtdScaling.from_object(obj, scale_index)
         elif scale_type == 'Table':
             scalings[scale_index] = TableScaling.from_object(obj, scale_index)
+        elif scale_type == 'Thermocouple':
+            scalings[scale_index] = ThermocoupleScaling.from_object(
+                obj, scale_index)
         elif scale_type == 'Add':
             scalings[scale_index] = AddScaling.from_object(obj, scale_index)
         elif scale_type == 'Subtract':
