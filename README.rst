@@ -52,11 +52,14 @@ Source code lives at https://github.com/adamreeve/npTDMS and any issues can be
 reported at https://github.com/adamreeve/npTDMS/issues.
 Documentation is available at http://nptdms.readthedocs.io.
 
-What Currently Doesn't Work
----------------------------
+Limitations
+-----------
 
 This module doesn't support TDMS files with XML headers or with
 extended floating point data.
+
+TDMS files support timestamps with a resolution of 2^-64 seconds but these
+are read as numpy datetime64 values with microsecond resolution.
 
 Contributors/Thanks
 -------------------
