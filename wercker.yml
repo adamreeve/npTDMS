@@ -14,7 +14,8 @@ build:
     - script:
         name: Test on Python 3
         code: |
-          pip3 install .[hdf,pandas]
+          export LC_ALL=C.UTF-8
+          pip3 install .[hdf,pandas,thermocouple_scaling]
           nosetests3
 
 deploy:
