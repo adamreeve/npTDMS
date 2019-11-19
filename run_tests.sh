@@ -6,7 +6,7 @@ docker run -i -t --rm \
     /bin/bash -c "
         cd /nptdms &&
         pep8 ./nptdms &&
-        python2.7 setup.py install &&
+        pip install .[hdf,pandas,thermocouple_scaling] &&
         nosetests &&
-        python3 setup.py install &&
+        pip3 install .[hdf,pandas] &&
         nosetests3"

@@ -9,12 +9,12 @@ build:
     - script:
         name: Test on Python 2.7
         code: |
-          python2.7 setup.py install
+          pip install .[hdf,pandas,thermocouple_scaling]
           nosetests
     - script:
         name: Test on Python 3
         code: |
-          python3 setup.py install
+          pip3 install .[hdf,pandas]
           nosetests3
 
 deploy:

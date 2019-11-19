@@ -42,6 +42,11 @@ setup(
     'Natural Language :: English',
   ],
   install_requires = ['numpy'],
+  extras_require = {
+      'pandas': ['pandas'],
+      'hdf': ['h5py'],
+      'thermocouple_scaling': ['thermocouples_reference', 'scipy'],
+  },
   entry_points = """
   [console_scripts]
   tdmsinfo=nptdms.tdmsinfo:main
