@@ -3,20 +3,10 @@
 from datetime import datetime, timedelta
 import numpy as np
 import struct
-try:
-    import pytz
-except ImportError:
-    pytz = None
 
 
 _struct_pack = struct.pack
 _struct_unpack = struct.unpack
-
-if pytz:
-    # Use UTC time zone if pytz is installed
-    timezone = pytz.utc
-else:
-    timezone = None
 
 
 tds_data_types = {}
@@ -189,43 +179,44 @@ class TimeStamp(TdmsType):
     # 01/01/1904 00:00:00.00 UTC, ignoring leap seconds,
     # and number of 2^-64 fractions of a second.
     # Note that the TDMS epoch is not the Unix epoch.
-    _tdms_epoch = datetime(1904, 1, 1, 0, 0, 0, tzinfo=timezone)
+
+    # We convert times to numpy datetime64s with microsecond precision,
+    # so lose some precision compared with  TDMS.
+    _tdms_epoch = np.datetime64('1904-01-01 00:00:00', 'us')
     _fractions_per_microsecond = float(10**-6) / 2**-64
 
     size = 16
 
     def __init__(self, value):
-        if isinstance(value, np.datetime64):
-            value = value.astype(datetime)
-            # numpy converts a datetime with no time part to
-            # datetime.date instead of datetime.datetime
-            if not isinstance(value, datetime):
-                value = datetime.combine(value, datetime.min.time())
-        if value.tzinfo is None:
-            value = value.replace(tzinfo=timezone)
+        if not isinstance(value, np.datetime64):
+            value = np.datetime64(value, 'us')
         self.value = value
         epoch_delta = value - self._tdms_epoch
-        seconds_per_day = 86400
-        seconds = epoch_delta.days * seconds_per_day + epoch_delta.seconds
-        second_fractions = int(
-            epoch_delta.microseconds * self._fractions_per_microsecond)
+
+        seconds = int(epoch_delta / np.timedelta64(1, 's'))
+        remainder = epoch_delta - np.timedelta64(seconds, 's')
+        zero_delta = np.timedelta64(0, 's')
+        if remainder < zero_delta:
+            remainder = np.timedelta64(1, 's') + remainder
+            seconds = seconds - 1
+        microseconds = int(remainder / np.timedelta64(1, 'us'))
+        second_fractions = int(microseconds * self._fractions_per_microsecond)
         self.bytes = _struct_pack('<Qq', second_fractions, seconds)
 
     @classmethod
     def read(cls, file, endianness="<"):
         data = file.read(16)
-        if endianness is "<":
+        if endianness == "<":
             (second_fractions, seconds) = _struct_unpack(
                 endianness + 'Qq', data)
         else:
             (seconds, second_fractions) = _struct_unpack(
-                 endianness + 'Qq', data)
-        micro_seconds = (
+                 endianness + 'qQ', data)
+        micro_seconds = int(
             float(second_fractions) / cls._fractions_per_microsecond)
-        # Adding timedelta with seconds ignores leap
-        # seconds, so this is correct
-        return (cls._tdms_epoch + timedelta(seconds=seconds) +
-                timedelta(microseconds=micro_seconds))
+
+        return (cls._tdms_epoch + np.timedelta64(seconds, 's') +
+                np.timedelta64(micro_seconds, 'us'))
 
 
 @tds_data_type(0x08000c, np.complex64)

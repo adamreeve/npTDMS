@@ -7,10 +7,6 @@ import numpy as np
 import os
 import tempfile
 import unittest
-try:
-    import pytz
-except ImportError:
-    pytz = None
 
 from nptdms import tdms, writer
 from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject
@@ -44,9 +40,7 @@ class TDMSTestClass(unittest.TestCase):
         self.assertTrue((b_output == b_input).all())
 
     def test_can_read_tdms_file_properties_after_writing(self):
-        test_time = datetime.utcnow()
-        if pytz:
-            test_time = test_time.replace(tzinfo=pytz.utc)
+        test_time = np.datetime64('2019-11-19T15:30:00')
 
         a_segment = RootObject(properties={
             "prop1": "foo",
@@ -187,13 +181,10 @@ class TDMSTestClass(unittest.TestCase):
             os.rmdir(tempdir)
 
     def test_can_write_timestamp_data(self):
-        tzinfo = None
-        if pytz:
-            tzinfo = pytz.utc
         input_data = [
-            datetime(2017, 7, 9, 12, 35, 0, 0, tzinfo),
-            datetime(2017, 7, 9, 12, 36, 0, 0, tzinfo),
-            datetime(2017, 7, 9, 12, 37, 0, 0, tzinfo),
+            np.datetime64('2017-07-09T12:35:00.00'),
+            np.datetime64('2017-07-09T12:36:00.00'),
+            np.datetime64('2017-07-09T12:37:00.00'),
             ]
 
         segment = ChannelObject("group", "timedata", input_data)
@@ -212,14 +203,15 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(output_data[1], input_data[1])
         self.assertEqual(output_data[2], input_data[2])
 
-    def test_can_write_numpy_timestamp_data(self):
-        tzinfo = None
-        if pytz:
-            tzinfo = pytz.utc
-        input_data = np.array([
-            '2017-07-09T12:35:00Z',
-            '2017-07-09T12:36:00Z',
-            '2017-07-09T12:37:00Z'], dtype='datetime64')
+    def test_can_write_timestamp_data_with_datetimes(self):
+        input_data = [
+            datetime(2017, 7, 9, 12, 35, 0),
+            datetime(2017, 7, 9, 12, 36, 0),
+            datetime(2017, 7, 9, 12, 37, 0)]
+        expected_data = np.array([
+            '2017-07-09T12:35:00',
+            '2017-07-09T12:36:00',
+            '2017-07-09T12:37:00'], dtype='datetime64')
 
         segment = ChannelObject("group", "timedata", input_data)
 
@@ -233,17 +225,11 @@ class TDMSTestClass(unittest.TestCase):
         output_data = tdms_file.object("group", "timedata").data
 
         self.assertEqual(len(output_data), 3)
-        self.assertEqual(
-            output_data[0], datetime(2017, 7, 9, 12, 35, 0, 0, tzinfo))
-        self.assertEqual(
-            output_data[1], datetime(2017, 7, 9, 12, 36, 0, 0, tzinfo))
-        self.assertEqual(
-            output_data[2], datetime(2017, 7, 9, 12, 37, 0, 0, tzinfo))
+        self.assertEqual(output_data[0], expected_data[0])
+        self.assertEqual(output_data[1], expected_data[1])
+        self.assertEqual(output_data[2], expected_data[2])
 
     def test_can_write_numpy_timestamp_data_with_dates(self):
-        tzinfo = None
-        if pytz:
-            tzinfo = pytz.utc
         input_data = np.array([
             '2017-07-09',
             '2017-07-09',
@@ -261,12 +247,9 @@ class TDMSTestClass(unittest.TestCase):
         output_data = tdms_file.object("group", "timedata").data
 
         self.assertEqual(len(output_data), 3)
-        self.assertEqual(
-            output_data[0], datetime(2017, 7, 9, 0, 0, 0, 0, tzinfo))
-        self.assertEqual(
-            output_data[1], datetime(2017, 7, 9, 0, 0, 0, 0, tzinfo))
-        self.assertEqual(
-            output_data[2], datetime(2017, 7, 9, 0, 0, 0, 0, tzinfo))
+        self.assertEqual(output_data[0], input_data[0])
+        self.assertEqual(output_data[1], input_data[1])
+        self.assertEqual(output_data[2], input_data[2])
 
     def test_can_write_string_data(self):
         input_data = [

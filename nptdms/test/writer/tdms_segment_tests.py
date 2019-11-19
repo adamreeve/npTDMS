@@ -6,10 +6,6 @@ try:
     from collections import OrderedDict
 except ImportError:
     OrderedDict = dict
-try:
-    import pytz
-except ImportError:
-    pytz = None
 
 from nptdms.writer import TdmsSegment, read_properties_dict
 from nptdms.types import *
@@ -124,8 +120,6 @@ class TDMSTestClass(unittest.TestCase):
 
     def test_properties_are_converted_to_tdms_types(self):
         test_time = datetime.utcnow()
-        if pytz:
-            test_time = test_time.replace(tzinfo=pytz.utc)
 
         properties = {
             "prop1": Int32(1),
@@ -155,12 +149,7 @@ class TDMSTestClass(unittest.TestCase):
 
         tdms_properties = read_properties_dict(properties)
 
-        self.assertEqual(tdms_properties["time_prop"].value.year, 2017)
-        self.assertEqual(tdms_properties["time_prop"].value.month, 11)
-        self.assertEqual(tdms_properties["time_prop"].value.day, 19)
-        self.assertEqual(tdms_properties["time_prop"].value.hour, 0)
-        self.assertEqual(tdms_properties["time_prop"].value.minute, 0)
-        self.assertEqual(tdms_properties["time_prop"].value.second, 0)
+        self.assertEqual(tdms_properties["time_prop"], TimeStamp(test_time))
 
     def test_writing_long_integer_properties(self):
         properties = {
