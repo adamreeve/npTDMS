@@ -4,9 +4,10 @@ docker run -i -t --rm \
     -v $PWD:/nptdms:z \
     adreeve/python-numpy:latest \
     /bin/bash -c "
+        export LC_ALL=C.UTF-8 &&
         cd /nptdms &&
         pep8 ./nptdms &&
-        python2.7 setup.py install &&
+        pip install .[hdf,pandas,thermocouple_scaling] &&
         nosetests &&
-        python3 setup.py install &&
+        pip3 install .[hdf,pandas,thermocouple_scaling] &&
         nosetests3"

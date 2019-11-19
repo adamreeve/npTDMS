@@ -40,6 +40,14 @@ install it is by running::
 
     pip install npTDMS
 
+There are optional features available that require additional dependencies.
+These are `hdf` for hdf export, `pandas` for pandas DataFrame export, and
+`thermocouple_scaling` for using thermocouple scalings. You can specify these
+extra features when installing npTDMS to also install the dependencies they
+require::
+
+    pip install npTDMS[hdf,pandas,thermocouple_scaling]
+
 Alternatively, after downloading the source code you can extract it and
 change into the new directory, then run::
 
