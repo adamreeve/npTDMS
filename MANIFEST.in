@@ -3,3 +3,8 @@ include docs/*.rst
 include docs/conf.py
 include docs/Makefile
 include COPYING COPYING.LESSER
+
+recursive-include nptdms *.*
+include coverage.sh
+include run_tests.sh
+include tox.ini
