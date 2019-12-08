@@ -24,14 +24,13 @@ class TdmsSegment(object):
 
     __slots__ = [
         'position', 'num_chunks', 'ordered_objects', 'toc', 'version',
-        'next_segment_offset', 'next_segment_pos', 'tdms_file',
+        'next_segment_offset', 'next_segment_pos',
         'raw_data_offset', 'data_position', 'final_chunk_proportion',
         'endianness']
 
-    def __init__(self, f, tdms_file):
+    def __init__(self, f):
         """Read the lead in section of a segment"""
 
-        self.tdms_file = tdms_file
         self.position = f.tell()
         self.num_chunks = 0
         self.endianness = "<"
@@ -134,7 +133,7 @@ class TdmsSegment(object):
             if object_path in objects:
                 obj = objects[object_path]
             else:
-                obj = TdmsObject(object_path, self.tdms_file)
+                obj = TdmsObject(object_path)
                 objects[object_path] = obj
 
             # Add this segment object to the list of segment objects,
@@ -392,9 +391,8 @@ class TdmsObject(object):
 
     """
 
-    def __init__(self, path, tdms_file=None):
+    def __init__(self, path):
         self.path = path
-        self.tdms_file = tdms_file
         self._data = None
         self._scaler_data = {}
         self._data_scaled = None

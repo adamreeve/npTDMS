@@ -1,9 +1,13 @@
-"""Python module for reading TDMS files produced by LabView"""
+""" Python module for reading TDMS files produced by LabView
+
+    This module contains the public facing API
+"""
 
 from nptdms.utils import Timer, OrderedDict
 from nptdms.log import log_manager
 from nptdms.common import path_components
-from nptdms.tdms_segment import TdmsSegment
+from nptdms.reader import TdmsReader
+from nptdms.data_store import get_data_store
 
 
 log = log_manager.get_logger(__name__)
@@ -11,10 +15,6 @@ log = log_manager.get_logger(__name__)
 
 class TdmsFile(object):
     """Reads and stores data from a TDMS file.
-
-    :ivar objects: A dictionary of objects in the TDMS file, where the keys are
-        the object paths.
-
     """
 
     def __init__(self, file, memmap_dir=None, read_metadata_only=False):
@@ -31,49 +31,42 @@ class TdmsFile(object):
             metadata of the TDMS file will only be read.
         """
 
-        self.read_metadata_only = read_metadata_only
-        self.segments = []
-        self.objects = OrderedDict()
-        self.memmap_dir = memmap_dir
+        self._memmap_dir = memmap_dir
+        self._obj_data = {}
 
         if hasattr(file, "read"):
             # Is a file
-            self._read_segments(file)
+            self._read_file(file, memmap_dir, read_metadata_only)
         else:
             # Is path to a file
             with open(file, 'rb') as open_file:
-                self._read_segments(open_file)
+                self._read_file(open_file, memmap_dir, read_metadata_only)
 
-    def _read_segments(self, open_file):
-        with Timer(log, "Read metadata"):
-            # Read metadata first to work out how much space we need
-            previous_segment = None
-            while True:
-                try:
-                    segment = TdmsSegment(open_file, self)
-                except EOFError:
-                    # We've finished reading the file
-                    break
-                segment.read_metadata(
-                    open_file, self.objects, previous_segment)
 
-                self.segments.append(segment)
-                previous_segment = segment
-                if segment.next_segment_pos is None:
-                    break
-                else:
-                    open_file.seek(segment.next_segment_pos)
-        if not self.read_metadata_only:
+    def _read_file(self, tdms_file, memmap_dir, read_metadata_only):
+        reader = TdmsReader(tdms_file)
+        reader.read_metadata()
+        self._objects = reader.objects
 
-            with Timer(log, "Allocate space"):
-                # Allocate space for data
-                for obj in self.objects.values():
-                    obj._initialise_data(memmap_dir=self.memmap_dir)
+        if not read_metadata_only:
+            self._read_data(reader)
 
-            with Timer(log, "Read data"):
-                # Now actually read all the data
-                for segment in self.segments:
-                    segment.read_raw_data(open_file)
+    def _read_data(self, tdms_reader):
+        with Timer(log, "Allocate space"):
+            # Allocate space for data
+            for obj in self._objects.values():
+                self._obj_data = get_data_store(obj)
+
+        with Timer(log, "Read data"):
+            # Now actually read all the data
+            for segment in tdms_reader.read_data():
+                for (path, data) in segment.raw_data.items():
+                    data_store = self._obj_data[path]
+                    data_store.append_data(data)
+                for (path, data) in segment.daqmx_raw_data:
+                    data_store = self._obj_data[path]
+                    for scaler_id, scaler_data in data.items():
+                        data_store.append_data(scaler_id, scaler_data)
 
     def object(self, *path):
         """Get a TDMS object from the file
@@ -96,9 +89,9 @@ class TdmsFile(object):
             object("group_name", "channel_name")
         """
 
-        object_path = components_to_path(*path)
+        object_path = _components_to_path(*path)
         try:
-            return self.objects[object_path]
+            return self._objects[object_path]
         except KeyError:
             raise KeyError("Invalid object path: %s" % object_path)
 
@@ -115,7 +108,7 @@ class TdmsFile(object):
         # Split paths into components and take the first (group) component.
         object_paths = (
             path_components(path)
-            for path in self.objects)
+            for path in self._objects)
         group_names = (path[0] for path in object_paths if len(path) > 0)
 
         # Use an ordered dict as an ordered set to find unique
@@ -133,10 +126,10 @@ class TdmsFile(object):
 
         """
 
-        path = components_to_path(group)
+        path = _components_to_path(group)
         return [
-            self.objects[p]
-            for p in self.objects
+            self._objects[p]
+            for p in self._objects
             if p.startswith(path + '/')]
 
     def channel_data(self, group, channel):
@@ -150,6 +143,18 @@ class TdmsFile(object):
         """
 
         return self.object(group, channel).data
+
+    def properties(self):
+        """ Return the properties of this file
+
+        These are properties associated with the root object of the file.
+        """
+
+        try:
+            obj = self.object()
+            return obj.properties
+        except KeyError:
+            return {}
 
     def as_dataframe(self, time_index=False, absolute_time=False):
         """
@@ -165,7 +170,7 @@ class TdmsFile(object):
         import pandas as pd
 
         dataframe_dict = OrderedDict()
-        for key, value in self.objects.items():
+        for key, value in self._objects.items():
             if value.has_data:
                 index = value.time_track(absolute_time) if time_index else None
                 dataframe_dict[key] = pd.Series(data=value.data, index=index)
@@ -230,7 +235,52 @@ class TdmsFile(object):
         return h5file
 
 
-def components_to_path(*args):
+class Group(object):
+    """A group of channels in a TDMS file
+
+    A group has no associated data but may have properties
+    """
+
+    def __init__(self, name, channels):
+        self._name = name
+        self._channels = OrderedDict((c.name, c) for c in channels)
+
+    @property
+    def name(self):
+        """The name of this group
+        """
+        return self._name
+
+    def channels(self):
+        """Returns a list of channel objects within this group
+        """
+        return list(self._channels.values())
+
+    def channel(self, channel_name):
+        """Get a channel from this group by name
+        """
+        try:
+            return self._channels[channel_name]
+        except KeyError:
+            raise ValueError(
+                "Group %s has no channel %s" % self._name, channel_name)
+
+    def __str__(self):
+        return self._name
+
+    def __repr__(self):
+        return "<Group name='%s'>" % self._name
+
+
+class Channel(object):
+    """A channel from a TDMS file which may contain properties and data
+    """
+
+    def __init__(self):
+        pass
+
+
+def _components_to_path(*args):
     """Convert group and channel to object path"""
 
     return ('/' + '/'.join(
