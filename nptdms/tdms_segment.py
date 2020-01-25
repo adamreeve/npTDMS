@@ -124,6 +124,7 @@ class TdmsSegment(object):
         # First four bytes have number of objects in metadata
         num_objects = types.Int32.read(f, self.endianness)
 
+        object_position_offset = 0
         for obj in range(num_objects):
             # Read the object path
             object_path = types.String.read(f, self.endianness)
@@ -165,6 +166,10 @@ class TdmsSegment(object):
             # data structure information and properties.
             segment_obj._read_metadata(f)
             obj._previous_segment_object = segment_obj
+
+            segment_obj.data_position = self.data_position + object_position_offset
+            object_position_offset += segment_obj.data_size
+            obj.ordered_segments.append(segment_obj)
 
         self.calculate_chunks()
 
@@ -396,6 +401,8 @@ class TdmsObject(object):
         self._data_insert_position = 0
         self._scaler_insert_positions = {}
 
+        self.ordered_segments = []
+
     def __repr__(self):
         return "<TdmsObject with path %s>" % self.path
 
@@ -599,7 +606,22 @@ class TdmsObject(object):
         """
         if self._data is None and not self._scaler_data:
             # self._data is None if data segment is empty
-            return np.empty((0, 1))
+            if self.has_data:
+                # Object has data but they are not loaded from file yet
+                file_path = self.tdms_file.file_path
+                if file_path is None:
+                    log.warn("Load on demand only supported if TdmsFile is instantiated with a file path.")
+                    return np.empty((0, 1))
+                with open(self.tdms_file.file_path, 'rb') as f:
+                    for obj_segment in self.ordered_segments:
+                        log.debug("Loading segment object on demand.")
+                        position = obj_segment.data_position
+                        f.seek(position)
+                        number_values = obj_segment.number_values
+                        data = obj_segment._read_values(f, number_values)
+                        self._update_data(data)
+            else:
+                return np.empty((0, 1))
         if self._data_scaled is None:
             scale = scaling.get_scaling(self)
             if scale is None:
@@ -645,7 +667,7 @@ class TdmsSegmentObject(object):
     __slots__ = [
         'tdms_object', 'number_values', 'data_size',
         'has_data', 'data_type', 'dimension', 'endianness',
-        'daqmx_metadata']
+        'daqmx_metadata', 'data_position']
 
     def __init__(self, tdms_object, endianness):
         self.tdms_object = tdms_object
@@ -656,6 +678,8 @@ class TdmsSegmentObject(object):
         self.has_data = True
         self.data_type = None
         self.dimension = 1
+
+        self.data_position = None
 
     def _read_metadata_mx(self, f):
 

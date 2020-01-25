@@ -35,12 +35,14 @@ class TdmsFile(object):
         self.segments = []
         self.objects = OrderedDict()
         self.memmap_dir = memmap_dir
+        self.file_path = None
 
         if hasattr(file, "read"):
             # Is a file
             self._read_segments(file)
         else:
             # Is path to a file
+            self.file_path = file
             with open(file, 'rb') as open_file:
                 self._read_segments(open_file)
 
