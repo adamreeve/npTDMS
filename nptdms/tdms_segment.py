@@ -124,7 +124,7 @@ class TdmsSegment(object):
         # First four bytes have number of objects in metadata
         num_objects = types.Int32.read(f, self.endianness)
 
-        object_position_offset = 0
+        obj_pos_offset = 0
         for obj in range(num_objects):
             # Read the object path
             object_path = types.String.read(f, self.endianness)
@@ -167,8 +167,8 @@ class TdmsSegment(object):
             segment_obj._read_metadata(f)
             obj._previous_segment_object = segment_obj
 
-            segment_obj.data_position = self.data_position + object_position_offset
-            object_position_offset += segment_obj.data_size
+            segment_obj.data_position = self.data_position + obj_pos_offset
+            obj_pos_offset += segment_obj.data_size
             obj.ordered_segments.append(segment_obj)
 
         self.calculate_chunks()
@@ -610,7 +610,8 @@ class TdmsObject(object):
                 # Object has data but they are not loaded from file yet
                 file_path = self.tdms_file.file_path
                 if file_path is None:
-                    log.warn("Load on demand only supported if TdmsFile is instantiated with a file path.")
+                    log.warning("Load on demand only supported if TdmsFile is"
+                                " instantiated with a file path.")
                     return np.empty((0, 1))
                 with open(self.tdms_file.file_path, 'rb') as f:
                     for obj_segment in self.ordered_segments:
