@@ -298,12 +298,16 @@ class TdmsSegment(object):
         log.debug("all_channel_bytes: %d", all_channel_bytes)
         # Read all data into 1 byte unsigned ints first
         combined_data = read_interleaved_segment_bytes(
-            f, all_channel_bytes, data_objects[0].number_values)
+            f, all_channel_bytes, data_objects[0].number_values,
+            len(data_objects[0].daqmx_metadata.raw_data_widths))
 
         # Now set arrays for each scaler of each channel
+        previous_offset = 0
         for (i, obj) in enumerate(data_objects):
             for scaler in obj.daqmx_metadata.scalers:
-                offset = scaler.raw_byte_offset
+                if i != 0 and scaler.raw_byte_offset == 0:
+                    previous_offset += data_objects[0].daqmx_metadata.raw_data_widths[0]
+                offset = scaler.raw_byte_offset + previous_offset
                 scaler_size = scaler.data_type.size
                 byte_columns = tuple(
                     range(offset, offset + scaler_size))
@@ -331,7 +335,8 @@ class TdmsSegment(object):
 
         # Read all data into 1 byte unsigned ints first
         combined_data = read_interleaved_segment_bytes(
-            f, all_channel_bytes, data_objects[0].number_values)
+            f, all_channel_bytes, data_objects[0].number_values,
+            len(data_objects[0].daqmx_metadata.raw_data_widths))
 
         # Now set arrays for each channel
         data_pos = 0
@@ -720,7 +725,7 @@ class TdmsSegmentObject(object):
             self.number_values = info.chunk_size
             # segment reading code relies on a single consistent raw
             # data width so assert that there is only one.
-            assert(len(info.raw_data_widths) == 1)
+            assert(len(set(info.raw_data_widths)) == 1)
             self.daqmx_metadata = info
             # fall through and read properties
         else:
@@ -854,11 +859,20 @@ def fromfile(file, dtype, count, *args, **kwargs):
             dtype=dtype, count=count, *args, **kwargs)
 
 
-def read_interleaved_segment_bytes(f, bytes_per_row, num_values):
+def read_interleaved_segment_bytes(f, bytes_per_row, num_values, num_cards):
     """ Read a segment of interleaved data as rows of bytes
     """
     number_bytes = bytes_per_row * num_values
     combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
+
+    if num_cards > 1:
+        c = combined_data.reshape(-1, int(bytes_per_row / num_cards))
+        temp = np.empty(np.shape(c), dtype=np.uint8)
+        for i in range(num_cards):
+            temp[i::num_cards] = c[i*int(c.shape[0]/2):(i+1)*int(c.shape[0]/2)]
+        combined_data = temp
+        combined_data = combined_data.reshape(-1)
+
     try:
         # Reshape, so that one row is all bytes for all objects
         combined_data = combined_data.reshape(-1, bytes_per_row)
