@@ -306,7 +306,8 @@ class TdmsSegment(object):
         for (i, obj) in enumerate(data_objects):
             for scaler in obj.daqmx_metadata.scalers:
                 if i != 0 and scaler.raw_byte_offset == 0:
-                    previous_offset += data_objects[0].daqmx_metadata.raw_data_widths[0]
+                    previous_offset += (data_objects[0]
+                                        .daqmx_metadata.raw_data_widths[0])
                 offset = scaler.raw_byte_offset + previous_offset
                 scaler_size = scaler.data_type.size
                 byte_columns = tuple(
