@@ -263,6 +263,137 @@ class DaqmxDataTests(unittest.TestCase):
         self.assertEqual(scaler_2_data.dtype, np.int32)
         np.testing.assert_array_equal(scaler_2_data, [33, 34, 35, 36])
 
+    def test_multiple_raw_data_buffers(self):
+        """ Test loading a DAQmx file with multiple raw data buffers
+        """
+
+        scaler_1 = daqmx_scaler_metadata(0, 3, 0, 0)
+        scaler_2 = daqmx_scaler_metadata(0, 3, 2, 0)
+        scaler_3 = daqmx_scaler_metadata(0, 3, 0, 1)
+        scaler_4 = daqmx_scaler_metadata(0, 3, 2, 1)
+        metadata = combine_metadata(
+            root_metadata(),
+            group_metadata(),
+            daqmx_channel_metadata("Channel1", 4, [4, 4], [scaler_1]),
+            daqmx_channel_metadata("Channel2", 4, [4, 4], [scaler_2]),
+            daqmx_channel_metadata("Channel3", 4, [4, 4], [scaler_3]),
+            daqmx_channel_metadata("Channel4", 4, [4, 4], [scaler_4]))
+        data = (
+            "01 00" "02 00" "03 00" "04 00"
+            "05 00" "06 00" "07 00" "08 00"
+            "09 00" "0A 00" "0B 00" "0C 00"
+            "0D 00" "0E 00" "0F 00" "10 00"
+        )
+
+        test_file = TestFile()
+        test_file.add_segment(metadata, data, segment_toc())
+        tdms_data = test_file.load()
+
+        data_1 = tdms_data.object("Group", "Channel1").raw_data
+        data_2 = tdms_data.object("Group", "Channel2").raw_data
+        data_3 = tdms_data.object("Group", "Channel3").raw_data
+        data_4 = tdms_data.object("Group", "Channel4").raw_data
+
+        for data in [data_1, data_2, data_3, data_4]:
+            self.assertEqual(data.dtype, np.int16)
+
+        np.testing.assert_array_equal(data_1, [1, 3, 5, 7])
+        np.testing.assert_array_equal(data_2, [2, 4, 6, 8])
+        np.testing.assert_array_equal(data_3, [9, 11, 13, 15])
+        np.testing.assert_array_equal(data_4, [10, 12, 14, 16])
+
+    def test_multiple_raw_data_buffers_with_different_widths(self):
+        """ DAQmx with raw data buffers with different widths
+        """
+
+        scaler_1 = daqmx_scaler_metadata(0, 3, 0, 0)
+        scaler_2 = daqmx_scaler_metadata(0, 3, 2, 0)
+        scaler_3 = daqmx_scaler_metadata(0, 3, 4, 0)
+        scaler_4 = daqmx_scaler_metadata(0, 5, 0, 1)
+        scaler_5 = daqmx_scaler_metadata(0, 5, 4, 1)
+        metadata = combine_metadata(
+            root_metadata(),
+            group_metadata(),
+            daqmx_channel_metadata("Channel1", 4, [6, 8], [scaler_1]),
+            daqmx_channel_metadata("Channel2", 4, [6, 8], [scaler_2]),
+            daqmx_channel_metadata("Channel3", 4, [6, 8], [scaler_3]),
+            daqmx_channel_metadata("Channel4", 4, [6, 8], [scaler_4]),
+            daqmx_channel_metadata("Channel5", 4, [6, 8], [scaler_5]))
+        data = (
+            "01 00" "02 00" "03 00"
+            "04 00" "05 00" "06 00"
+            "07 00" "08 00" "09 00"
+            "0A 00" "0B 00" "0C 00"
+            "0D 00 00 00" "0E 00 00 00"
+            "0F 00 00 00" "10 00 00 00"
+            "11 00 00 00" "12 00 00 00"
+            "13 00 00 00" "14 00 00 00"
+        )
+
+        test_file = TestFile()
+        test_file.add_segment(metadata, data, segment_toc())
+        tdms_data = test_file.load()
+
+        data_1 = tdms_data.object("Group", "Channel1").raw_data
+        data_2 = tdms_data.object("Group", "Channel2").raw_data
+        data_3 = tdms_data.object("Group", "Channel3").raw_data
+        data_4 = tdms_data.object("Group", "Channel4").raw_data
+        data_5 = tdms_data.object("Group", "Channel5").raw_data
+
+        for data in [data_1, data_2, data_3]:
+            self.assertEqual(data.dtype, np.int16)
+        for data in [data_4, data_5]:
+            self.assertEqual(data.dtype, np.int32)
+
+        np.testing.assert_array_equal(data_1, [1, 4, 7, 10])
+        np.testing.assert_array_equal(data_2, [2, 5, 8, 11])
+        np.testing.assert_array_equal(data_3, [3, 6, 9, 12])
+        np.testing.assert_array_equal(data_4, [13, 15, 17, 19])
+        np.testing.assert_array_equal(data_5, [14, 16, 18, 20])
+
+    def test_multiple_raw_data_buffers_with_scalers_split_across_buffers(self):
+        """ DAQmx with scalers split across different raw data buffers
+        """
+
+        scaler_1 = daqmx_scaler_metadata(0, 3, 0, 0)
+        scaler_2 = daqmx_scaler_metadata(1, 3, 0, 1)
+        scaler_3 = daqmx_scaler_metadata(0, 3, 2, 0)
+        scaler_4 = daqmx_scaler_metadata(1, 3, 2, 1)
+        metadata = combine_metadata(
+            root_metadata(),
+            group_metadata(),
+            daqmx_channel_metadata(
+                "Channel1", 4, [4, 4], [scaler_1, scaler_2]),
+            daqmx_channel_metadata(
+                "Channel2", 4, [4, 4], [scaler_3, scaler_4]))
+        data = (
+            "01 00" "02 00" "03 00" "04 00"
+            "05 00" "06 00" "07 00" "08 00"
+            "09 00" "0A 00" "0B 00" "0C 00"
+            "0D 00" "0E 00" "0F 00" "10 00"
+        )
+
+        test_file = TestFile()
+        test_file.add_segment(metadata, data, segment_toc())
+        tdms_data = test_file.load()
+
+        channel_1 = tdms_data.object("Group", "Channel1")
+        channel_2 = tdms_data.object("Group", "Channel2")
+
+        scaler_data_1 = channel_1.raw_scaler_data(0)
+        scaler_data_2 = channel_1.raw_scaler_data(1)
+        scaler_data_3 = channel_2.raw_scaler_data(0)
+        scaler_data_4 = channel_2.raw_scaler_data(1)
+
+        for data in [
+                scaler_data_1, scaler_data_2, scaler_data_3, scaler_data_4]:
+            self.assertEqual(data.dtype, np.int16)
+
+        np.testing.assert_array_equal(scaler_data_1, [1, 3, 5, 7])
+        np.testing.assert_array_equal(scaler_data_2, [9, 11, 13, 15])
+        np.testing.assert_array_equal(scaler_data_3, [2, 4, 6, 8])
+        np.testing.assert_array_equal(scaler_data_4, [10, 12, 14, 16])
+
 
 def combine_metadata(*args):
     num_objects_hex = hexlify_value("<I", len(args))
@@ -299,12 +430,12 @@ def group_metadata():
         "00 00 00 00")
 
 
-def daqmx_scaler_metadata(scale_id, type_id, byte_offset):
+def daqmx_scaler_metadata(scale_id, type_id, byte_offset, raw_buffer_index=0):
     return (
         # DAQmx data type (type ids don't match TDMS types)
         hexlify_value("<I", type_id) +
         # Raw buffer index
-        "00 00 00 00" +
+        hexlify_value("<I", raw_buffer_index) +
         # Raw byte offset
         hexlify_value("<I", byte_offset) +
         # Sample format bitmap (don't know what this is for...)
