@@ -179,7 +179,9 @@ class TdmsSegment(object):
         """
 
         if self.toc['kTocDAQmxRawData']:
-            # chunks defined differently for DAQmxRawData format
+            # For DAQmxRawData, each channel in a segment has the same number
+            # of values and contains the same raw data widths, so use
+            # the first valid channel metadata to calcualte the data size.
             try:
                 data_size = next(
                     o.number_values * o.total_raw_data_width
@@ -287,38 +289,47 @@ class TdmsSegment(object):
         log.debug("Reading DAQmx data segment")
 
         # If we have DAQmx data, we expect all objects to have matching
-        # raw data widths, and this gives the number of bytes to read:
+        # raw data widths:
         all_daqmx = all(
             o.data_type == types.DaqMxRawData for o in data_objects)
         if not all_daqmx:
             raise Exception("Cannot read a mix of DAQmx and "
                             "non-DAQmx interleaved data")
-        all_channel_bytes = data_objects[0].total_raw_data_width
 
-        log.debug("all_channel_bytes: %d", all_channel_bytes)
-        # Read all data into 1 byte unsigned ints first
-        combined_data = read_interleaved_segment_bytes(
-            f, all_channel_bytes, data_objects[0].number_values)
+        raw_data_widths = data_objects[0].daqmx_metadata.raw_data_widths
+        chunk_size = data_objects[0].number_values
 
-        # Now set arrays for each scaler of each channel
-        for (i, obj) in enumerate(data_objects):
-            for scaler in obj.daqmx_metadata.scalers:
-                offset = scaler.raw_byte_offset
-                scaler_size = scaler.data_type.size
-                byte_columns = tuple(
-                    range(offset, offset + scaler_size))
-                log.debug("Byte columns for channel %d scaler %d: %s",
-                          i, scaler.scale_id, byte_columns)
-                # Select columns for this scaler, so that number of values will
-                # be number of bytes per point * number of data points.
-                # Then use ravel to flatten the results into a vector.
-                object_data = combined_data[:, byte_columns].ravel()
-                # Now set correct data type, so that the array length should
-                # be correct
-                object_data.dtype = (
-                    scaler.data_type.nptype.newbyteorder(self.endianness))
-                obj.tdms_object._update_data_for_scaler(
-                    scaler.scale_id, object_data)
+        # Data for each set of raw data (corresponding to one card) is
+        # interleaved separately, so read one after another
+        for (raw_buffer_index, raw_data_width) in enumerate(raw_data_widths):
+            # Read all data into 1 byte unsigned ints first
+            combined_data = read_interleaved_segment_bytes(
+                f, raw_data_width, chunk_size)
+
+            # Now set arrays for each scaler of each channel where the scaler
+            # data comes from this set of raw data
+            for (i, obj) in enumerate(data_objects):
+                scalers_for_raw_buffer_index = [
+                    scaler for scaler in obj.daqmx_metadata.scalers
+                    if scaler.raw_buffer_index == raw_buffer_index]
+                for scaler in scalers_for_raw_buffer_index:
+                    offset = scaler.raw_byte_offset
+                    scaler_size = scaler.data_type.size
+                    byte_columns = tuple(
+                        range(offset, offset + scaler_size))
+                    log.debug("Byte columns for channel %d scaler %d: %s",
+                              i, scaler.scale_id, byte_columns)
+                    # Select columns for this scaler, so that number of values
+                    # will be number of bytes per point * number of data
+                    # points. Then use ravel to flatten the results into a
+                    # vector.
+                    object_data = combined_data[:, byte_columns].ravel()
+                    # Now set correct data type, so that the array length
+                    # should be correct
+                    object_data.dtype = (
+                        scaler.data_type.nptype.newbyteorder(self.endianness))
+                    obj.tdms_object._update_data_for_scaler(
+                        scaler.scale_id, object_data)
 
     def _read_interleaved_numpy(self, f, data_objects):
         """Read interleaved data where all channels have a numpy type"""
@@ -718,9 +729,6 @@ class TdmsSegmentObject(object):
             # DAQmx format has special chunking
             self.data_size = info.chunk_size * sum(info.raw_data_widths)
             self.number_values = info.chunk_size
-            # segment reading code relies on a single consistent raw
-            # data width so assert that there is only one.
-            assert(len(info.raw_data_widths) == 1)
             self.daqmx_metadata = info
             # fall through and read properties
         else:
@@ -859,6 +867,7 @@ def read_interleaved_segment_bytes(f, bytes_per_row, num_values):
     """
     number_bytes = bytes_per_row * num_values
     combined_data = fromfile(f, dtype=np.uint8, count=number_bytes)
+
     try:
         # Reshape, so that one row is all bytes for all objects
         combined_data = combined_data.reshape(-1, bytes_per_row)

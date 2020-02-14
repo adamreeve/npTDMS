@@ -8,7 +8,7 @@ log = log_manager.get_logger(__name__)
 
 
 class DaqMxMetadata(object):
-    """ Describes DAQmx data
+    """ Describes DAQmx data for a single channel
     """
 
     __slots__ = [
@@ -40,8 +40,9 @@ class DaqMxMetadata(object):
 
         # Read raw data widths.
         # This is an array of widths in bytes, which should be the same
-        # for all channels that have DAQmx data. It's unclear what it means
-        # when there are multiple entries in this array.
+        # for all channels that have DAQmx data in a segment.
+        # There is one element per acquisition card, as data is interleaved
+        # separately for each card.
         raw_data_widths_length = types.Uint32.read(f, endianness)
         self.raw_data_widths = np.zeros(raw_data_widths_length, dtype=np.int32)
         for width_idx in range(raw_data_widths_length):
@@ -90,8 +91,7 @@ class DaqMxScaler(object):
         return "%s(%s)" % (self.__class__.__name__, properties_list)
 
 
-# Type codes for DAQmx scalers don't appear to match
-# the  normal TDMS type codes:
+# Type codes for DAQmx scalers don't match the normal TDMS type codes:
 DAQMX_TYPES = {
     0: types.Uint8,
     1: types.Int8,
