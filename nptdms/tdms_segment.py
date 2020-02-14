@@ -179,7 +179,9 @@ class TdmsSegment(object):
         """
 
         if self.toc['kTocDAQmxRawData']:
-            # chunks defined differently for DAQmxRawData format
+            # For DAQmxRawData, each channel in a segment has the same number
+            # of values and contains the same raw data widths, so use
+            # the first valid channel metadata to calcualte the data size.
             try:
                 data_size = next(
                     o.number_values * o.total_raw_data_width

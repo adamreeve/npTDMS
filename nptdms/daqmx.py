@@ -8,7 +8,7 @@ log = log_manager.get_logger(__name__)
 
 
 class DaqMxMetadata(object):
-    """ Describes DAQmx data
+    """ Describes DAQmx data for a single channel
     """
 
     __slots__ = [
