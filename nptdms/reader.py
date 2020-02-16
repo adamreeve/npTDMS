@@ -21,6 +21,7 @@ class TdmsReader(object):
         """
         self._file = tdms_file
         self._segments = None
+        self._prev_segment_objects = {}
         self.objects = OrderedDict()
 
     def read_metadata(self):
@@ -37,10 +38,12 @@ class TdmsReader(object):
                     # We've finished reading the file
                     break
                 segment.read_metadata(
-                    self._file, self.objects, previous_segment)
+                    self._file, self._prev_segment_objects, previous_segment)
 
+                self._update_object_state(segment.ordered_objects)
                 self._segments.append(segment)
                 previous_segment = segment
+
                 if segment.next_segment_pos is None:
                     break
                 else:
@@ -54,18 +57,35 @@ class TdmsReader(object):
         if self._segments is None:
             raise RuntimeError(
                 "Cannot read data unless metadata has first been read")
+        # TODO: read data from segments
+
+    def _update_object_state(self, segment_objects):
+        for segment_object in segment_objects:
+            path = segment_object.path
+            self._prev_segment_objects[path] = segment_object
+
+            try:
+                obj = self.objects[path]
+            except KeyError:
+                obj = ObjectState()
+                self.objects[path] = obj
+            for prop, val in segment_object.properties.items():
+                obj[prop] = val
+            if segment_object.has_data:
+                obj.has_data = True
+            obj.num_values += segment_object.num_values
+            if (obj.data_type is not None and
+                    obj.data_type != segment_object.data_type):
+                raise ValueError(
+                    "Segment data doesn't have the same type as previous "
+                    "segments for objects %s. Expected type %s but got %s" %
+                    (path, obj.data_type, segment_object.data_type))
+            obj.data_type = segment_object.data_type
 
 
-class DataSegment(object):
-    """Data read from a single TDMS segment
-
-    :ivar raw_data: A dictionary of object data in this segment for
-        normal objects. Keys are object paths and values are numpy arrays.
-    :ivar daqmx_raw_data: A dictionary of data in this segment for
-        DAQmx raw data. Keys are object paths and values are dictionaries of
-        numpy arrays keyed by scaler id.
-    """
-
-    def __init__(self, data, daqmx_data):
-        self.raw_data = data
-        self.daqmx_raw_data = daqmx_data
+class ObjectState(object):
+    def __init__(self):
+        self.properties = {}
+        self.data_type = None
+        self.num_values = 0
+        self.has_data = True

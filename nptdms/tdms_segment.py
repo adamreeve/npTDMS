@@ -1,20 +1,13 @@
 from copy import copy
 from io import UnsupportedOperation
-import tempfile
 import os
 import numpy as np
 
-from nptdms import scaling
 from nptdms import types
-from nptdms.common import toc_properties, path_components
-from nptdms.utils import OrderedDict
-from nptdms.log import log_manager
+from nptdms.common import toc_properties
 from nptdms.daqmx import DaqMxMetadata
-
-
-# Have to get a reference to the builtin property decorator
-# so we can use it in TdmsObject, which has a property method.
-_property_builtin = property
+from nptdms.log import log_manager
+from nptdms.utils import OrderedDict
 
 
 log = log_manager.get_logger(__name__)
@@ -99,8 +92,15 @@ class TdmsSegment(object):
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
 
-    def read_metadata(self, f, objects, previous_segment=None):
-        """Read segment metadata section and update object information"""
+    def read_metadata(
+            self, f, previous_segment_objects, previous_segment=None):
+        """Read segment metadata section and update object information
+
+        :param f: Open TDMS file.
+        :param previous_segment_objects: Dictionary of path to the most recently reada
+            segment object for a TDMS object.
+        :param previous_segment: Previous segment in the file.
+        """
 
         if not self.toc["kTocMetaData"]:
             try:
@@ -123,18 +123,9 @@ class TdmsSegment(object):
         # First four bytes have number of objects in metadata
         num_objects = types.Int32.read(f, self.endianness)
 
-        for obj in range(num_objects):
+        for _ in range(num_objects):
             # Read the object path
             object_path = types.String.read(f, self.endianness)
-
-            # If this is a new segment for an existing object,
-            # reuse the existing object, otherwise,
-            # create a new object and add it to the object dictionary
-            if object_path in objects:
-                obj = objects[object_path]
-            else:
-                obj = TdmsObject(object_path)
-                objects[object_path] = obj
 
             # Add this segment object to the list of segment objects,
             # re-using any properties from previous segments.
@@ -142,28 +133,27 @@ class TdmsSegment(object):
             if not self.toc["kTocNewObjList"]:
                 # Search for the same object from the previous segment
                 # object list.
-                obj_index = [
-                    i for i, o in enumerate(self.ordered_objects)
-                    if o.tdms_object is obj]
-                if len(obj_index) > 0:
-                    updating_existing = True
-                    log.debug("Updating object in segment list")
-                    obj_index = obj_index[0]
-                    segment_obj = self.ordered_objects[obj_index]
+                for obj in self.ordered_objects:
+                    if obj.path == object_path:
+                        updating_existing = True
+                        log.debug("Updating object in segment list")
+                        segment_obj = obj
+                        break
             if not updating_existing:
-                if obj._previous_segment_object is not None:
+                try:
+                    prev_segment_obj = previous_segment_objects[object_path]
                     log.debug("Copying previous segment object for %s",
                               object_path)
-                    segment_obj = copy(obj._previous_segment_object)
-                else:
+                    segment_obj = copy(prev_segment_obj)
+                except KeyError:
                     log.debug("Creating a new segment object for %s",
                               object_path)
-                    segment_obj = TdmsSegmentObject(obj, self.endianness)
+                    segment_obj = TdmsSegmentObject(
+                        object_path, self.endianness)
                 self.ordered_objects.append(segment_obj)
             # Read the metadata for this object, updating any
             # data structure information and properties.
-            segment_obj._read_metadata(f)
-            obj._previous_segment_object = segment_obj
+            segment_obj.read_metadata(f)
 
         self.calculate_chunks()
 
@@ -380,284 +370,18 @@ class TdmsSegment(object):
             obj.tdms_object._update_data(object_data[obj.path])
 
 
-class TdmsObject(object):
-    """Represents an object in a TDMS file.
-
-    :ivar path: The TDMS object path.
-    :ivar properties: Dictionary of TDMS properties defined for this object,
-                      for example the start time and time increment for
-                      waveforms.
-    :ivar has_data: Boolean, true if there is data associated with the object.
-
-    """
-
-    def __init__(self, path):
-        self.path = path
-        self._data = None
-        self._scaler_data = {}
-        self._data_scaled = None
-        self.properties = OrderedDict()
-        self.data_type = None
-        self.dimension = 1
-        self.number_values = 0
-        self.has_data = False
-        self._previous_segment_object = None
-        self._data_insert_position = 0
-        self._scaler_insert_positions = {}
-
-    def __repr__(self):
-        return "<TdmsObject with path %s>" % self.path
-
-    def property(self, property_name):
-        """Returns the value of a TDMS property
-
-        :param property_name: The name of the property to get.
-        :returns: The value of the requested property.
-        :raises: KeyError if the property isn't found.
-
-        """
-
-        try:
-            return self.properties[property_name]
-        except KeyError:
-            raise KeyError(
-                "Object does not have property '%s'" % property_name)
-
-    @_property_builtin
-    def group(self):
-        """ Returns the name of the group for this object,
-            or None if it is the root object.
-        """
-        path = path_components(self.path)
-        if len(path) > 0:
-            return path[0]
-        return None
-
-    @_property_builtin
-    def channel(self):
-        """ Returns the name of the channel for this object,
-            or None if it is a group or the root object.
-        """
-        path = path_components(self.path)
-        if len(path) > 1:
-            return path[1]
-        return None
-
-    def time_track(self, absolute_time=False, accuracy='ns'):
-        """Return an array of time or the independent variable for this channel
-
-        This depends on the object having the wf_increment
-        and wf_start_offset properties defined.
-        Note that wf_start_offset is usually zero for time-series data.
-        If you have time-series data channels with different start times,
-        you should use the absolute time or calculate the time offsets using
-        the wf_start_time property.
-
-        For larger timespans, the accuracy setting should be set lower.
-        The default setting is 'ns', which has a timespan of
-        [1678 AD, 2262 AD]. For the exact ranges, refer to
-        http://docs.scipy.org/doc/numpy/reference/arrays.datetime.html
-        section "Datetime Units".
-
-        :param absolute_time: Whether the returned time values are absolute
-            times rather than relative to the start time. If true, the
-            wf_start_time property must be set.
-        :param accuracy: The accuracy of the returned datetime64 array.
-        :rtype: NumPy array.
-        :raises: KeyError if required properties aren't found
-
-        """
-
-        try:
-            increment = self.property('wf_increment')
-            offset = self.property('wf_start_offset')
-        except KeyError:
-            raise KeyError("Object does not have time properties available.")
-
-        relative_time = np.linspace(
-            offset,
-            offset + (self.number_values - 1) * increment,
-            self.number_values)
-
-        if not absolute_time:
-            return relative_time
-
-        try:
-            start_time = self.property('wf_start_time')
-        except KeyError:
-            raise KeyError(
-                "Object does not have start time property available.")
-
-        try:
-            unit_correction = {
-                's': 1e0,
-                'ms': 1e3,
-                'us': 1e6,
-                'ns': 1e9,
-            }[accuracy]
-        except KeyError:
-            raise KeyError("Invalid accuracy: {0}".format(accuracy))
-
-        # Because numpy only knows ints as its date datatype,
-        # convert to accuracy.
-        time_type = "timedelta64[{0}]".format(accuracy)
-        return (np.datetime64(start_time) +
-                (relative_time * unit_correction).astype(time_type))
-
-    def _initialise_data(self, memmap_dir=None):
-        """Initialise data array to zeros"""
-
-        if self.number_values == 0:
-            pass
-        elif self.data_type == types.DaqMxRawData:
-            segment_obj = self._previous_segment_object
-            self._scaler_insert_positions = {}
-            for scaler in segment_obj.daqmx_metadata.scalers:
-                self._scaler_data[scaler.scale_id] = self._new_numpy_array(
-                    scaler.data_type.nptype, self.number_values, memmap_dir)
-                self._scaler_insert_positions[scaler.scale_id] = 0
-        elif self.data_type.nptype is None:
-            self._data = []
-        else:
-            self._data = self._new_numpy_array(
-                self.data_type.nptype, self.number_values, memmap_dir)
-            self._data_insert_position = 0
-            log.debug("Allocated %d sample slots for %s", len(self._data),
-                      self.path)
-
-    def _new_numpy_array(self, dtype, num_values, memmap_dir):
-        """Initialise numpy array for data
-        """
-        if memmap_dir:
-            memmap_file = tempfile.NamedTemporaryFile(
-                mode='w+b', prefix="nptdms_", dir=memmap_dir)
-            return np.memmap(
-                memmap_file.file,
-                mode='w+',
-                shape=(num_values,),
-                dtype=dtype)
-        else:
-            return np.zeros(num_values, dtype=dtype)
-
-    def _update_data(self, new_data):
-        """Update the object data with a new array of data"""
-
-        log.debug("Adding %d data points to data for %s",
-                  len(new_data), self.path)
-        if self._data is None:
-            self._data = new_data
-        else:
-            if self.data_type.nptype is not None:
-                data_pos = (
-                    self._data_insert_position,
-                    self._data_insert_position + len(new_data))
-                self._data_insert_position += len(new_data)
-                self._data[data_pos[0]:data_pos[1]] = new_data
-            else:
-                self._data.extend(new_data)
-
-    def _update_data_for_scaler(self, scale_id, new_data):
-        """Append new DAQmx scaler data read from a segment
-        """
-
-        log.debug("Adding %d data points for object %s, scaler %d",
-                  len(new_data), self.path, scale_id)
-        data_array = self._scaler_data[scale_id]
-        start_pos = self._scaler_insert_positions[scale_id]
-        end_pos = start_pos + len(new_data)
-        data_array[start_pos:end_pos] = new_data
-        self._scaler_insert_positions[scale_id] += len(new_data)
-
-    def as_dataframe(self, absolute_time=False, scaled_data=True):
-        """
-        Converts the TDMS object to a DataFrame
-
-        :param absolute_time: Whether times should be absolute rather than
-            relative to the start time.
-        :return: The TDMS object data.
-        :rtype: pandas.DataFrame
-        """
-
-        import pandas as pd
-
-        def get_data(chan):
-            if scaled_data:
-                return chan.data
-            else:
-                return chan.raw_data
-
-        # When absolute_time is True,
-        # use the wf_start_time as offset for the time_track()
-        try:
-            time = self.time_track(absolute_time)
-        except KeyError:
-            time = None
-        if self.channel is None:
-            return pd.DataFrame.from_dict(OrderedDict(
-                (ch.channel, pd.Series(get_data(ch)))
-                for ch in self.tdms_file.group_channels(self.group)))
-        else:
-            return pd.DataFrame(
-                get_data(self), index=time, columns=[self.path])
-
-    @_property_builtin
-    def data(self):
-        """
-        NumPy array containing data if there is data for this object,
-        otherwise None.
-        """
-        if self._data is None and not self._scaler_data:
-            # self._data is None if data segment is empty
-            return np.empty((0, 1))
-        if self._data_scaled is None:
-            scale = scaling.get_scaling(self)
-            if scale is None:
-                self._data_scaled = self._data
-            elif self._scaler_data:
-                self._data_scaled = scale.scale_daqmx(self._scaler_data)
-            else:
-                self._data_scaled = scale.scale(self._data)
-
-        return self._data_scaled
-
-    @_property_builtin
-    def raw_data(self):
-        """
-        The raw, unscaled data array.
-        For unscaled objects this is the same as the data property.
-        """
-        if self._scaler_data:
-            if len(self._scaler_data) == 1:
-                return next(v for v in self._scaler_data.values())
-            else:
-                raise Exception(
-                    "This object has data for multiple DAQmx scalers, "
-                    "use the raw_scaler_data method to get raw data "
-                    "for a scale_id")
-        if self._data is None:
-            # self._data is None if data segment is empty
-            return np.empty((0, 1))
-        return self._data
-
-    def raw_scaler_data(self, scale_id):
-        """
-        Raw DAQmx scaler data for the given scale id
-        """
-        return self._scaler_data[scale_id]
-
-
 class TdmsSegmentObject(object):
     """
     Describes an object in an individual TDMS file segment
     """
 
     __slots__ = [
-        'tdms_object', 'number_values', 'data_size',
+        'path', 'number_values', 'data_size',
         'has_data', 'data_type', 'dimension', 'endianness',
-        'daqmx_metadata']
+        'daqmx_metadata', 'properties']
 
-    def __init__(self, tdms_object, endianness):
-        self.tdms_object = tdms_object
+    def __init__(self, path, endianness):
+        self.path = path
         self.endianness = endianness
 
         self.number_values = 0
@@ -665,6 +389,8 @@ class TdmsSegmentObject(object):
         self.has_data = True
         self.data_type = None
         self.dimension = 1
+        self.daqmx_metadata = None
+        self.properties = None
 
     def _read_metadata_mx(self, f):
 
@@ -675,28 +401,19 @@ class TdmsSegmentObject(object):
         except KeyError:
             raise KeyError("Unrecognised data type: %s" % data_type_val)
 
-        if self.tdms_object.data_type is not None \
-           and self.data_type != self.tdms_object.data_type:
-
-            raise ValueError(
-                "Segment object doesn't have the same data "
-                "type as previous segments.")
-        else:
-            self.tdms_object.data_type = self.data_type
-
-        log.debug("DAQmx object data type: %r", self.tdms_object.data_type)
+        log.debug("DAQmx object data type: %r", self.data_type)
 
         info = DaqMxMetadata(f, self.endianness)
         log.debug("DAQmx metadata: %r", info)
 
         return info
 
-    def _read_metadata(self, f):
+    def read_metadata(self, f):
         """Read object metadata and update object information"""
 
         raw_data_index = types.Uint32.read(f, self.endianness)
 
-        log.debug("Reading metadata for object %s", self.tdms_object.path)
+        log.debug("Reading metadata for object %s", self.path)
 
         # Object has no data in this segment
         if raw_data_index == 0xFFFFFFFF:
@@ -709,7 +426,7 @@ class TdmsSegmentObject(object):
             log.debug(
                 "Object has same data structure as in the previous segment")
             self.has_data = True
-        elif raw_data_index == 0x00001269 or raw_data_index == 0x00001369:
+        elif raw_data_index in (0x00001269, 0x00001369):
             # This is a DAQmx raw data segment.
             #    0x00001269 for segment containing Format Changing scaler.
             #    0x00001369 for segment containing Digital Line scaler.
@@ -719,7 +436,6 @@ class TdmsSegmentObject(object):
 
             # DAQmx raw data format metadata has its own class
             self.has_data = True
-            self.tdms_object.has_data = True
 
             info = self._read_metadata_mx(f)
             self.dimension = info.dimension
@@ -730,10 +446,9 @@ class TdmsSegmentObject(object):
             self.daqmx_metadata = info
             # fall through and read properties
         else:
-            # Assume metadata format is legacy TDMS format.
+            # Metadata format is standard (non-DAQmx) TDMS format.
             # raw_data_index gives the length of the index information.
             self.has_data = True
-            self.tdms_object.has_data = True
 
             # Read the data type
             try:
@@ -741,19 +456,12 @@ class TdmsSegmentObject(object):
                     types.Uint32.read(f, self.endianness)]
             except KeyError:
                 raise KeyError("Unrecognised data type")
-            if (self.tdms_object.data_type is not None and
-                    self.data_type != self.tdms_object.data_type):
-                raise ValueError(
-                    "Segment object doesn't have the same data "
-                    "type as previous segments.")
-            else:
-                self.tdms_object.data_type = self.data_type
-            log.debug("Object data type: %r", self.tdms_object.data_type)
+            log.debug("Object data type: %r", self.data_type)
 
-            if (self.tdms_object.data_type.size is None and
-                    self.tdms_object.data_type != types.String):
+            if (self.data_type.size is None and
+                    self.data_type != types.String):
                 raise ValueError(
-                    "Unsupported data type: %r" % self.tdms_object.data_type)
+                    "Unsupported data type: %r" % self.data_type)
 
             # Read data dimension
             self.dimension = types.Uint32.read(f, self.endianness)
@@ -778,13 +486,9 @@ class TdmsSegmentObject(object):
         # Read data properties
         num_properties = types.Uint32.read(f, self.endianness)
         log.debug("Reading %d properties", num_properties)
-        for i in range(num_properties):
-            prop_name, value = read_property(f, self.endianness)
-            self.tdms_object.properties[prop_name] = value
-
-    @property
-    def path(self):
-        return self.tdms_object.path
+        self.properties = dict(
+            read_property(f, self.endianness)
+            for _ in range(num_properties))
 
     @property
     def total_raw_data_width(self):
@@ -821,6 +525,25 @@ class TdmsSegmentObject(object):
             return np.zeros(self.number_values, dtype=self.data_type.nptype)
         else:
             return [None] * self.number_values
+
+
+class DataSegment(object):
+    """Data read from a single TDMS segment
+
+    :ivar raw_data: A dictionary of object data in this segment for
+        normal objects. Keys are object paths and values are numpy arrays.
+    :ivar daqmx_raw_data: A dictionary of data in this segment for
+        DAQmx raw data. Keys are object paths and values are dictionaries of
+        numpy arrays keyed by scaler id.
+    """
+
+    def __init__(self, data, daqmx_data):
+        self.raw_data = data
+        self.daqmx_raw_data = daqmx_data
+
+    @staticmethod
+    def empty():
+        return DataSegment({}, {})
 
 
 def read_string_data(file, number_values, endianness):

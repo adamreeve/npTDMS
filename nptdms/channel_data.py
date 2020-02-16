@@ -10,10 +10,10 @@ from nptdms.log import log_manager
 log = log_manager.get_logger(__name__)
 
 
-def get_data_store(obj, memmap_dir=None):
-    """Return a new data store to use for the given TDMS channel object
+def get_data_receiver(obj, memmap_dir=None):
+    """Return a new channel data receiver to use for the given TDMS object
 
-    :param obj: TDMS channel object to store data for
+    :param obj: TDMS channel object to receive data for
     :memmap_dir: Optional directory to store memmap files,
         or None to not use mmemap files
     """
@@ -21,23 +21,23 @@ def get_data_store(obj, memmap_dir=None):
         return None
 
     if obj.data_type == types.DaqMxRawData:
-        return DaqmxDataStore(obj, memmap_dir)
+        return DaqmxDataReceiver(obj, memmap_dir)
 
     if obj.data_type.nptype is None:
-        return ListDataStore()
+        return ListDataReceiver()
 
-    return NumpyDataStore(obj, memmap_dir)
+    return NumpyDataReceiver(obj, memmap_dir)
 
 
-class ListDataStore(object):
-    """Simple list based data store for objects that don't have a
+class ListDataReceiver(object):
+    """Simple list based data receiver for objects that don't have a
         corresponding numpy data type
 
        :ivar data: List of data points
     """
 
     def __init__(self):
-        """Initialise new data store for a TDMS object
+        """Initialise new data receiver for a TDMS object
         """
         self.data = []
 
@@ -47,14 +47,14 @@ class ListDataStore(object):
         self.data.extend(data)
 
 
-class NumpyDataStore(object):
-    """Stores data for a TDMS object in a numpy array
+class NumpyDataReceiver(object):
+    """Receives data for a TDMS object and stores it in a numpy array
 
     :ivar data: Data that has been read for the object
     """
 
     def __init__(self, obj, memmap_dir=None):
-        """Initialise data store backed by a numpy array
+        """Initialise data receiver backed by a numpy array
 
         :param obj: Object to store data for
         :param memmap_dir: Optional directory to store memmap files in.
@@ -78,14 +78,15 @@ class NumpyDataStore(object):
         self._data_insert_position += len(new_data)
 
 
-class DaqmxDataStore(object):
-    """Stores raw scaler data for a DAQmx object in numpy arrays
+class DaqmxDataReceiver(object):
+    """Receives raw scaler data for a DAQmx object and stores it in numpy
+    arrays
 
     :ivar scaler_data: Dictionary mapping from scaler id to data for a scaler
     """
 
     def __init__(self, obj, memmap_dir=None):
-        """Initialise data store backed by a numpy array
+        """Initialise data receiver for DAQmx backed by a numpy array
 
         :param obj: Object to store data for
         :param memmap_dir: Optional directory to store memmap files in.
@@ -99,7 +100,7 @@ class DaqmxDataStore(object):
                 scaler.data_type.nptype, obj.number_values, memmap_dir)
             self._scaler_insert_positions[scaler.scale_id] = 0
 
-    def append_data(self, scale_id, new_data):
+    def append_scaler_data(self, scale_id, new_data):
         """Append new DAQmx scaler data read from a segment
         """
 
