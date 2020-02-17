@@ -53,7 +53,11 @@ class TdmsFile(object):
     def _read_file(self, tdms_file, memmap_dir, read_metadata_only):
         reader = TdmsReader(tdms_file)
         reader.read_metadata()
-        self._objects = reader.objects
+
+        self._objects = {}
+        for (path, obj) in reader.object_metadata.items():
+            self._objects[path] = TdmsObject(
+                self, path, obj.properties, obj.num_values)
 
         if not read_metadata_only:
             self._read_data(memmap_dir, reader)
@@ -66,11 +70,11 @@ class TdmsFile(object):
 
         with Timer(log, "Read data"):
             # Now actually read all the data
-            for segment in tdms_reader.read_data():
-                for (path, data) in segment.raw_data.items():
+            for chunk in tdms_reader.read_raw_data():
+                for (path, data) in chunk.raw_data.items():
                     data_receiver = self._channel_data[path]
                     data_receiver.append_data(data)
-                for (path, data) in segment.daqmx_raw_data:
+                for (path, data) in chunk.daqmx_raw_data:
                     data_receiver = self._channel_data[path]
                     for scaler_id, scaler_data in data.items():
                         data_receiver.append_scaler_data(

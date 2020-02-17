@@ -1,4 +1,5 @@
 from copy import copy
+from collections import defaultdict
 from io import UnsupportedOperation
 import os
 import numpy as np
@@ -97,8 +98,8 @@ class TdmsSegment(object):
         """Read segment metadata section and update object information
 
         :param f: Open TDMS file.
-        :param previous_segment_objects: Dictionary of path to the most recently reada
-            segment object for a TDMS object.
+        :param previous_segment_objects: Dictionary of path to the most
+            recently read segment object for a TDMS object.
         :param previous_segment: Previous segment in the file.
         """
 
@@ -198,35 +199,24 @@ class TdmsSegment(object):
         chunk_remainder = total_data_size % data_size
         if chunk_remainder == 0:
             self.num_chunks = int(total_data_size // data_size)
-
-            # Update data count for the overall tdms object
-            # using the data count for this segment.
-            for obj in self.ordered_objects:
-                if obj.has_data:
-                    obj.tdms_object.number_values += (
-                        obj.number_values * self.num_chunks)
-
         else:
             log.warning(
                 "Data size %d is not a multiple of the "
                 "chunk size %d. Will attempt to read last chunk",
                 total_data_size, data_size)
             self.num_chunks = 1 + int(total_data_size // data_size)
-
             self.final_chunk_proportion = (
                 float(chunk_remainder) / float(data_size))
 
-            for obj in self.ordered_objects:
-                if obj.has_data:
-                    obj.tdms_object.number_values += (
-                        obj.number_values * (self.num_chunks - 1) + int(
-                            obj.number_values * self.final_chunk_proportion))
-
     def read_raw_data(self, f):
-        """Read signal data from file"""
+        """Read raw data from a TDMS segment
+
+        :returns: A generator of DataChunk objects with raw channel data for
+            objects in this segment.
+        """
 
         if not self.toc["kTocRawData"]:
-            return
+            yield DataChunk.empty()
 
         f.seek(self.data_position)
 
@@ -238,7 +228,7 @@ class TdmsSegment(object):
         for chunk in range(self.num_chunks):
             if self.toc['kTocDAQmxRawData']:
                 data_objects = [o for o in self.ordered_objects if o.has_data]
-                self._read_interleaved_daqmx(f, data_objects)
+                yield self._read_interleaved_daqmx(f, data_objects)
             elif self.toc["kTocInterleavedData"]:
                 log.debug("Data is interleaved")
                 data_objects = [o for o in self.ordered_objects if o.has_data]
@@ -250,27 +240,27 @@ class TdmsSegment(object):
                 same_length = (len(
                     set((o.number_values for o in data_objects))) == 1)
                 if (all_numpy and same_length):
-                    self._read_interleaved_numpy(f, data_objects)
+                    yield self._read_interleaved_numpy(f, data_objects)
                 else:
-                    self._read_interleaved(f, data_objects)
+                    yield self._read_interleaved(f, data_objects)
             else:
-                object_data = {}
-                log.debug("Data is contiguous")
-                for obj in self.ordered_objects:
-                    if obj.has_data:
-                        if (chunk == (self.num_chunks - 1) and
-                                self.final_chunk_proportion != 1.0):
-                            number_values = int(
-                                obj.number_values *
-                                self.final_chunk_proportion)
-                        else:
-                            number_values = obj.number_values
-                        object_data[obj.path] = (
-                            obj._read_values(f, number_values))
+                yield self._read_contiguous_data(f, data_objects, chunk)
 
-                for obj in self.ordered_objects:
-                    if obj.has_data:
-                        obj.tdms_object._update_data(object_data[obj.path])
+    def _read_contiguous_data(self, f, data_objects, chunk):
+        """ Read contiguous (non-interleaved) data from a segment
+        """
+        log.debug("Data is contiguous")
+        object_data = {}
+        for obj in data_objects:
+            if (chunk == (self.num_chunks - 1) and
+                    self.final_chunk_proportion != 1.0):
+                number_values = int(
+                    obj.number_values *
+                    self.final_chunk_proportion)
+            else:
+                number_values = obj.number_values
+            object_data[obj.path] = obj.read_values(f, number_values)
+        return DataChunk.channel_data(object_data)
 
     def _read_interleaved_daqmx(self, f, data_objects):
         """Read data from DAQmx data segment"""
@@ -287,6 +277,7 @@ class TdmsSegment(object):
 
         raw_data_widths = data_objects[0].daqmx_metadata.raw_data_widths
         chunk_size = data_objects[0].number_values
+        scaler_data = defaultdict(dict)
 
         # Data for each set of raw data (corresponding to one card) is
         # interleaved separately, so read one after another
@@ -312,13 +303,14 @@ class TdmsSegment(object):
                     # will be number of bytes per point * number of data
                     # points. Then use ravel to flatten the results into a
                     # vector.
-                    object_data = combined_data[:, byte_columns].ravel()
+                    scaler_data = combined_data[:, byte_columns].ravel()
                     # Now set correct data type, so that the array length
                     # should be correct
-                    object_data.dtype = (
+                    scaler_data.dtype = (
                         scaler.data_type.nptype.newbyteorder(self.endianness))
-                    obj.tdms_object._update_data_for_scaler(
-                        scaler.scale_id, object_data)
+                    scaler_data[obj.path][scaler.scale_id] = scaler_data
+
+        return DataChunk.scaler_data(scaler_data)
 
     def _read_interleaved_numpy(self, f, data_objects):
         """Read interleaved data where all channels have a numpy type"""
@@ -333,7 +325,8 @@ class TdmsSegment(object):
         combined_data = read_interleaved_segment_bytes(
             f, all_channel_bytes, data_objects[0].number_values)
 
-        # Now set arrays for each channel
+        # Now get arrays for each channel
+        channel_data = {}
         data_pos = 0
         for (i, obj) in enumerate(data_objects):
             byte_columns = tuple(
@@ -347,8 +340,10 @@ class TdmsSegment(object):
             # be correct
             object_data.dtype = (
                 obj.data_type.nptype.newbyteorder(self.endianness))
-            obj.tdms_object._update_data(object_data)
+            channel_data[obj.path] = object_data
             data_pos += obj.data_type.size
+
+        return DataChunk.channel_data(channel_data)
 
     def _read_interleaved(self, f, data_objects):
         """Read interleaved data that doesn't have a numpy type"""
@@ -357,17 +352,17 @@ class TdmsSegment(object):
         object_data = {}
         points_added = {}
         for obj in data_objects:
-            object_data[obj.path] = obj._new_segment_data()
+            object_data[obj.path] = obj.new_segment_data()
             points_added[obj.path] = 0
         while any([points_added[o.path] < o.number_values
-                  for o in data_objects]):
+                   for o in data_objects]):
             for obj in data_objects:
                 if points_added[obj.path] < obj.number_values:
                     object_data[obj.path][points_added[obj.path]] = (
-                        obj._read_value(f))
+                        obj.read_value(f))
                     points_added[obj.path] += 1
-        for obj in data_objects:
-            obj.tdms_object._update_data(object_data[obj.path])
+
+        return DataChunk.channel_data(object_data)
 
 
 class TdmsSegmentObject(object):
@@ -497,7 +492,7 @@ class TdmsSegmentObject(object):
         else:
             return self.data_type.size
 
-    def _read_value(self, file):
+    def read_value(self, file):
         """Read a single value from the given file"""
 
         if self.data_type.nptype is not None:
@@ -505,7 +500,7 @@ class TdmsSegmentObject(object):
             return fromfile(file, dtype=dtype, count=1)
         return self.data_type.read(file, self.endianness)
 
-    def _read_values(self, file, number_values):
+    def read_values(self, file, number_values):
         """Read all values for this object from a contiguous segment"""
 
         if self.data_type.nptype is not None:
@@ -513,12 +508,12 @@ class TdmsSegmentObject(object):
             return fromfile(file, dtype=dtype, count=number_values)
         elif self.data_type == types.String:
             return read_string_data(file, number_values, self.endianness)
-        data = self._new_segment_data()
+        data = self.new_segment_data()
         for i in range(number_values):
             data[i] = self.data_type.read(file, self.endianness)
         return data
 
-    def _new_segment_data(self):
+    def new_segment_data(self):
         """Return a new array to read the data of the current section into"""
 
         if self.data_type.nptype is not None:
@@ -527,11 +522,11 @@ class TdmsSegmentObject(object):
             return [None] * self.number_values
 
 
-class DataSegment(object):
-    """Data read from a single TDMS segment
+class DataChunk(object):
+    """Data read from a single chunk in a TDMS segment
 
-    :ivar raw_data: A dictionary of object data in this segment for
-        normal objects. Keys are object paths and values are numpy arrays.
+    :ivar raw_data: A dictionary of object data in this chunk for standard
+        TDMS channels. Keys are object paths and values are numpy arrays.
     :ivar daqmx_raw_data: A dictionary of data in this segment for
         DAQmx raw data. Keys are object paths and values are dictionaries of
         numpy arrays keyed by scaler id.
@@ -543,7 +538,15 @@ class DataSegment(object):
 
     @staticmethod
     def empty():
-        return DataSegment({}, {})
+        return DataChunk({}, {})
+
+    @staticmethod
+    def channel_data(data):
+        return DataChunk(data, {})
+
+    @staticmethod
+    def scaler_data(data):
+        return DataChunk({}, data)
 
 
 def read_string_data(file, number_values, endianness):
