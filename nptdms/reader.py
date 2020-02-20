@@ -17,7 +17,7 @@ class TdmsReader(object):
     def __init__(self, tdms_file):
         """ Initialise a new TdmsReader
 
-        :param file: An opened file object.
+        :param tdms_file: An opened file object.
         """
         self._file = tdms_file
         self._segments = None
@@ -59,7 +59,7 @@ class TdmsReader(object):
             raise RuntimeError(
                 "Cannot read data unless metadata has first been read")
         for segment in self._segments:
-            for chunk in segment.read_raw_data():
+            for chunk in segment.read_raw_data(self._file):
                 yield chunk
 
     def _update_object_metadata(self, segment):
@@ -75,7 +75,7 @@ class TdmsReader(object):
                 obj = ObjectMetadata()
                 self.object_metadata[path] = obj
             for prop, val in segment_object.properties.items():
-                obj[prop] = val
+                obj.properties[prop] = val
             if segment_object.has_data:
                 if final_chunk_proportion == 1.0:
                     obj.num_values += segment_object.number_values * num_chunks
@@ -91,10 +91,15 @@ class TdmsReader(object):
                     "segments for objects %s. Expected type %s but got %s" %
                     (path, obj.data_type, segment_object.data_type))
             obj.data_type = segment_object.data_type
+            if segment_object.daqmx_metadata is not None:
+                obj.scaler_data_types = dict(
+                    (s.scale_id, s.data_type)
+                    for s in segment_object.daqmx_metadata.scalers)
 
 
 class ObjectMetadata(object):
     def __init__(self):
         self.properties = {}
         self.data_type = None
+        self.scaler_data_types = None
         self.num_values = 0

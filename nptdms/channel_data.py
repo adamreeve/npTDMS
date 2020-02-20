@@ -14,8 +14,8 @@ def get_data_receiver(obj, memmap_dir=None):
     """Return a new channel data receiver to use for the given TDMS object
 
     :param obj: TDMS channel object to receive data for
-    :memmap_dir: Optional directory to store memmap files,
-        or None to not use mmemap files
+    :param memmap_dir: Optional directory to store memory map files,
+        or None to not use memory map files
     """
     if obj.data_type is None:
         return None
@@ -57,7 +57,7 @@ class NumpyDataReceiver(object):
         """Initialise data receiver backed by a numpy array
 
         :param obj: Object to store data for
-        :param memmap_dir: Optional directory to store memmap files in.
+        :param memmap_dir: Optional directory to store memory map files in.
         """
 
         self.path = obj.path
@@ -89,16 +89,16 @@ class DaqmxDataReceiver(object):
         """Initialise data receiver for DAQmx backed by a numpy array
 
         :param obj: Object to store data for
-        :param memmap_dir: Optional directory to store memmap files in.
+        :param memmap_dir: Optional directory to store memory mmap files in.
         """
 
         self.path = obj.path
         self.scaler_data = {}
         self._scaler_insert_positions = {}
-        for scaler in obj.scalers:
-            self.scaler_data[scaler.scale_id] = _new_numpy_array(
-                scaler.data_type.nptype, obj.number_values, memmap_dir)
-            self._scaler_insert_positions[scaler.scale_id] = 0
+        for scaler_id, scaler_type in obj.scaler_data_types.items():
+            self.scaler_data[scaler_id] = _new_numpy_array(
+                scaler_type.nptype, obj.number_values, memmap_dir)
+            self._scaler_insert_positions[scaler_id] = 0
 
     def append_scaler_data(self, scale_id, new_data):
         """Append new DAQmx scaler data read from a segment
@@ -116,9 +116,9 @@ class DaqmxDataReceiver(object):
 def _new_numpy_array(dtype, num_values, memmap_dir=None):
     """Initialise a new numpy array for data
 
-    :param dtype: Numpy datatype for array
+    :param dtype: Numpy data type for array
     :param num_values: Capacity required
-    :param mmemap_dir: Optional directory to store memmap files
+    :param mmemap_dir: Optional directory to store memory mmap files
     """
     if memmap_dir:
         memmap_file = tempfile.NamedTemporaryFile(

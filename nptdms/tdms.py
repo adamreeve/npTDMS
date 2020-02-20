@@ -57,7 +57,8 @@ class TdmsFile(object):
         self._objects = {}
         for (path, obj) in reader.object_metadata.items():
             self._objects[path] = TdmsObject(
-                self, path, obj.properties, obj.num_values)
+                self, path, obj.properties, obj.data_type,
+                obj.scaler_data_types, obj.num_values)
 
         if not read_metadata_only:
             self._read_data(memmap_dir, reader)
@@ -74,7 +75,7 @@ class TdmsFile(object):
                 for (path, data) in chunk.raw_data.items():
                     data_receiver = self._channel_data[path]
                     data_receiver.append_data(data)
-                for (path, data) in chunk.daqmx_raw_data:
+                for (path, data) in chunk.daqmx_raw_data.items():
                     data_receiver = self._channel_data[path]
                     for scaler_id, scaler_data in data.items():
                         data_receiver.append_scaler_data(
@@ -267,11 +268,15 @@ class TdmsObject(object):
 
     """
 
-    def __init__(self, tdms_file, path, properties, number_values=0):
+    def __init__(
+            self, tdms_file, path, properties, data_type,
+            scaler_data_types=None, number_values=0):
         self.tdms_file = tdms_file
         self.path = path
         self.properties = properties
         self.number_values = number_values
+        self.data_type = data_type
+        self.scaler_data_types = scaler_data_types
         self.has_data = number_values > 0
 
         self._data = None
@@ -383,6 +388,7 @@ class TdmsObject(object):
 
         :param absolute_time: Whether times should be absolute rather than
             relative to the start time.
+        :param scaled_data: Whether to return scaled or raw data.
         :return: The TDMS object data.
         :rtype: pandas.DataFrame
         """

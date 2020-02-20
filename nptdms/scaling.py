@@ -63,7 +63,7 @@ class PolynomialScaling(object):
 
 
 class RtdScaling(object):
-    """ Converts a signal from a resitance temperature detector into
+    """ Converts a signal from a resistance temperature detector into
         degrees celcius using the Callendar-Van Dusen equation
     """
     def __init__(

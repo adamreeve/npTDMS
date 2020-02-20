@@ -131,6 +131,7 @@ class TdmsSegment(object):
             # Add this segment object to the list of segment objects,
             # re-using any properties from previous segments.
             updating_existing = False
+            segment_obj = None
             if not self.toc["kTocNewObjList"]:
                 # Search for the same object from the previous segment
                 # object list.
@@ -225,13 +226,12 @@ class TdmsSegment(object):
             "Reading %d bytes of data at %d in %d chunks",
             total_data_size, f.tell(), self.num_chunks)
 
+        data_objects = [o for o in self.ordered_objects if o.has_data]
         for chunk in range(self.num_chunks):
             if self.toc['kTocDAQmxRawData']:
-                data_objects = [o for o in self.ordered_objects if o.has_data]
                 yield self._read_interleaved_daqmx(f, data_objects)
             elif self.toc["kTocInterleavedData"]:
                 log.debug("Data is interleaved")
-                data_objects = [o for o in self.ordered_objects if o.has_data]
                 # If all data types have numpy types and all the lengths are
                 # the same, then we can read all data at once with numpy,
                 # which is much faster
@@ -239,7 +239,7 @@ class TdmsSegment(object):
                     o.data_type.nptype is not None for o in data_objects)
                 same_length = (len(
                     set((o.number_values for o in data_objects))) == 1)
-                if (all_numpy and same_length):
+                if all_numpy and same_length:
                     yield self._read_interleaved_numpy(f, data_objects)
                 else:
                     yield self._read_interleaved(f, data_objects)
@@ -303,12 +303,12 @@ class TdmsSegment(object):
                     # will be number of bytes per point * number of data
                     # points. Then use ravel to flatten the results into a
                     # vector.
-                    scaler_data = combined_data[:, byte_columns].ravel()
+                    this_scaler_data = combined_data[:, byte_columns].ravel()
                     # Now set correct data type, so that the array length
                     # should be correct
-                    scaler_data.dtype = (
+                    this_scaler_data.dtype = (
                         scaler.data_type.nptype.newbyteorder(self.endianness))
-                    scaler_data[obj.path][scaler.scale_id] = scaler_data
+                    scaler_data[obj.path][scaler.scale_id] = this_scaler_data
 
         return DataChunk.scaler_data(scaler_data)
 
