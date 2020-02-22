@@ -163,6 +163,22 @@ class TdmsSegmentTests(unittest.TestCase):
         self.assertEqual(tdms_properties["prop1"], Int32(2147483647))
         self.assertEqual(tdms_properties["prop2"], Int64(2147483648))
 
+    def test_writing_properties_with_numpy_typed_values(self):
+        properties = {
+            "int32prop": np.int32(32),
+            "int64prop": np.int64(64),
+            "float32prop": np.float32(32.0),
+            "float64prop": np.float64(64.0),
+        }
+
+        tdms_properties = read_properties_dict(properties)
+
+        self.assertEqual(len(tdms_properties), len(properties))
+        self.assertEqual(tdms_properties["int32prop"], Int32(32))
+        self.assertEqual(tdms_properties["int64prop"], Int64(64))
+        self.assertEqual(tdms_properties["float32prop"], SingleFloat(32.0))
+        self.assertEqual(tdms_properties["float64prop"], DoubleFloat(64.0))
+
     def test_error_raised_when_cannot_convert_property_value(self):
         properties = {
             "prop1": None

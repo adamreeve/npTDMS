@@ -270,6 +270,8 @@ def read_properties_dict(properties_dict):
 
 
 def _to_tdms_value(value):
+    if isinstance(value, np.number):
+        return numpy_data_types[value.dtype](value)
     if isinstance(value, TdmsType):
         return value
     if isinstance(value, bool):
