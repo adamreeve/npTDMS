@@ -1,30 +1,20 @@
 """Test exporting TDMS data to Pandas"""
 
 import unittest
-import sys
 import logging
 from datetime import datetime
-try:
-    import pytz
-except ImportError:
-    pytz = None
 try:
     import pandas
 except ImportError:
     pandas = None
 
 from nptdms import tdms
-from .tdms_test import (
+from .util import (
     TestFile,
     basic_segment,
     string_hexlify,
     hexlify_value
 )
-
-if pytz:
-    timezone = pytz.utc
-else:
-    timezone = None
 
 
 def within_tol(a, b, tol=1.0e-10):
@@ -142,7 +132,7 @@ def timed_segment():
     return (metadata, data, toc)
 
 
-class TDMSTestClass(unittest.TestCase):
+class PandasTests(unittest.TestCase):
     def setUp(self):
         logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 
@@ -198,7 +188,7 @@ class TDMSTestClass(unittest.TestCase):
 
         df = tdmsData.as_dataframe(time_index=True, absolute_time=True)
 
-        expected_start = datetime(2015, 9, 8, 10, 5, 49, tzinfo=timezone)
+        expected_start = datetime(2015, 9, 8, 10, 5, 49)
         self.assertTrue((df.index == expected_start)[0])
 
     @unittest.skipIf(pandas is None, 'Pandas is not installed')
@@ -273,7 +263,7 @@ class TDMSTestClass(unittest.TestCase):
         df = tdmsData.object("Group", "Channel1").as_dataframe(
             absolute_time=True)
 
-        expected_start = datetime(2015, 9, 8, 10, 5, 49, tzinfo=timezone)
+        expected_start = datetime(2015, 9, 8, 10, 5, 49)
         self.assertTrue((df.index == expected_start)[0])
 
 

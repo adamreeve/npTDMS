@@ -18,15 +18,15 @@ class LinearScaling(object):
         self.input_source = input_source
 
     @staticmethod
-    def from_object(obj, scale_index):
+    def from_properties(properties, scale_index):
         try:
-            input_source = obj.properties[
+            input_source = properties[
                 "NI_Scale[%d]_Linear_Input_Source" % scale_index]
         except KeyError:
             input_source = RAW_DATA_INPUT_SOURCE
         return LinearScaling(
-            obj.properties["NI_Scale[%d]_Linear_Y_Intercept" % scale_index],
-            obj.properties["NI_Scale[%d]_Linear_Slope" % scale_index],
+            properties["NI_Scale[%d]_Linear_Y_Intercept" % scale_index],
+            properties["NI_Scale[%d]_Linear_Slope" % scale_index],
             input_source)
 
     def scale(self, data):
@@ -41,19 +41,19 @@ class PolynomialScaling(object):
         self.input_source = input_source
 
     @staticmethod
-    def from_object(obj, scale_index):
+    def from_properties(properties, scale_index):
         try:
-            number_of_coefficients = obj.properties[
+            number_of_coefficients = properties[
                 'NI_Scale[%d]_Polynomial_Coefficients_Size' % (scale_index)]
         except KeyError:
             number_of_coefficients = 4
         try:
-            input_source = obj.properties[
+            input_source = properties[
                 "NI_Scale[%d]_Polynomial_Input_Source" % scale_index]
         except KeyError:
             input_source = RAW_DATA_INPUT_SOURCE
         coefficients = [
-            obj.properties[
+            properties[
                 'NI_Scale[%d]_Polynomial_Coefficients[%d]' % (scale_index, i)]
             for i in range(number_of_coefficients)]
         return PolynomialScaling(coefficients, input_source)
@@ -63,7 +63,7 @@ class PolynomialScaling(object):
 
 
 class RtdScaling(object):
-    """ Converts a signal from a resitance temperature detector into
+    """ Converts a signal from a resistance temperature detector into
         degrees celcius using the Callendar-Van Dusen equation
     """
     def __init__(
@@ -80,20 +80,20 @@ class RtdScaling(object):
         self.input_source = input_source
 
     @staticmethod
-    def from_object(obj, scale_index):
+    def from_properties(properties, scale_index):
         prefix = "NI_Scale[%d]" % scale_index
-        current_excitation = obj.properties[
+        current_excitation = properties[
             "%s_RTD_Current_Excitation" % prefix]
-        r0_nominal_resistance = obj.properties[
+        r0_nominal_resistance = properties[
             "%s_RTD_R0_Nominal_Resistance" % prefix]
-        a = obj.properties["%s_RTD_A" % prefix]
-        b = obj.properties["%s_RTD_B" % prefix]
-        c = obj.properties["%s_RTD_C" % prefix]
-        lead_wire_resistance = obj.properties[
+        a = properties["%s_RTD_A" % prefix]
+        b = properties["%s_RTD_B" % prefix]
+        c = properties["%s_RTD_C" % prefix]
+        lead_wire_resistance = properties[
             "%s_RTD_Lead_Wire_Resistance" % prefix]
-        resistance_configuration = obj.properties[
+        resistance_configuration = properties[
             "%s_RTD_Resistance_Configuration" % prefix]
-        input_source = obj.properties[
+        input_source = properties[
             "%s_RTD_Input_Source" % prefix]
         return RtdScaling(
             current_excitation, r0_nominal_resistance, a, b, c,
@@ -159,25 +159,25 @@ class TableScaling(object):
         self.input_source = input_source
 
     @staticmethod
-    def from_object(obj, scale_index):
+    def from_properties(properties, scale_index):
         prefix = "NI_Scale[%d]_Table_" % scale_index
         try:
-            input_source = obj.properties[prefix + "Input_Source"]
+            input_source = properties[prefix + "Input_Source"]
         except KeyError:
             input_source = RAW_DATA_INPUT_SOURCE
-        num_pre_scaled_values = obj.properties[
+        num_pre_scaled_values = properties[
             prefix + "Pre_Scaled_Values_Size"]
-        num_scaled_values = obj.properties[
+        num_scaled_values = properties[
             prefix + "Scaled_Values_Size"]
         if num_pre_scaled_values != num_scaled_values:
             raise ValueError(
                 "Number of pre-scaled values does not match "
                 "number of scaled values")
         pre_scaled_values = np.array([
-            obj.properties[prefix + "Pre_Scaled_Values[%d]" % i]
+            properties[prefix + "Pre_Scaled_Values[%d]" % i]
             for i in range(num_pre_scaled_values)])
         scaled_values = np.array([
-            obj.properties[prefix + "Scaled_Values[%d]" % i]
+            properties[prefix + "Scaled_Values[%d]" % i]
             for i in range(num_scaled_values)])
         return TableScaling(pre_scaled_values, scaled_values, input_source)
 
@@ -213,13 +213,13 @@ class ThermocoupleScaling(object):
         self.input_source = input_source
 
     @staticmethod
-    def from_object(obj, scale_index):
+    def from_properties(properties, scale_index):
         prefix = "NI_Scale[%d]_Thermocouple" % scale_index
-        input_source = obj.properties.get(
+        input_source = properties.get(
             "%s_Input_Source" % prefix, RAW_DATA_INPUT_SOURCE)
-        type_code = obj.properties.get(
+        type_code = properties.get(
             "%s_Thermocouple_Type" % prefix, 10072)
-        scaling_direction = obj.properties.get(
+        scaling_direction = properties.get(
             "%s_Scaling_Direction" % prefix, 0)
         return ThermocoupleScaling(type_code, scaling_direction, input_source)
 
@@ -261,10 +261,10 @@ class AddScaling(object):
         self.right_input_source = right_input_source
 
     @staticmethod
-    def from_object(obj, scale_index):
-        left_input_source = obj.properties[
+    def from_properties(properties, scale_index):
+        left_input_source = properties[
             "NI_Scale[%d]_Add_Left_Operand_Input_Source" % scale_index]
-        right_input_source = obj.properties[
+        right_input_source = properties[
             "NI_Scale[%d]_Add_Right_Operand_Input_Source" % scale_index]
         return AddScaling(left_input_source, right_input_source)
 
@@ -280,10 +280,10 @@ class SubtractScaling(object):
         self.right_input_source = right_input_source
 
     @staticmethod
-    def from_object(obj, scale_index):
-        left_input_source = obj.properties[
+    def from_properties(properties, scale_index):
+        left_input_source = properties[
             "NI_Scale[%d]_Subtract_Left_Operand_Input_Source" % scale_index]
-        right_input_source = obj.properties[
+        right_input_source = properties[
             "NI_Scale[%d]_Subtract_Right_Operand_Input_Source" % scale_index]
         return SubtractScaling(left_input_source, right_input_source)
 
@@ -351,19 +351,21 @@ class MultiScaling(object):
             raise ValueError("Cannot compute scaled data for %r" % scaling)
 
 
-def get_scaling(channel):
+def get_scaling(channel_properties, group_properties, file_properties):
     """ Get scaling for a channel from either the channel itself,
         its group, or the whole TDMS file
     """
-    scalings = (_get_object_scaling(o) for o in _tdms_hierarchy(channel))
+    scalings = (
+        _get_channel_scaling(p)
+        for p in [channel_properties, group_properties, file_properties])
     try:
         return next(s for s in scalings if s is not None)
     except StopIteration:
         return None
 
 
-def _get_object_scaling(obj):
-    num_scalings = _get_number_of_scalings(obj.properties)
+def _get_channel_scaling(properties):
+    num_scalings = _get_number_of_scalings(properties)
     if num_scalings is None or num_scalings == 0:
         return None
 
@@ -371,28 +373,32 @@ def _get_object_scaling(obj):
     for scale_index in range(num_scalings):
         type_property = 'NI_Scale[%d]_Scale_Type' % scale_index
         try:
-            scale_type = obj.properties[type_property]
+            scale_type = properties[type_property]
         except KeyError:
             # Scalings are not in properties if they come from DAQmx scalers
             scalings[scale_index] = DaqMxScalerScaling(scale_index)
             continue
         if scale_type == 'Polynomial':
-            scalings[scale_index] = PolynomialScaling.from_object(
-                obj, scale_index)
+            scalings[scale_index] = PolynomialScaling.from_properties(
+                properties, scale_index)
         elif scale_type == 'Linear':
-            scalings[scale_index] = LinearScaling.from_object(obj, scale_index)
+            scalings[scale_index] = LinearScaling.from_properties(
+                properties, scale_index)
         elif scale_type == 'RTD':
-            scalings[scale_index] = RtdScaling.from_object(obj, scale_index)
+            scalings[scale_index] = RtdScaling.from_properties(
+                properties, scale_index)
         elif scale_type == 'Table':
-            scalings[scale_index] = TableScaling.from_object(obj, scale_index)
+            scalings[scale_index] = TableScaling.from_properties(
+                properties, scale_index)
         elif scale_type == 'Thermocouple':
-            scalings[scale_index] = ThermocoupleScaling.from_object(
-                obj, scale_index)
+            scalings[scale_index] = ThermocoupleScaling.from_properties(
+                properties, scale_index)
         elif scale_type == 'Add':
-            scalings[scale_index] = AddScaling.from_object(obj, scale_index)
+            scalings[scale_index] = AddScaling.from_properties(
+                properties, scale_index)
         elif scale_type == 'Subtract':
-            scalings[scale_index] = SubtractScaling.from_object(
-                obj, scale_index)
+            scalings[scale_index] = SubtractScaling.from_properties(
+                properties, scale_index)
         else:
             log.warning("Unsupported scale type: %s", scale_type)
 
@@ -401,26 +407,6 @@ def _get_object_scaling(obj):
     if len(scalings) > 1:
         return MultiScaling(scalings)
     return scalings[0]
-
-
-def _tdms_hierarchy(tdms_channel):
-    yield tdms_channel
-
-    tdms_file = tdms_channel.tdms_file
-    if tdms_file is None:
-        return
-
-    group_name = tdms_channel.group
-    if group_name is not None:
-        try:
-            yield tdms_file.object(group_name)
-        except KeyError:
-            pass
-
-    try:
-        yield tdms_file.object()
-    except KeyError:
-        pass
 
 
 _scale_regex = re.compile(r"NI_Scale\[(\d+)\]_Scale_Type")

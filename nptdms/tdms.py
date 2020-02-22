@@ -1,20 +1,28 @@
-"""Python module for reading TDMS files produced by LabView"""
+""" Python module for reading TDMS files produced by LabView
 
+    This module contains the public facing API
+"""
+
+import numpy as np
+
+from nptdms import scaling
 from nptdms.utils import Timer, OrderedDict
 from nptdms.log import log_manager
 from nptdms.common import path_components
-from nptdms.tdms_segment import TdmsSegment
+from nptdms.reader import TdmsReader
+from nptdms.channel_data import get_data_receiver, DaqmxDataReceiver
 
 
 log = log_manager.get_logger(__name__)
 
 
+# Have to get a reference to the builtin property decorator
+# so we can use it in TdmsObject, which has a property method.
+_property_builtin = property
+
+
 class TdmsFile(object):
     """Reads and stores data from a TDMS file.
-
-    :ivar objects: A dictionary of objects in the TDMS file, where the keys are
-        the object paths.
-
     """
 
     def __init__(self, file, memmap_dir=None, read_metadata_only=False):
@@ -27,53 +35,60 @@ class TdmsFile(object):
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
-        :param read_metadata_only: If this parameter is enabled then the
-            metadata of the TDMS file will only be read.
+        :param read_metadata_only: If this parameter is enabled then only the
+            metadata of the TDMS file will read.
         """
 
-        self.read_metadata_only = read_metadata_only
-        self.segments = []
-        self.objects = OrderedDict()
-        self.memmap_dir = memmap_dir
+        self._memmap_dir = memmap_dir
+        self._channel_data = {}
 
         if hasattr(file, "read"):
             # Is a file
-            self._read_segments(file)
+            self._read_file(file, memmap_dir, read_metadata_only)
         else:
             # Is path to a file
             with open(file, 'rb') as open_file:
-                self._read_segments(open_file)
+                self._read_file(open_file, memmap_dir, read_metadata_only)
 
-    def _read_segments(self, open_file):
-        with Timer(log, "Read metadata"):
-            # Read metadata first to work out how much space we need
-            previous_segment = None
-            while True:
-                try:
-                    segment = TdmsSegment(open_file, self)
-                except EOFError:
-                    # We've finished reading the file
-                    break
-                segment.read_metadata(
-                    open_file, self.objects, previous_segment)
+    def _read_file(self, tdms_file, memmap_dir, read_metadata_only):
+        reader = TdmsReader(tdms_file)
+        reader.read_metadata()
 
-                self.segments.append(segment)
-                previous_segment = segment
-                if segment.next_segment_pos is None:
-                    break
-                else:
-                    open_file.seek(segment.next_segment_pos)
-        if not self.read_metadata_only:
+        self._objects = {}
+        for (path, obj) in reader.object_metadata.items():
+            self._objects[path] = TdmsObject(
+                self, path, obj.properties, obj.data_type,
+                obj.scaler_data_types, obj.num_values)
 
-            with Timer(log, "Allocate space"):
-                # Allocate space for data
-                for obj in self.objects.values():
-                    obj._initialise_data(memmap_dir=self.memmap_dir)
+        if not read_metadata_only:
+            self._read_data(memmap_dir, reader)
 
-            with Timer(log, "Read data"):
-                # Now actually read all the data
-                for segment in self.segments:
-                    segment.read_raw_data(open_file)
+    def _read_data(self, memmap_dir, tdms_reader):
+        with Timer(log, "Allocate space"):
+            # Allocate space for data
+            for (path, obj) in self._objects.items():
+                self._channel_data[path] = get_data_receiver(obj, memmap_dir)
+
+        with Timer(log, "Read data"):
+            # Now actually read all the data
+            for chunk in tdms_reader.read_raw_data():
+                for (path, data) in chunk.raw_data.items():
+                    data_receiver = self._channel_data[path]
+                    data_receiver.append_data(data)
+                for (path, data) in chunk.daqmx_raw_data.items():
+                    data_receiver = self._channel_data[path]
+                    for scaler_id, scaler_data in data.items():
+                        data_receiver.append_scaler_data(
+                            scaler_id, scaler_data)
+
+            for (path, obj) in self._objects.items():
+                data_receiver = self._channel_data[path]
+                if data_receiver is not None:
+                    if hasattr(data_receiver, 'scaler_data'):
+                        # Data is DAQmx scaler data
+                        obj._set_scaler_data(data_receiver.scaler_data)
+                    else:
+                        obj._set_raw_data(data_receiver.data)
 
     def object(self, *path):
         """Get a TDMS object from the file
@@ -96,9 +111,9 @@ class TdmsFile(object):
             object("group_name", "channel_name")
         """
 
-        object_path = components_to_path(*path)
+        object_path = _components_to_path(*path)
         try:
-            return self.objects[object_path]
+            return self._objects[object_path]
         except KeyError:
             raise KeyError("Invalid object path: %s" % object_path)
 
@@ -115,7 +130,7 @@ class TdmsFile(object):
         # Split paths into components and take the first (group) component.
         object_paths = (
             path_components(path)
-            for path in self.objects)
+            for path in self._objects)
         group_names = (path[0] for path in object_paths if len(path) > 0)
 
         # Use an ordered dict as an ordered set to find unique
@@ -133,10 +148,10 @@ class TdmsFile(object):
 
         """
 
-        path = components_to_path(group)
+        path = _components_to_path(group)
         return [
-            self.objects[p]
-            for p in self.objects
+            self._objects[p]
+            for p in self._objects
             if p.startswith(path + '/')]
 
     def channel_data(self, group, channel):
@@ -150,6 +165,18 @@ class TdmsFile(object):
         """
 
         return self.object(group, channel).data
+
+    def properties(self):
+        """ Return the properties of this file
+
+        These are properties associated with the root object of the file.
+        """
+
+        try:
+            obj = self.object()
+            return obj.properties
+        except KeyError:
+            return {}
 
     def as_dataframe(self, time_index=False, absolute_time=False):
         """
@@ -165,7 +192,7 @@ class TdmsFile(object):
         import pandas as pd
 
         dataframe_dict = OrderedDict()
-        for key, value in self.objects.items():
+        for key, value in self._objects.items():
             if value.has_data:
                 index = value.time_track(absolute_time) if time_index else None
                 dataframe_dict[key] = pd.Series(data=value.data, index=index)
@@ -230,7 +257,231 @@ class TdmsFile(object):
         return h5file
 
 
-def components_to_path(*args):
+class TdmsObject(object):
+    """Represents an object in a TDMS file.
+
+    :ivar path: The TDMS object path.
+    :ivar properties: Dictionary of TDMS properties defined for this object,
+                      for example the start time and time increment for
+                      waveforms.
+    :ivar has_data: Boolean, true if there is data associated with the object.
+
+    """
+
+    def __init__(
+            self, tdms_file, path, properties, data_type=None,
+            scaler_data_types=None, number_values=0):
+        self.tdms_file = tdms_file
+        self.path = path
+        self.properties = properties
+        self.number_values = number_values
+        self.data_type = data_type
+        self.scaler_data_types = scaler_data_types
+        self.has_data = number_values > 0
+
+        self._data = None
+        self._scaler_data = {}
+        self._data_scaled = None
+
+    def __repr__(self):
+        return "<TdmsObject with path %s>" % self.path
+
+    def property(self, property_name):
+        """Returns the value of a TDMS property
+
+        :param property_name: The name of the property to get.
+        :returns: The value of the requested property.
+        :raises: KeyError if the property isn't found.
+
+        """
+
+        try:
+            return self.properties[property_name]
+        except KeyError:
+            raise KeyError(
+                "Object does not have property '%s'" % property_name)
+
+    @_property_builtin
+    def group(self):
+        """ Returns the name of the group for this object,
+            or None if it is the root object.
+        """
+        path = path_components(self.path)
+        if len(path) > 0:
+            return path[0]
+        return None
+
+    @_property_builtin
+    def channel(self):
+        """ Returns the name of the channel for this object,
+            or None if it is a group or the root object.
+        """
+        path = path_components(self.path)
+        if len(path) > 1:
+            return path[1]
+        return None
+
+    def time_track(self, absolute_time=False, accuracy='ns'):
+        """Return an array of time or the independent variable for this channel
+
+        This depends on the object having the wf_increment
+        and wf_start_offset properties defined.
+        Note that wf_start_offset is usually zero for time-series data.
+        If you have time-series data channels with different start times,
+        you should use the absolute time or calculate the time offsets using
+        the wf_start_time property.
+
+        For larger timespans, the accuracy setting should be set lower.
+        The default setting is 'ns', which has a timespan of
+        [1678 AD, 2262 AD]. For the exact ranges, refer to
+        http://docs.scipy.org/doc/numpy/reference/arrays.datetime.html
+        section "Datetime Units".
+
+        :param absolute_time: Whether the returned time values are absolute
+            times rather than relative to the start time. If true, the
+            wf_start_time property must be set.
+        :param accuracy: The accuracy of the returned datetime64 array.
+        :rtype: NumPy array.
+        :raises: KeyError if required properties aren't found
+
+        """
+
+        try:
+            increment = self.property('wf_increment')
+            offset = self.property('wf_start_offset')
+        except KeyError:
+            raise KeyError("Object does not have time properties available.")
+
+        relative_time = np.linspace(
+            offset,
+            offset + (self.number_values - 1) * increment,
+            self.number_values)
+
+        if not absolute_time:
+            return relative_time
+
+        try:
+            start_time = self.property('wf_start_time')
+        except KeyError:
+            raise KeyError(
+                "Object does not have start time property available.")
+
+        try:
+            unit_correction = {
+                's': 1e0,
+                'ms': 1e3,
+                'us': 1e6,
+                'ns': 1e9,
+            }[accuracy]
+        except KeyError:
+            raise KeyError("Invalid accuracy: {0}".format(accuracy))
+
+        # Because numpy only knows ints as its date datatype,
+        # convert to accuracy.
+        time_type = "timedelta64[{0}]".format(accuracy)
+        return (np.datetime64(start_time) +
+                (relative_time * unit_correction).astype(time_type))
+
+    def as_dataframe(self, absolute_time=False, scaled_data=True):
+        """
+        Converts the TDMS object to a DataFrame
+
+        :param absolute_time: Whether times should be absolute rather than
+            relative to the start time.
+        :param scaled_data: Whether to return scaled or raw data.
+        :return: The TDMS object data.
+        :rtype: pandas.DataFrame
+        """
+
+        import pandas as pd
+
+        def get_data(chan):
+            if scaled_data:
+                return chan.data
+            else:
+                return chan.raw_data
+
+        # When absolute_time is True,
+        # use the wf_start_time as offset for the time_track()
+        try:
+            time = self.time_track(absolute_time)
+        except KeyError:
+            time = None
+        if self.channel is None:
+            return pd.DataFrame.from_dict(OrderedDict(
+                (ch.channel, pd.Series(get_data(ch)))
+                for ch in self.tdms_file.group_channels(self.group)))
+        else:
+            return pd.DataFrame(
+                get_data(self), index=time, columns=[self.path])
+
+    @_property_builtin
+    def data(self):
+        """
+        NumPy array containing data if there is data for this object,
+        otherwise None.
+        """
+        if self._data is None and not self._scaler_data:
+            # self._data is None if data segment is empty
+            return np.empty((0, 1))
+        if self._data_scaled is None:
+            scale = self._get_scaling()
+            if scale is None:
+                self._data_scaled = self._data
+            elif self._scaler_data:
+                self._data_scaled = scale.scale_daqmx(self._scaler_data)
+            else:
+                self._data_scaled = scale.scale(self._data)
+
+        return self._data_scaled
+
+    @_property_builtin
+    def raw_data(self):
+        """
+        The raw, unscaled data array.
+        For unscaled objects this is the same as the data property.
+        """
+        if self._scaler_data:
+            if len(self._scaler_data) == 1:
+                return next(v for v in self._scaler_data.values())
+            else:
+                raise Exception(
+                    "This object has data for multiple DAQmx scalers, "
+                    "use the raw_scaler_data method to get raw data "
+                    "for a scale_id")
+        if self._data is None:
+            # self._data is None if data segment is empty
+            return np.empty((0, 1))
+        return self._data
+
+    def raw_scaler_data(self, scale_id):
+        """
+        Raw DAQmx scaler data for the given scale id
+        """
+        return self._scaler_data[scale_id]
+
+    def _get_scaling(self):
+        try:
+            group = self.tdms_file.object(self.group)
+        except KeyError:
+            group = None
+        group_properties = {} if group is None else group.properties
+        try:
+            root_obj = self.tdms_file.object()
+        except KeyError:
+            root_obj = None
+        file_properties = {} if root_obj is None else root_obj.properties
+        return scaling.get_scaling(
+            self.properties, group_properties, file_properties)
+
+    def _set_raw_data(self, data):
+        self._data = data
+
+    def _set_scaler_data(self, data):
+        self._scaler_data = data
+
+
+def _components_to_path(*args):
     """Convert group and channel to object path"""
 
     return ('/' + '/'.join(

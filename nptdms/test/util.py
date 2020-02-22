@@ -113,7 +113,15 @@ def basic_segment():
         # Raw data index
         "FF FF FF FF"
         # Num properties
-        "00 00 00 00"
+        "01 00 00 00"
+        # Length of property name
+        "03 00 00 00"
+        # Property name (num)
+        "6E 75 6D"
+        # Data type of property
+        "03 00 00 00"
+        # Value
+        "0F 00 00 00"
     )
     data = (
         # Data for segment

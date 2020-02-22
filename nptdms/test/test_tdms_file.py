@@ -2,15 +2,14 @@
 
 import logging
 import numpy as np
-import os
 import tempfile
 import unittest
 
-from nptdms import tdms, types
+from nptdms import tdms
 from nptdms.test.util import *
 
 
-class TDMSTestClass(unittest.TestCase):
+class TdmsFileTests(unittest.TestCase):
     def setUp(self):
         logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 
@@ -804,6 +803,17 @@ class TDMSTestClass(unittest.TestCase):
         self.assertEqual(len(data), 2)
         self.assertEqual(data[0], 3)
         self.assertEqual(data[1], 4)
+
+    def test_file_properties(self):
+        """Test reading properties of the file (root object)"""
+
+        test_file = TestFile()
+        test_file.add_segment(*basic_segment())
+
+        tdms_file = test_file.load()
+
+        file_props = tdms_file.properties()
+        self.assertEqual(file_props['num'], 15)
 
 
 if __name__ == '__main__':

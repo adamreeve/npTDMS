@@ -12,7 +12,7 @@ from nptdms import tdms, writer
 from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject
 
 
-class TDMSTestClass(unittest.TestCase):
+class TdmsAcceptanceTests(unittest.TestCase):
     def setUp(self):
         logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
         logging.getLogger(writer.__name__).setLevel(logging.DEBUG)
