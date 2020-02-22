@@ -2,7 +2,7 @@
 """
 
 from nptdms.utils import Timer, OrderedDict
-from nptdms.tdms_segment import TdmsSegment
+from nptdms.tdms_segment import read_segment_metadata
 from nptdms.log import log_manager
 
 log = log_manager.get_logger(__name__)
@@ -34,12 +34,11 @@ class TdmsReader(object):
             previous_segment = None
             while True:
                 try:
-                    segment = TdmsSegment(self._file)
+                    segment = read_segment_metadata(
+                        self._file, self._prev_segment_objects, previous_segment)
                 except EOFError:
                     # We've finished reading the file
                     break
-                segment.read_metadata(
-                    self._file, self._prev_segment_objects, previous_segment)
 
                 self._update_object_metadata(segment)
                 self._segments.append(segment)
