@@ -269,7 +269,7 @@ class TdmsObject(object):
     """
 
     def __init__(
-            self, tdms_file, path, properties, data_type,
+            self, tdms_file, path, properties, data_type=None,
             scaler_data_types=None, number_values=0):
         self.tdms_file = tdms_file
         self.path = path
@@ -425,7 +425,7 @@ class TdmsObject(object):
             # self._data is None if data segment is empty
             return np.empty((0, 1))
         if self._data_scaled is None:
-            scale = scaling.get_scaling(self)
+            scale = self._get_scaling()
             if scale is None:
                 self._data_scaled = self._data
             elif self._scaler_data:
@@ -459,6 +459,20 @@ class TdmsObject(object):
         Raw DAQmx scaler data for the given scale id
         """
         return self._scaler_data[scale_id]
+
+    def _get_scaling(self):
+        try:
+            group = self.tdms_file.object(self.group)
+        except KeyError:
+            group = None
+        group_properties = {} if group is None else group.properties
+        try:
+            root_obj = self.tdms_file.object()
+        except KeyError:
+            root_obj = None
+        file_properties = {} if root_obj is None else root_obj.properties
+        return scaling.get_scaling(
+            self.properties, group_properties, file_properties)
 
     def _set_raw_data(self, data):
         self._data = data
