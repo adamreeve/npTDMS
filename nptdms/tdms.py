@@ -166,6 +166,7 @@ class TdmsFile(object):
 
         return self.object(group, channel).data
 
+    @_property_builtin
     def properties(self):
         """ Return the properties of this file
 

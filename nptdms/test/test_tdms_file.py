@@ -812,7 +812,7 @@ class TdmsFileTests(unittest.TestCase):
 
         tdms_file = test_file.load()
 
-        file_props = tdms_file.properties()
+        file_props = tdms_file.properties
         self.assertEqual(file_props['num'], 15)
 
 
