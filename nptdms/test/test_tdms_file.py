@@ -2,15 +2,14 @@
 
 import logging
 import numpy as np
-import os
 import tempfile
 import unittest
 
-from nptdms import tdms, types
+from nptdms import tdms
 from nptdms.test.util import *
 
 
-class TDMSTestClass(unittest.TestCase):
+class TdmsFileTests(unittest.TestCase):
     def setUp(self):
         logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 

@@ -1,7 +1,6 @@
 """Test exporting TDMS data to Pandas"""
 
 import unittest
-import sys
 import logging
 from datetime import datetime
 try:
@@ -14,7 +13,7 @@ except ImportError:
     pandas = None
 
 from nptdms import tdms
-from .tdms_test import (
+from .util import (
     TestFile,
     basic_segment,
     string_hexlify,
@@ -142,7 +141,7 @@ def timed_segment():
     return (metadata, data, toc)
 
 
-class TDMSTestClass(unittest.TestCase):
+class PandasTests(unittest.TestCase):
     def setUp(self):
         logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
 

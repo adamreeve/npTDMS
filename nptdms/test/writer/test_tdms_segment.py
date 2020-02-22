@@ -16,7 +16,7 @@ class TestObject(object):
         self.__dict__.update(kwds)
 
 
-class TDMSTestClass(unittest.TestCase):
+class TdmsSegmentTests(unittest.TestCase):
     def test_write_leadin_with_one_channel(self):
         data_type = TestObject(size=4)
 
