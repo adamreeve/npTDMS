@@ -168,9 +168,9 @@ class TdmsFile(object):
 
     @_property_builtin
     def properties(self):
-        """ Return the properties of this file
+        """ Return the properties of this file as a dictionary
 
-        These are properties associated with the root object of the file.
+        These are the properties associated with the root TDMS object.
         """
 
         try:
