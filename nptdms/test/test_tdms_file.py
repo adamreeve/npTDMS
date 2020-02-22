@@ -804,6 +804,17 @@ class TdmsFileTests(unittest.TestCase):
         self.assertEqual(data[0], 3)
         self.assertEqual(data[1], 4)
 
+    def test_file_properties(self):
+        """Test reading properties of the file (root object)"""
+
+        test_file = TestFile()
+        test_file.add_segment(*basic_segment())
+
+        tdms_file = test_file.load()
+
+        file_props = tdms_file.properties()
+        self.assertEqual(file_props['num'], 15)
+
 
 if __name__ == '__main__':
     unittest.main()
