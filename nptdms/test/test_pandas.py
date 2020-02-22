@@ -4,10 +4,6 @@ import unittest
 import logging
 from datetime import datetime
 try:
-    import pytz
-except ImportError:
-    pytz = None
-try:
     import pandas
 except ImportError:
     pandas = None
@@ -19,11 +15,6 @@ from .util import (
     string_hexlify,
     hexlify_value
 )
-
-if pytz:
-    timezone = pytz.utc
-else:
-    timezone = None
 
 
 def within_tol(a, b, tol=1.0e-10):
@@ -197,7 +188,7 @@ class PandasTests(unittest.TestCase):
 
         df = tdmsData.as_dataframe(time_index=True, absolute_time=True)
 
-        expected_start = datetime(2015, 9, 8, 10, 5, 49, tzinfo=timezone)
+        expected_start = datetime(2015, 9, 8, 10, 5, 49)
         self.assertTrue((df.index == expected_start)[0])
 
     @unittest.skipIf(pandas is None, 'Pandas is not installed')
@@ -272,7 +263,7 @@ class PandasTests(unittest.TestCase):
         df = tdmsData.object("Group", "Channel1").as_dataframe(
             absolute_time=True)
 
-        expected_start = datetime(2015, 9, 8, 10, 5, 49, tzinfo=timezone)
+        expected_start = datetime(2015, 9, 8, 10, 5, 49)
         self.assertTrue((df.index == expected_start)[0])
 
 
