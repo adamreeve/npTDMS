@@ -18,18 +18,19 @@ def read_segment_metadata(file, previous_segment_objects, previous_segment=None)
     (position, toc, endianness, data_position, raw_data_offset,
      next_segment_offset, next_segment_pos) = read_lead_in(file)
 
-    ordered_objects = read_segment_objects(
-        file, previous_segment_objects, toc, endianness, previous_segment)
-
     segment_args = (
-        position, toc, endianness, ordered_objects, next_segment_offset,
+        position, toc, endianness, next_segment_offset,
         next_segment_pos, raw_data_offset, data_position)
     if toc['kTocDAQmxRawData']:
-        return DaqmxSegment(*segment_args)
+        segment = DaqmxSegment(*segment_args)
     elif toc["kTocInterleavedData"]:
-        return InterleavedDataSegment(*segment_args)
+        segment = InterleavedDataSegment(*segment_args)
     else:
-        return ContiguousDataSegment(*segment_args)
+        segment = ContiguousDataSegment(*segment_args)
+
+    segment.read_segment_objects(
+        file, previous_segment_objects, previous_segment)
+    return segment
 
 
 def read_lead_in(file):
@@ -95,74 +96,6 @@ def read_lead_in(file):
             next_segment_offset, next_segment_pos)
 
 
-def read_segment_objects(file, previous_segment_objects, toc, endianness, previous_segment=None):
-    """Read segment metadata section and update object information
-
-    :param file: Open TDMS file
-    :param previous_segment_objects: Dictionary of path to the most
-        recently read segment object for a TDMS object.
-    :param toc: Table of contents for segment.
-    :param endianness: Either '<' for little endian or '>' for big endian
-    :param previous_segment: Previous segment in the file.
-    """
-
-    if not toc["kTocMetaData"]:
-        try:
-            return previous_segment.ordered_objects
-        except AttributeError:
-            raise ValueError(
-                "kTocMetaData is not set for segment but "
-                "there is no previous segment")
-
-    if toc["kTocNewObjList"]:
-        ordered_objects = []
-    else:
-        # In this case, there can be a list of new objects that
-        # are appended, or previous objects can also be repeated
-        # if their properties change
-        ordered_objects = [
-            copy(o) for o in previous_segment.ordered_objects]
-
-    log.debug("Reading segment object metadata at %d", file.tell())
-
-    # First four bytes have number of objects in metadata
-    num_objects = types.Int32.read(file, endianness)
-
-    for _ in range(num_objects):
-        # Read the object path
-        object_path = types.String.read(file, endianness)
-
-        # Add this segment object to the list of segment objects,
-        # re-using any properties from previous segments.
-        updating_existing = False
-        segment_obj = None
-        if not toc["kTocNewObjList"]:
-            # Search for the same object from the previous segment
-            # object list.
-            for obj in ordered_objects:
-                if obj.path == object_path:
-                    updating_existing = True
-                    log.debug("Updating object in segment list")
-                    segment_obj = obj
-                    break
-        if not updating_existing:
-            try:
-                prev_segment_obj = previous_segment_objects[object_path]
-                log.debug("Copying previous segment object for %s",
-                          object_path)
-                segment_obj = copy(prev_segment_obj)
-            except KeyError:
-                log.debug("Creating a new segment object for %s",
-                          object_path)
-                segment_obj = TdmsSegmentObject(
-                    object_path, endianness)
-            ordered_objects.append(segment_obj)
-        # Read the metadata for this object, updating any
-        # data structure information and properties.
-        segment_obj.read_metadata(file)
-    return ordered_objects
-
-
 class BaseSegment(object):
     """ Abstract base class for TDMS segments
     """
@@ -174,24 +107,107 @@ class BaseSegment(object):
         'endianness']
 
     def __init__(
-            self, position, toc, endianness, ordered_objects,
-            next_segment_offset, next_segment_pos, raw_data_offset,
-            data_position):
+            self, position, toc, endianness, next_segment_offset,
+            next_segment_pos, raw_data_offset, data_position):
         self.position = position
         self.toc = toc
         self.endianness = endianness
-        self.ordered_objects = ordered_objects
         self.next_segment_offset = next_segment_offset
         self.next_segment_pos = next_segment_pos
         self.raw_data_offset = raw_data_offset
         self.data_position = data_position
         self.num_chunks = 0
         self.final_chunk_proportion = 1.0
-
-        self._calculate_chunks()
+        self.ordered_objects = []
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
+
+    def read_segment_objects(self, file, previous_segment_objects, previous_segment=None):
+        """Read segment metadata section and update object information
+
+        :param file: Open TDMS file
+        :param previous_segment_objects: Dictionary of path to the most
+            recently read segment object for a TDMS object.
+        :param previous_segment: Previous segment in the file.
+        """
+
+        if not self.toc["kTocMetaData"]:
+            try:
+                self.ordered_objects = previous_segment.ordered_objects
+                self._calculate_chunks()
+                return
+            except AttributeError:
+                raise ValueError(
+                    "kTocMetaData is not set for segment but "
+                    "there is no previous segment")
+
+        if not self.toc["kTocNewObjList"]:
+            # In this case, there can be a list of new objects that
+            # are appended, or previous objects can also be repeated
+            # if their properties change
+            self.ordered_objects = [
+                copy(o) for o in previous_segment.ordered_objects]
+
+        log.debug("Reading segment object metadata at %d", file.tell())
+
+        # First four bytes have number of objects in metadata
+        num_objects = types.Int32.read(file, self.endianness)
+
+        for _ in range(num_objects):
+            # Read the object path
+            object_path = types.String.read(file, self.endianness)
+
+            # Add this segment object to the list of segment objects,
+            # re-using any properties from previous segments.
+            updating_existing = False
+            segment_obj = None
+            if not self.toc["kTocNewObjList"]:
+                # Search for the same object from the previous segment
+                # object list.
+                for obj in self.ordered_objects:
+                    if obj.path == object_path:
+                        updating_existing = True
+                        log.debug("Updating object in segment list")
+                        segment_obj = obj
+                        break
+            if not updating_existing:
+                try:
+                    prev_segment_obj = previous_segment_objects[object_path]
+                    log.debug("Copying previous segment object for %s",
+                              object_path)
+                    segment_obj = copy(prev_segment_obj)
+                except KeyError:
+                    log.debug("Creating a new segment object for %s",
+                              object_path)
+                    segment_obj = self._new_segment_object(object_path)
+                self.ordered_objects.append(segment_obj)
+            # Read the metadata for this object, updating any
+            # data structure information and properties.
+            segment_obj.read_metadata(file)
+
+        self._calculate_chunks()
+
+    def read_raw_data(self, f):
+        """Read raw data from a TDMS segment
+
+        :returns: A generator of DataChunk objects with raw channel data for
+            objects in this segment.
+        """
+
+        if not self.toc["kTocRawData"]:
+            yield DataChunk.empty()
+
+        f.seek(self.data_position)
+
+        total_data_size = self.next_segment_offset - self.raw_data_offset
+        log.debug(
+            "Reading %d bytes of data at %d in %d chunks",
+            total_data_size, f.tell(), self.num_chunks)
+
+        data_objects = [o for o in self.ordered_objects if o.has_data]
+        for chunk in range(self.num_chunks):
+            yield self._read_data_chunk(f, data_objects, chunk)
 
     def _calculate_chunks(self):
         """
@@ -223,28 +239,7 @@ class BaseSegment(object):
                 total_data_size, data_size)
             self.num_chunks = 1 + int(total_data_size // data_size)
             self.final_chunk_proportion = (
-                float(chunk_remainder) / float(data_size))
-
-    def read_raw_data(self, f):
-        """Read raw data from a TDMS segment
-
-        :returns: A generator of DataChunk objects with raw channel data for
-            objects in this segment.
-        """
-
-        if not self.toc["kTocRawData"]:
-            yield DataChunk.empty()
-
-        f.seek(self.data_position)
-
-        total_data_size = self.next_segment_offset - self.raw_data_offset
-        log.debug(
-            "Reading %d bytes of data at %d in %d chunks",
-            total_data_size, f.tell(), self.num_chunks)
-
-        data_objects = [o for o in self.ordered_objects if o.has_data]
-        for chunk in range(self.num_chunks):
-            yield self._read_data_chunk(f, data_objects, chunk)
+                    float(chunk_remainder) / float(data_size))
 
     def _get_chunk_size(self):
         return sum([
@@ -254,10 +249,21 @@ class BaseSegment(object):
     def _read_data_chunk(self, file, data_objects, chunk_index):
         raise NotImplementedError("Data chunk reading must be implemented in base classes")
 
+    def _new_segment_object(self, object_path):
+        """ Create a new segment object for a segment
+
+        :param object_path: Path for the object
+        """
+
+        raise NotImplementedError("New segment object creation must be implemented in base classes")
+
 
 class DaqmxSegment(BaseSegment):
     """ A TDMS segment with DAQmx data
     """
+
+    def _new_segment_object(self, object_path):
+        return DaqmxSegmentObject(object_path, self.endianness)
 
     def _get_chunk_size(self):
         # For DAQmxRawData, each channel in a segment has the same number
@@ -326,6 +332,9 @@ class DaqmxSegment(BaseSegment):
 class InterleavedDataSegment(BaseSegment):
     """ A TDMS segment with interleaved data
     """
+
+    def _new_segment_object(self, object_path):
+        return TdmsSegmentObject(object_path, self.endianness)
 
     def _read_data_chunk(self, file, data_objects, chunk_index):
         # If all data types have numpy types and all the lengths are
@@ -397,6 +406,9 @@ class ContiguousDataSegment(BaseSegment):
     """ A TDMS segment with contiguous (non-interleaved) data
     """
 
+    def _new_segment_object(self, object_path):
+        return TdmsSegmentObject(object_path, self.endianness)
+
     def _read_data_chunk(self, file, data_objects, chunk):
         log.debug("Data is contiguous")
         object_data = {}
@@ -412,15 +424,14 @@ class ContiguousDataSegment(BaseSegment):
         return DataChunk.channel_data(object_data)
 
 
-class TdmsSegmentObject(object):
-    """
-    Describes an object in an individual TDMS file segment
+class BaseSegmentObject(object):
+    """ Abstract base class for an object in a TDMS segment
     """
 
     __slots__ = [
         'path', 'number_values', 'data_size',
         'has_data', 'data_type', 'dimension', 'endianness',
-        'daqmx_metadata', 'properties']
+        'properties']
 
     def __init__(self, path, endianness):
         self.path = path
@@ -431,24 +442,7 @@ class TdmsSegmentObject(object):
         self.has_data = True
         self.data_type = None
         self.dimension = 1
-        self.daqmx_metadata = None
         self.properties = None
-
-    def _read_metadata_mx(self, f):
-
-        # Read the data type
-        data_type_val = types.Uint32.read(f, self.endianness)
-        try:
-            self.data_type = types.tds_data_types[data_type_val]
-        except KeyError:
-            raise KeyError("Unrecognised data type: %s" % data_type_val)
-
-        log.debug("DAQmx object data type: %r", self.data_type)
-
-        info = DaqMxMetadata(f, self.endianness)
-        log.debug("DAQmx metadata: %r", info)
-
-        return info
 
     def read_metadata(self, f):
         """Read object metadata and update object information"""
@@ -463,67 +457,14 @@ class TdmsSegmentObject(object):
             self.has_data = False
             # Leave number_values and data_size as set previously,
             # as these may be re-used by later segments.
-        # Data has same structure as previously
         elif raw_data_index == 0x00000000:
             log.debug(
                 "Object has same data structure as in the previous segment")
             self.has_data = True
-        elif raw_data_index in (0x00001269, 0x00001369):
-            # This is a DAQmx raw data segment.
-            #    0x00001269 for segment containing Format Changing scaler.
-            #    0x00001369 for segment containing Digital Line scaler.
-            if raw_data_index == 0x00001369:
-                # special scaling for DAQ's digital input lines?
-                log.warning("DAQmx with Digital Line scaler has not tested")
-
-            # DAQmx raw data format metadata has its own class
-            self.has_data = True
-
-            info = self._read_metadata_mx(f)
-            self.dimension = info.dimension
-            self.data_type = info.data_type
-            # DAQmx format has special chunking
-            self.data_size = info.chunk_size * sum(info.raw_data_widths)
-            self.number_values = info.chunk_size
-            self.daqmx_metadata = info
-            # fall through and read properties
         else:
-            # Metadata format is standard (non-DAQmx) TDMS format.
-            # raw_data_index gives the length of the index information.
+            # New segment metadata, or updates to existing data
             self.has_data = True
-
-            # Read the data type
-            try:
-                self.data_type = types.tds_data_types[
-                    types.Uint32.read(f, self.endianness)]
-            except KeyError:
-                raise KeyError("Unrecognised data type")
-            log.debug("Object data type: %r", self.data_type)
-
-            if (self.data_type.size is None and
-                    self.data_type != types.String):
-                raise ValueError(
-                    "Unsupported data type: %r" % self.data_type)
-
-            # Read data dimension
-            self.dimension = types.Uint32.read(f, self.endianness)
-            # In TDMS version 2.0, 1 is the only valid value for dimension
-            if self.dimension != 1:
-                log.warning("Data dimension is not 1")
-
-            # Read number of values
-            self.number_values = types.Uint64.read(f, self.endianness)
-
-            # Variable length data types have total size
-            if self.data_type in (types.String, ):
-                self.data_size = types.Uint64.read(f, self.endianness)
-            else:
-                self.data_size = (
-                    self.number_values *
-                    self.data_type.size * self.dimension)
-
-            log.debug(
-                "Object number of values in segment: %d", self.number_values)
+            self.read_segment_metadata(f, raw_data_index)
 
         # Read data properties
         num_properties = types.Uint32.read(f, self.endianness)
@@ -532,12 +473,62 @@ class TdmsSegmentObject(object):
             read_property(f, self.endianness)
             for _ in range(num_properties))
 
+    def read_segment_metadata(self, file, raw_data_index):
+        raise NotImplementedError("Segment metadata reading must be implemented in base classes")
+
     @property
     def total_raw_data_width(self):
-        if self.data_type == types.DaqMxRawData:
-            return sum(self.daqmx_metadata.raw_data_widths)
+        raise NotImplementedError("Raw data width must be implemented in base classes")
+
+    @property
+    def scaler_data_types(self):
+        return None
+
+
+class TdmsSegmentObject(BaseSegmentObject):
+    """ A standard (non DAQmx) TDMS segment object
+    """
+
+    def read_segment_metadata(self, f, raw_data_index):
+        # Metadata format is standard (non-DAQmx) TDMS format.
+        # raw_data_index gives the length of the index information.
+
+        # Read the data type
+        try:
+            self.data_type = types.tds_data_types[
+                types.Uint32.read(f, self.endianness)]
+        except KeyError:
+            raise KeyError("Unrecognised data type")
+        log.debug("Object data type: %r", self.data_type)
+
+        if (self.data_type.size is None and
+                self.data_type != types.String):
+            raise ValueError(
+                "Unsupported data type: %r" % self.data_type)
+
+        # Read data dimension
+        self.dimension = types.Uint32.read(f, self.endianness)
+        # In TDMS version 2.0, 1 is the only valid value for dimension
+        if self.dimension != 1:
+            log.warning("Data dimension is not 1")
+
+        # Read number of values
+        self.number_values = types.Uint64.read(f, self.endianness)
+
+        # Variable length data types have total size
+        if self.data_type in (types.String,):
+            self.data_size = types.Uint64.read(f, self.endianness)
         else:
-            return self.data_type.size
+            self.data_size = (
+                    self.number_values *
+                    self.data_type.size * self.dimension)
+
+        log.debug(
+            "Object number of values in segment: %d", self.number_values)
+
+    @property
+    def total_raw_data_width(self):
+        return self.data_type.size
 
     def read_value(self, file):
         """Read a single value from the given file"""
@@ -567,6 +558,58 @@ class TdmsSegmentObject(object):
             return np.zeros(self.number_values, dtype=self.data_type.nptype)
         else:
             return [None] * self.number_values
+
+
+class DaqmxSegmentObject(BaseSegmentObject):
+    """ A DAQmx TDMS segment object
+    """
+
+    __slots__ = ['daqmx_metadata']
+
+    def __init__(self, path, endianness):
+        super(DaqmxSegmentObject, self).__init__(path, endianness)
+        self.daqmx_metadata = None
+
+    def read_segment_metadata(self, f, raw_data_index):
+        if raw_data_index not in (0x00001269, 0x00001369):
+            raise ValueError("Unexpected raw data index for DAQmx data: 0x%08X" % raw_data_index)
+        # This is a DAQmx raw data segment.
+        #    0x00001269 for segment containing Format Changing scaler.
+        #    0x00001369 for segment containing Digital Line scaler.
+        if raw_data_index == 0x00001369:
+            # special scaling for DAQ's digital input lines?
+            log.warning("DAQmx with Digital Line scaler has not tested")
+
+        # Read the data type
+        data_type_val = types.Uint32.read(f, self.endianness)
+        try:
+            self.data_type = types.tds_data_types[data_type_val]
+        except KeyError:
+            raise KeyError("Unrecognised data type: %s" % data_type_val)
+
+        log.debug("DAQmx object data type: %r", self.data_type)
+
+        daqmx_metadata = DaqMxMetadata(f, self.endianness)
+        log.debug("DAQmx metadata: %r", daqmx_metadata)
+
+        self.dimension = daqmx_metadata.dimension
+        self.data_type = daqmx_metadata.data_type
+        # DAQmx format has special chunking
+        self.data_size = daqmx_metadata.chunk_size * sum(daqmx_metadata.raw_data_widths)
+        self.number_values = daqmx_metadata.chunk_size
+        self.daqmx_metadata = daqmx_metadata
+
+    @property
+    def total_raw_data_width(self):
+        return sum(self.daqmx_metadata.raw_data_widths)
+
+    @property
+    def scaler_data_types(self):
+        if self.daqmx_metadata is None:
+            return None
+        return dict(
+            (s.scale_id, s.data_type)
+            for s in self.daqmx_metadata.scalers)
 
 
 class DataChunk(object):

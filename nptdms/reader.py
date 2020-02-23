@@ -90,10 +90,14 @@ class TdmsReader(object):
                     "segments for objects %s. Expected type %s but got %s" %
                     (path, obj.data_type, segment_object.data_type))
             obj.data_type = segment_object.data_type
-            if segment_object.daqmx_metadata is not None:
-                obj.scaler_data_types = dict(
-                    (s.scale_id, s.data_type)
-                    for s in segment_object.daqmx_metadata.scalers)
+            if segment_object.scaler_data_types is not None:
+                if (obj.scaler_data_types is not None and
+                        obj.scaler_data_types != segment_object.scaler_data_types):
+                    raise ValueError(
+                        "Segment data doesn't have the same scaler data types as previous "
+                        "segments for objects %s. Expected types %s but got %s" %
+                        (path, obj.scaler_data_types, segment_object.scaler_data_types))
+                obj.scaler_data_types = segment_object.scaler_data_types
 
 
 class ObjectMetadata(object):
