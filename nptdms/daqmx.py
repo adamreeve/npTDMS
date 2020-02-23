@@ -1,10 +1,136 @@
+from collections import defaultdict
 import numpy as np
 
 from nptdms import types
+from nptdms.base_segment import (
+    BaseSegment, BaseSegmentObject, DataChunk, read_interleaved_segment_bytes)
 from nptdms.log import log_manager
 
 
 log = log_manager.get_logger(__name__)
+
+
+class DaqmxSegment(BaseSegment):
+    """ A TDMS segment with DAQmx data
+    """
+
+    def _new_segment_object(self, object_path):
+        return DaqmxSegmentObject(object_path, self.endianness)
+
+    def _get_chunk_size(self):
+        # For DAQmxRawData, each channel in a segment has the same number
+        # of values and contains the same raw data widths, so use
+        # the first valid channel metadata to calculate the data size.
+        try:
+            return next(
+                o.number_values * o.total_raw_data_width
+                for o in self.ordered_objects
+                if o.has_data and
+                o.number_values * o.total_raw_data_width > 0)
+        except StopIteration:
+            return 0
+
+    def _read_data_chunk(self, file, data_objects, chunk_index):
+        """Read data from DAQmx data segment"""
+
+        log.debug("Reading DAQmx data segment")
+
+        all_daqmx = all(
+            o.data_type == types.DaqMxRawData for o in data_objects)
+        if not all_daqmx:
+            raise Exception("Cannot read a mix of DAQmx and "
+                            "non-DAQmx interleaved data")
+
+        # If we have DAQmx data, we expect all objects to have matching
+        # raw data widths, so just use the first object:
+        raw_data_widths = data_objects[0].daqmx_metadata.raw_data_widths
+        chunk_size = data_objects[0].number_values
+        scaler_data = defaultdict(dict)
+
+        # Data for each set of raw data (corresponding to one card) is
+        # interleaved separately, so read one after another
+        for (raw_buffer_index, raw_data_width) in enumerate(raw_data_widths):
+            # Read all data into 1 byte unsigned ints first
+            combined_data = read_interleaved_segment_bytes(
+                file, raw_data_width, chunk_size)
+
+            # Now set arrays for each scaler of each channel where the scaler
+            # data comes from this set of raw data
+            for (i, obj) in enumerate(data_objects):
+                scalers_for_raw_buffer_index = [
+                    scaler for scaler in obj.daqmx_metadata.scalers
+                    if scaler.raw_buffer_index == raw_buffer_index]
+                for scaler in scalers_for_raw_buffer_index:
+                    offset = scaler.raw_byte_offset
+                    scaler_size = scaler.data_type.size
+                    byte_columns = tuple(
+                        range(offset, offset + scaler_size))
+                    log.debug("Byte columns for channel %d scaler %d: %s",
+                              i, scaler.scale_id, byte_columns)
+                    # Select columns for this scaler, so that number of values
+                    # will be number of bytes per point * number of data
+                    # points. Then use ravel to flatten the results into a
+                    # vector.
+                    this_scaler_data = combined_data[:, byte_columns].ravel()
+                    # Now set correct data type, so that the array length
+                    # should be correct
+                    this_scaler_data.dtype = (
+                        scaler.data_type.nptype.newbyteorder(self.endianness))
+                    scaler_data[obj.path][scaler.scale_id] = this_scaler_data
+
+        return DataChunk.scaler_data(scaler_data)
+
+
+class DaqmxSegmentObject(BaseSegmentObject):
+    """ A DAQmx TDMS segment object
+    """
+
+    __slots__ = ['daqmx_metadata']
+
+    def __init__(self, path, endianness):
+        super(DaqmxSegmentObject, self).__init__(path, endianness)
+        self.daqmx_metadata = None
+
+    def read_segment_metadata(self, f, raw_data_index):
+        if raw_data_index not in (0x00001269, 0x00001369):
+            raise ValueError("Unexpected raw data index for DAQmx data: 0x%08X" % raw_data_index)
+        # This is a DAQmx raw data segment.
+        #    0x00001269 for segment containing Format Changing scaler.
+        #    0x00001369 for segment containing Digital Line scaler.
+        if raw_data_index == 0x00001369:
+            # special scaling for DAQ's digital input lines?
+            log.warning("DAQmx with Digital Line scaler has not tested")
+
+        # Read the data type
+        data_type_val = types.Uint32.read(f, self.endianness)
+        try:
+            self.data_type = types.tds_data_types[data_type_val]
+        except KeyError:
+            raise KeyError("Unrecognised data type: %s" % data_type_val)
+
+        log.debug("DAQmx object data type: %r", self.data_type)
+
+        daqmx_metadata = DaqMxMetadata(f, self.endianness)
+        log.debug("DAQmx metadata: %r", daqmx_metadata)
+
+        self.dimension = daqmx_metadata.dimension
+        self.data_type = daqmx_metadata.data_type
+        # DAQmx format has special chunking
+        self.data_size = daqmx_metadata.chunk_size * sum(daqmx_metadata.raw_data_widths)
+        self.number_values = daqmx_metadata.chunk_size
+        self.daqmx_metadata = daqmx_metadata
+
+    @property
+    def total_raw_data_width(self):
+        return sum(self.daqmx_metadata.raw_data_widths)
+
+    @property
+    def scaler_data_types(self):
+        if self.daqmx_metadata is None:
+            return None
+        return dict(
+            (s.scale_id, s.data_type)
+            for s in self.daqmx_metadata.scalers)
 
 
 class DaqMxMetadata(object):
