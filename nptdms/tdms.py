@@ -41,6 +41,7 @@ class TdmsFile(object):
 
         self._memmap_dir = memmap_dir
         self._channel_data = {}
+        self._objects = OrderedDict()
 
         if hasattr(file, "read"):
             # Is a file
@@ -54,7 +55,6 @@ class TdmsFile(object):
         reader = TdmsReader(tdms_file)
         reader.read_metadata()
 
-        self._objects = {}
         for (path, obj) in reader.object_metadata.items():
             self._objects[path] = TdmsObject(
                 self, path, obj.properties, obj.data_type,
@@ -178,6 +178,12 @@ class TdmsFile(object):
             return obj.properties
         except KeyError:
             return {}
+
+    @_property_builtin
+    def objects(self):
+        """ A dictionary of objects in the TDMS file, where the keys are the object paths.
+        """
+        return self._objects
 
     def as_dataframe(self, time_index=False, absolute_time=False):
         """

@@ -2,10 +2,8 @@
 
 import logging
 import numpy as np
-import tempfile
 import unittest
 
-from nptdms import tdms
 from nptdms.test.util import *
 
 
@@ -28,6 +26,20 @@ class TdmsFileTests(unittest.TestCase):
         self.assertEqual(len(data), 2)
         self.assertEqual(data[0], 3)
         self.assertEqual(data[1], 4)
+
+    def test_get_objects(self):
+        """Test reading data"""
+
+        test_file = TestFile()
+        test_file.add_segment(*basic_segment())
+        tdms_file = test_file.load()
+
+        objects = tdms_file.objects
+        self.assertEqual(len(objects), 4)
+        self.assertTrue("/" in objects.keys())
+        self.assertTrue("/'Group'" in objects.keys())
+        self.assertTrue("/'Group'/'Channel1'" in objects.keys())
+        self.assertTrue("/'Group'/'Channel2'" in objects.keys())
 
     def test_property_read(self):
         """Test reading an object property"""
