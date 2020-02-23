@@ -2,7 +2,7 @@
 """
 
 from nptdms.utils import Timer, OrderedDict
-from nptdms.tdms_segment import TdmsSegment
+from nptdms.tdms_segment import read_segment_metadata
 from nptdms.log import log_manager
 
 log = log_manager.get_logger(__name__)
@@ -34,12 +34,11 @@ class TdmsReader(object):
             previous_segment = None
             while True:
                 try:
-                    segment = TdmsSegment(self._file)
+                    segment = read_segment_metadata(
+                        self._file, self._prev_segment_objects, previous_segment)
                 except EOFError:
                     # We've finished reading the file
                     break
-                segment.read_metadata(
-                    self._file, self._prev_segment_objects, previous_segment)
 
                 self._update_object_metadata(segment)
                 self._segments.append(segment)
@@ -91,10 +90,14 @@ class TdmsReader(object):
                     "segments for objects %s. Expected type %s but got %s" %
                     (path, obj.data_type, segment_object.data_type))
             obj.data_type = segment_object.data_type
-            if segment_object.daqmx_metadata is not None:
-                obj.scaler_data_types = dict(
-                    (s.scale_id, s.data_type)
-                    for s in segment_object.daqmx_metadata.scalers)
+            if segment_object.scaler_data_types is not None:
+                if (obj.scaler_data_types is not None and
+                        obj.scaler_data_types != segment_object.scaler_data_types):
+                    raise ValueError(
+                        "Segment data doesn't have the same scaler data types as previous "
+                        "segments for objects %s. Expected types %s but got %s" %
+                        (path, obj.scaler_data_types, segment_object.scaler_data_types))
+                obj.scaler_data_types = segment_object.scaler_data_types
 
 
 class ObjectMetadata(object):
