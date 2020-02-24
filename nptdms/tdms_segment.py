@@ -212,9 +212,9 @@ class TdmsSegmentObject(BaseSegmentObject):
                 "Unsupported data type: %r" % self.data_type)
 
         # Read data dimension
-        self.dimension = types.Uint32.read(f, self.endianness)
+        dimension = types.Uint32.read(f, self.endianness)
         # In TDMS version 2.0, 1 is the only valid value for dimension
-        if self.dimension != 1:
+        if dimension != 1:
             log.warning("Data dimension is not 1")
 
         # Read number of values
@@ -224,9 +224,7 @@ class TdmsSegmentObject(BaseSegmentObject):
         if self.data_type in (types.String,):
             self.data_size = types.Uint64.read(f, self.endianness)
         else:
-            self.data_size = (
-                    self.number_values *
-                    self.data_type.size * self.dimension)
+            self.data_size = self.number_values * self.data_type.size
 
         log.debug(
             "Object number of values in segment: %d", self.number_values)

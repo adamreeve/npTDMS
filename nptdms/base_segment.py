@@ -177,7 +177,7 @@ class BaseSegmentObject(object):
 
     __slots__ = [
         'path', 'number_values', 'data_size',
-        'has_data', 'data_type', 'dimension', 'endianness',
+        'has_data', 'data_type', 'endianness',
         'properties']
 
     def __init__(self, path, endianness):
@@ -188,7 +188,6 @@ class BaseSegmentObject(object):
         self.data_size = 0
         self.has_data = True
         self.data_type = None
-        self.dimension = 1
         self.properties = None
 
     def read_metadata(self, f):
@@ -215,10 +214,11 @@ class BaseSegmentObject(object):
 
         # Read data properties
         num_properties = types.Uint32.read(f, self.endianness)
-        log.debug("Reading %d properties", num_properties)
-        self.properties = dict(
-            read_property(f, self.endianness)
-            for _ in range(num_properties))
+        if num_properties > 0:
+            log.debug("Reading %d properties", num_properties)
+            self.properties = [
+                read_property(f, self.endianness)
+                for _ in range(num_properties)]
 
     def read_segment_metadata(self, file, raw_data_index):
         raise NotImplementedError("Segment metadata reading must be implemented in base classes")

@@ -73,8 +73,9 @@ class TdmsReader(object):
             except KeyError:
                 obj = ObjectMetadata()
                 self.object_metadata[path] = obj
-            for prop, val in segment_object.properties.items():
-                obj.properties[prop] = val
+            if segment_object.properties is not None:
+                for prop, val in segment_object.properties:
+                    obj.properties[prop] = val
             if segment_object.has_data:
                 if final_chunk_proportion == 1.0:
                     obj.num_values += segment_object.number_values * num_chunks
@@ -102,7 +103,7 @@ class TdmsReader(object):
 
 class ObjectMetadata(object):
     def __init__(self):
-        self.properties = {}
+        self.properties = OrderedDict()
         self.data_type = None
         self.scaler_data_types = None
         self.num_values = 0

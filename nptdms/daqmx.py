@@ -113,7 +113,6 @@ class DaqmxSegmentObject(BaseSegmentObject):
         daqmx_metadata = DaqMxMetadata(f, self.endianness)
         log.debug("DAQmx metadata: %r", daqmx_metadata)
 
-        self.dimension = daqmx_metadata.dimension
         self.data_type = daqmx_metadata.data_type
         # DAQmx format has special chunking
         self.data_size = daqmx_metadata.chunk_size * sum(daqmx_metadata.raw_data_widths)
