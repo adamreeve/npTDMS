@@ -99,6 +99,8 @@ class InterleavedDataSegment(BaseSegment):
     """ A TDMS segment with interleaved data
     """
 
+    __slots__ = []
+
     def _new_segment_object(self, object_path):
         return TdmsSegmentObject(object_path, self.endianness)
 
@@ -172,6 +174,8 @@ class ContiguousDataSegment(BaseSegment):
     """ A TDMS segment with contiguous (non-interleaved) data
     """
 
+    __slots__ = []
+
     def _new_segment_object(self, object_path):
         return TdmsSegmentObject(object_path, self.endianness)
 
@@ -193,6 +197,8 @@ class ContiguousDataSegment(BaseSegment):
 class TdmsSegmentObject(BaseSegmentObject):
     """ A standard (non DAQmx) TDMS segment object
     """
+
+    __slots__ = []
 
     def read_segment_metadata(self, f, raw_data_index):
         # Metadata format is standard (non-DAQmx) TDMS format.
