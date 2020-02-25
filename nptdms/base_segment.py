@@ -18,7 +18,7 @@ class BaseSegment(object):
         'position', 'num_chunks', 'ordered_objects', 'toc_mask',
         'next_segment_offset', 'next_segment_pos',
         'raw_data_offset', 'data_position', 'final_chunk_proportion',
-        'endianness']
+        'endianness', 'object_properties']
 
     def __init__(
             self, position, toc_mask, endianness, next_segment_offset,
@@ -33,6 +33,7 @@ class BaseSegment(object):
         self.num_chunks = 0
         self.final_chunk_proportion = 1.0
         self.ordered_objects = []
+        self.object_properties = None
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
@@ -56,12 +57,15 @@ class BaseSegment(object):
                     "kTocMetaData is not set for segment but "
                     "there is no previous segment")
 
-        if not self.toc_mask & toc_properties['kTocNewObjList']:
+        new_obj_list = self.toc_mask & toc_properties['kTocNewObjList']
+        if not new_obj_list:
             # In this case, there can be a list of new objects that
             # are appended, or previous objects can also be repeated
-            # if their properties change
+            # if their properties change.
+            # Copy the list of objects for now, but any objects that have
+            # metadata changed will need to be copied before being modified.
             self.ordered_objects = [
-                copy(o) for o in previous_segment.ordered_objects]
+                o for o in previous_segment.ordered_objects]
 
         log.debug("Reading segment object metadata at %d", file.tell())
 
@@ -71,36 +75,97 @@ class BaseSegment(object):
         for _ in range(num_objects):
             # Read the object path
             object_path = types.String.read(file, self.endianness)
+            log.debug("Reading metadata for object %s", object_path)
 
-            # Add this segment object to the list of segment objects,
-            # re-using any properties from previous segments.
-            updating_existing = False
-            segment_obj = None
-            if not self.toc_mask & toc_properties['kTocNewObjList']:
-                # Search for the same object from the previous segment
-                # object list.
-                for obj in self.ordered_objects:
-                    if obj.path == object_path:
-                        updating_existing = True
-                        log.debug("Updating object in segment list")
-                        segment_obj = obj
-                        break
-            if not updating_existing:
+            # Check whether we already have this object in our list from
+            # the last segment
+            existing_object = None
+            existing_object_index = None
+            if not new_obj_list:
                 try:
-                    prev_segment_obj = previous_segment_objects[object_path]
-                    log.debug("Copying previous segment object for %s",
-                              object_path)
-                    segment_obj = copy(prev_segment_obj)
-                except KeyError:
-                    log.debug("Creating a new segment object for %s",
-                              object_path)
+                    (existing_object_index, existing_object) = next(
+                        (i, o) for (i, o) in enumerate(self.ordered_objects)
+                        if o.path == object_path)
+                except StopIteration:
+                    pass
+
+            # Check whether we have any previous occurrence of this object
+            try:
+                previous_segment_obj = previous_segment_objects[object_path]
+            except KeyError:
+                previous_segment_obj = None
+
+            raw_data_index_header = types.Uint32.read(file, self.endianness)
+
+            if raw_data_index_header == 0xFFFFFFFF:
+                log.debug("Object has no data in this segment")
+                # Re-use previous object if possible
+                # Leave number_values and data_size as set previously,
+                # as these may be re-used by later segments.
+                if existing_object_index is not None:
+                    if existing_object.has_data:
+                        new_obj = copy(existing_object)
+                        new_obj.has_data = False
+                        self.ordered_objects[existing_object_index] = new_obj
+                elif previous_segment_obj is not None:
+                    if previous_segment_obj.has_data:
+                        obj = copy(previous_segment_obj)
+                        obj.has_data = False
+                    else:
+                        obj = previous_segment_obj
+                    self.ordered_objects.append(obj)
+                else:
+                    obj = self._new_segment_object(object_path)
+                    self.ordered_objects.append(obj)
+            elif raw_data_index_header == 0x00000000:
+                log.debug(
+                    "Object has same data structure as in the previous segment")
+                # Re-use previous object if possible, but if it previously
+                # didn't have data need to now set has_data to True.
+                if existing_object_index is not None:
+                    if not existing_object.has_data:
+                        new_obj = copy(existing_object)
+                        new_obj.has_data = True
+                        self.ordered_objects[existing_object_index] = new_obj
+                elif previous_segment_obj is not None:
+                    if not previous_segment_obj.has_data:
+                        obj = copy(previous_segment_obj)
+                        obj.has_data = True
+                    else:
+                        obj = previous_segment_obj
+                    self.ordered_objects.append(obj)
+                else:
+                    obj = self._new_segment_object(object_path)
+                    self.ordered_objects.append(obj)
+            else:
+                # New segment metadata, or updates to existing data
+                if existing_object_index is not None:
+                    segment_obj = copy(existing_object)
+                    self.ordered_objects[existing_object_index] = segment_obj
+                elif previous_segment_obj is not None:
+                    segment_obj = copy(previous_segment_obj)
+                    self.ordered_objects.append(segment_obj)
+                else:
                     segment_obj = self._new_segment_object(object_path)
-                self.ordered_objects.append(segment_obj)
-            # Read the metadata for this object, updating any
-            # data structure information and properties.
-            segment_obj.read_metadata(file)
+                    self.ordered_objects.append(segment_obj)
+                segment_obj.has_data = True
+                segment_obj.read_raw_data_index(file, raw_data_index_header)
+
+            self._read_object_properties(file, object_path)
 
         self._calculate_chunks()
+
+    def _read_object_properties(self, file, object_path):
+        """Read properties for an object in the segment"""
+
+        num_properties = types.Uint32.read(file, self.endianness)
+        if num_properties > 0:
+            log.debug("Reading %d properties", num_properties)
+            if self.object_properties is None:
+                self.object_properties = {}
+            self.object_properties[object_path] = [
+                read_property(file, self.endianness)
+                for _ in range(num_properties)]
 
     def read_raw_data(self, f):
         """Read raw data from a TDMS segment
@@ -178,50 +243,19 @@ class BaseSegmentObject(object):
 
     __slots__ = [
         'path', 'number_values', 'data_size',
-        'has_data', 'data_type', 'endianness',
-        'properties']
+        'has_data', 'data_type', 'endianness']
 
     def __init__(self, path, endianness):
         self.path = path
-        self.endianness = endianness
-
         self.number_values = 0
         self.data_size = 0
-        self.has_data = True
+        self.has_data = False
         self.data_type = None
-        self.properties = None
+        self.endianness = endianness
 
-    def read_metadata(self, f):
-        """Read object metadata and update object information"""
-
-        raw_data_index = types.Uint32.read(f, self.endianness)
-
-        log.debug("Reading metadata for object %s", self.path)
-
-        # Object has no data in this segment
-        if raw_data_index == 0xFFFFFFFF:
-            log.debug("Object has no data in this segment")
-            self.has_data = False
-            # Leave number_values and data_size as set previously,
-            # as these may be re-used by later segments.
-        elif raw_data_index == 0x00000000:
-            log.debug(
-                "Object has same data structure as in the previous segment")
-            self.has_data = True
-        else:
-            # New segment metadata, or updates to existing data
-            self.has_data = True
-            self.read_segment_metadata(f, raw_data_index)
-
-        # Read data properties
-        num_properties = types.Uint32.read(f, self.endianness)
-        if num_properties > 0:
-            log.debug("Reading %d properties", num_properties)
-            self.properties = [
-                read_property(f, self.endianness)
-                for _ in range(num_properties)]
-
-    def read_segment_metadata(self, file, raw_data_index):
+    def read_raw_data_index(self, file, raw_data_index_header):
+        """ Read the raw data index for a single object in a segment
+        """
         raise NotImplementedError("Segment metadata reading must be implemented in base classes")
 
     @property

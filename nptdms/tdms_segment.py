@@ -199,9 +199,9 @@ class TdmsSegmentObject(BaseSegmentObject):
 
     __slots__ = []
 
-    def read_segment_metadata(self, f, raw_data_index):
+    def read_raw_data_index(self, f, raw_data_index_header):
         # Metadata format is standard (non-DAQmx) TDMS format.
-        # raw_data_index gives the length of the index information.
+        # raw_data_index_header gives the length of the index information.
 
         # Read the data type
         try:

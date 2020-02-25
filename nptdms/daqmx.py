@@ -91,13 +91,15 @@ class DaqmxSegmentObject(BaseSegmentObject):
         super(DaqmxSegmentObject, self).__init__(path, endianness)
         self.daqmx_metadata = None
 
-    def read_segment_metadata(self, f, raw_data_index):
-        if raw_data_index not in (0x00001269, 0x00001369):
-            raise ValueError("Unexpected raw data index for DAQmx data: 0x%08X" % raw_data_index)
+    def read_raw_data_index(self, f, raw_data_index_header):
+        if raw_data_index_header not in (0x00001269, 0x00001369):
+            raise ValueError(
+                "Unexpected raw data index for DAQmx data: 0x%08X" %
+                raw_data_index_header)
         # This is a DAQmx raw data segment.
         #    0x00001269 for segment containing Format Changing scaler.
         #    0x00001369 for segment containing Digital Line scaler.
-        if raw_data_index == 0x00001369:
+        if raw_data_index_header == 0x00001369:
             # special scaling for DAQ's digital input lines?
             log.warning("DAQmx with Digital Line scaler has not tested")
 

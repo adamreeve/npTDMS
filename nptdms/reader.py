@@ -64,6 +64,7 @@ class TdmsReader(object):
     def _update_object_metadata(self, segment):
         num_chunks = segment.num_chunks
         final_chunk_proportion = segment.final_chunk_proportion
+
         for segment_object in segment.ordered_objects:
             path = segment_object.path
             self._prev_segment_objects[path] = segment_object
@@ -73,9 +74,8 @@ class TdmsReader(object):
             except KeyError:
                 obj = ObjectMetadata()
                 self.object_metadata[path] = obj
-            if segment_object.properties is not None:
-                for prop, val in segment_object.properties:
-                    obj.properties[prop] = val
+
+            # Update number of data values
             if segment_object.has_data:
                 if final_chunk_proportion == 1.0:
                     obj.num_values += segment_object.number_values * num_chunks
@@ -84,6 +84,8 @@ class TdmsReader(object):
                         segment_object.number_values * (num_chunks - 1) +
                         int(segment_object.number_values *
                             final_chunk_proportion))
+
+            # Update data type
             if (obj.data_type is not None and
                     obj.data_type != segment_object.data_type):
                 raise ValueError(
@@ -99,6 +101,13 @@ class TdmsReader(object):
                         "segments for objects %s. Expected types %s but got %s" %
                         (path, obj.scaler_data_types, segment_object.scaler_data_types))
                 obj.scaler_data_types = segment_object.scaler_data_types
+
+        # Update properties
+        if segment.object_properties is not None:
+            for path, properties in segment.object_properties.items():
+                obj = self.object_metadata[path]
+                for prop, val in properties:
+                    obj.properties[prop] = val
 
 
 class ObjectMetadata(object):
