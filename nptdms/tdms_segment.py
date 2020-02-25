@@ -1,3 +1,4 @@
+import logging
 import os
 import numpy as np
 
@@ -7,22 +8,21 @@ from nptdms.base_segment import (
     BaseSegment, BaseSegmentObject, DataChunk, read_interleaved_segment_bytes, fromfile)
 from nptdms.daqmx import DaqmxSegment
 from nptdms.log import log_manager
-from nptdms.utils import OrderedDict
 
 
 log = log_manager.get_logger(__name__)
 
 
 def read_segment_metadata(file, previous_segment_objects, previous_segment=None):
-    (position, toc, endianness, data_position, raw_data_offset,
+    (position, toc_mask, endianness, data_position, raw_data_offset,
      next_segment_offset, next_segment_pos) = read_lead_in(file)
 
     segment_args = (
-        position, toc, endianness, next_segment_offset,
+        position, toc_mask, endianness, next_segment_offset,
         next_segment_pos, raw_data_offset, data_position)
-    if toc['kTocDAQmxRawData']:
+    if toc_mask & toc_properties['kTocDAQmxRawData']:
         segment = DaqmxSegment(*segment_args)
-    elif toc["kTocInterleavedData"]:
+    elif toc_mask & toc_properties['kTocInterleavedData']:
         segment = InterleavedDataSegment(*segment_args)
     else:
         segment = ContiguousDataSegment(*segment_args)
@@ -50,13 +50,12 @@ def read_lead_in(file):
     # Next four bytes are table of contents mask
     toc_mask = types.Int32.read(file)
 
-    toc = OrderedDict()
-    for prop_name, prop_mask in toc_properties.items():
-        prop_is_set = (toc_mask & prop_mask) != 0
-        toc[prop_name] = prop_is_set
-        log.debug("Property %s is %s", prop_name, prop_is_set)
+    if log.isEnabledFor(logging.DEBUG):
+        for prop_name, prop_mask in toc_properties.items():
+            prop_is_set = (toc_mask & prop_mask) != 0
+            log.debug("Property %s is %s", prop_name, prop_is_set)
 
-    endianness = '>' if toc['kTocBigEndian'] else '<'
+    endianness = '>' if (toc_mask & toc_properties['kTocBigEndian']) else '<'
 
     # Next four bytes are version number
     version = types.Int32.read(file, endianness)
@@ -91,7 +90,7 @@ def read_lead_in(file):
         next_segment_pos = (
                 position + next_segment_offset + lead_size)
 
-    return (position, toc, endianness, data_position, raw_data_offset,
+    return (position, toc_mask, endianness, data_position, raw_data_offset,
             next_segment_offset, next_segment_pos)
 
 

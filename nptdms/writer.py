@@ -1,6 +1,5 @@
 """Module for writing TDMS files"""
 
-from collections import namedtuple
 try:
     from collections import OrderedDict
 except ImportError:
@@ -95,7 +94,7 @@ class TdmsSegment(object):
         metadata = self.metadata()
         metadata_size = sum(len(val.bytes) for val in metadata)
 
-        toc = ["kTocMetaData", "kTocRawData", "kTocNewObjList"]
+        toc = ['kTocMetaData', 'kTocRawData', 'kTocNewObjList']
         leadin = self.leadin(toc, metadata_size)
 
         file.write(b''.join(val.bytes for val in leadin))
@@ -138,9 +137,8 @@ class TdmsSegment(object):
         leadin.append(Bytes(b'TDSm'))
 
         toc_mask = long(0)
-        for toc_key, toc_val in toc_properties.items():
-            if toc_key in toc:
-                toc_mask = toc_mask | toc_val
+        for toc_flag in toc:
+            toc_mask = toc_mask | toc_properties[toc_flag]
         leadin.append(Int32(toc_mask))
 
         tdms_version = 4712

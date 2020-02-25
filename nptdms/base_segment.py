@@ -3,6 +3,7 @@ from io import UnsupportedOperation
 import numpy as np
 
 from nptdms import types
+from nptdms.common import toc_properties
 from nptdms.log import log_manager
 
 
@@ -14,16 +15,16 @@ class BaseSegment(object):
     """
 
     __slots__ = [
-        'position', 'num_chunks', 'ordered_objects', 'toc',
+        'position', 'num_chunks', 'ordered_objects', 'toc_mask',
         'next_segment_offset', 'next_segment_pos',
         'raw_data_offset', 'data_position', 'final_chunk_proportion',
         'endianness']
 
     def __init__(
-            self, position, toc, endianness, next_segment_offset,
+            self, position, toc_mask, endianness, next_segment_offset,
             next_segment_pos, raw_data_offset, data_position):
         self.position = position
-        self.toc = toc
+        self.toc_mask = toc_mask
         self.endianness = endianness
         self.next_segment_offset = next_segment_offset
         self.next_segment_pos = next_segment_pos
@@ -45,7 +46,7 @@ class BaseSegment(object):
         :param previous_segment: Previous segment in the file.
         """
 
-        if not self.toc["kTocMetaData"]:
+        if not self.toc_mask & toc_properties['kTocMetaData']:
             try:
                 self.ordered_objects = previous_segment.ordered_objects
                 self._calculate_chunks()
@@ -55,7 +56,7 @@ class BaseSegment(object):
                     "kTocMetaData is not set for segment but "
                     "there is no previous segment")
 
-        if not self.toc["kTocNewObjList"]:
+        if not self.toc_mask & toc_properties['kTocNewObjList']:
             # In this case, there can be a list of new objects that
             # are appended, or previous objects can also be repeated
             # if their properties change
@@ -75,7 +76,7 @@ class BaseSegment(object):
             # re-using any properties from previous segments.
             updating_existing = False
             segment_obj = None
-            if not self.toc["kTocNewObjList"]:
+            if not self.toc_mask & toc_properties['kTocNewObjList']:
                 # Search for the same object from the previous segment
                 # object list.
                 for obj in self.ordered_objects:
@@ -108,7 +109,7 @@ class BaseSegment(object):
             objects in this segment.
         """
 
-        if not self.toc["kTocRawData"]:
+        if not self.toc_mask & toc_properties['kTocRawData']:
             yield DataChunk.empty()
 
         f.seek(self.data_position)
