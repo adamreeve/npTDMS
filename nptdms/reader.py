@@ -41,6 +41,7 @@ class TdmsReader(object):
                     break
 
                 self._update_object_metadata(segment)
+                self._update_object_properties(segment)
                 self._segments.append(segment)
                 previous_segment = segment
 
@@ -62,55 +63,76 @@ class TdmsReader(object):
                 yield chunk
 
     def _update_object_metadata(self, segment):
-        num_chunks = segment.num_chunks
-        final_chunk_proportion = segment.final_chunk_proportion
-
+        """ Update object metadata using the metadata read from a single segment
+        """
         for segment_object in segment.ordered_objects:
             path = segment_object.path
             self._prev_segment_objects[path] = segment_object
 
-            try:
-                obj = self.object_metadata[path]
-            except KeyError:
-                obj = ObjectMetadata()
-                self.object_metadata[path] = obj
-
-            # Update number of data values
+            object_metadata = self._get_or_create_object(path)
             if segment_object.has_data:
-                if final_chunk_proportion == 1.0:
-                    obj.num_values += segment_object.number_values * num_chunks
-                else:
-                    obj.num_values += (
-                        segment_object.number_values * (num_chunks - 1) +
-                        int(segment_object.number_values *
-                            final_chunk_proportion))
+                object_metadata.num_values += _number_of_segment_values(segment_object, segment)
+            _update_object_data_type(path, object_metadata, segment_object)
+            _update_object_scaler_data_types(path, object_metadata, segment_object)
 
-            # Update data type
-            if (obj.data_type is not None and
-                    obj.data_type != segment_object.data_type):
-                raise ValueError(
-                    "Segment data doesn't have the same type as previous "
-                    "segments for objects %s. Expected type %s but got %s" %
-                    (path, obj.data_type, segment_object.data_type))
-            obj.data_type = segment_object.data_type
-            if segment_object.scaler_data_types is not None:
-                if (obj.scaler_data_types is not None and
-                        obj.scaler_data_types != segment_object.scaler_data_types):
-                    raise ValueError(
-                        "Segment data doesn't have the same scaler data types as previous "
-                        "segments for objects %s. Expected types %s but got %s" %
-                        (path, obj.scaler_data_types, segment_object.scaler_data_types))
-                obj.scaler_data_types = segment_object.scaler_data_types
-
-        # Update properties
+    def _update_object_properties(self, segment):
+        """ Update object properties using any properties in a segment
+        """
         if segment.object_properties is not None:
             for path, properties in segment.object_properties.items():
-                obj = self.object_metadata[path]
+                object_metadata = self._get_or_create_object(path)
                 for prop, val in properties:
-                    obj.properties[prop] = val
+                    object_metadata.properties[prop] = val
+
+    def _get_or_create_object(self, path):
+        """ Get existing object metadata or create metadata for a new object
+        """
+        try:
+            return self.object_metadata[path]
+        except KeyError:
+            obj = ObjectMetadata()
+            self.object_metadata[path] = obj
+            return obj
+
+
+def _number_of_segment_values(segment_object, segment):
+    """ Compute the number of values an object has in a segment
+    """
+    num_chunks = segment.num_chunks
+    final_chunk_proportion = segment.final_chunk_proportion
+    if final_chunk_proportion == 1.0:
+        return segment_object.number_values * num_chunks
+    else:
+        return (segment_object.number_values * (num_chunks - 1) +
+                int(segment_object.number_values * final_chunk_proportion))
+
+
+def _update_object_data_type(path, obj, segment_object):
+    """ Update the data type for an object using its segment metadata
+    """
+    if obj.data_type is not None and obj.data_type != segment_object.data_type:
+        raise ValueError(
+            "Segment data doesn't have the same type as previous "
+            "segments for objects %s. Expected type %s but got %s" %
+            (path, obj.data_type, segment_object.data_type))
+    obj.data_type = segment_object.data_type
+
+
+def _update_object_scaler_data_types(path, obj, segment_object):
+    """ Update the DAQmx scaler data types for an object using its segment metadata
+    """
+    if segment_object.scaler_data_types is not None:
+        if obj.scaler_data_types is not None and obj.scaler_data_types != segment_object.scaler_data_types:
+            raise ValueError(
+                "Segment data doesn't have the same scaler data types as previous "
+                "segments for objects %s. Expected types %s but got %s" %
+                (path, obj.scaler_data_types, segment_object.scaler_data_types))
+        obj.scaler_data_types = segment_object.scaler_data_types
 
 
 class ObjectMetadata(object):
+    """ Stores information about an object in a TDMS file
+    """
     def __init__(self):
         self.properties = OrderedDict()
         self.data_type = None
