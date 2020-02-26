@@ -72,9 +72,9 @@ class BaseSegment(object):
         for _ in range(num_objects):
             # Read the object path
             object_path = types.String.read(file, self.endianness)
-            log.debug("Reading metadata for object %s", object_path)
-
             raw_data_index_header = types.Uint32.read(file, self.endianness)
+            log.debug("Reading metadata for object %s with index header 0x%08x",
+                      object_path, raw_data_index_header)
 
             # Check whether we already have this object in our list from
             # the last segment
@@ -104,16 +104,13 @@ class BaseSegment(object):
         """ Update raw data index information for an object already in the list of segment objects
         """
         if raw_data_index_header == RAW_DATA_INDEX_NO_DATA:
-            log.debug("Object has no data in this segment")
             # Re-use object but leave data index information as set previously
             if existing_object.has_data:
                 new_obj = copy(existing_object)
                 new_obj.has_data = False
                 self.ordered_objects[existing_object_index] = new_obj
         elif raw_data_index_header == RAW_DATA_INDEX_MATCHES_PREVIOUS:
-            log.debug("Object has same data structure as in the previous segment")
-            # Re-use previous object if possible, but if it previously
-            # didn't have data we need to now set has_data to True.
+            # Re-use object and ensure we set has data to true for this segment
             if not existing_object.has_data:
                 new_obj = copy(existing_object)
                 new_obj.has_data = True
@@ -121,37 +118,34 @@ class BaseSegment(object):
         else:
             # New segment metadata, or updates to existing data
             segment_obj = self._new_segment_object(object_path)
-            self.ordered_objects[existing_object_index] = segment_obj
             segment_obj.has_data = True
             segment_obj.read_raw_data_index(file, raw_data_index_header)
+            self.ordered_objects[existing_object_index] = segment_obj
 
     def _reuse_previous_object(
             self, object_path, previous_segment_obj, raw_data_index_header, file):
         """ Attempt to reuse raw data index information from a previous segment
         """
         if raw_data_index_header == RAW_DATA_INDEX_NO_DATA:
-            log.debug("Object has no data in this segment")
-            # Re-use previous object but leave data index information as set previously
+            # Re-use object but leave data index information as set previously
             if previous_segment_obj.has_data:
-                obj = copy(previous_segment_obj)
-                obj.has_data = False
+                segment_obj = copy(previous_segment_obj)
+                segment_obj.has_data = False
             else:
-                obj = previous_segment_obj
-            self.ordered_objects.append(obj)
+                segment_obj = previous_segment_obj
         elif raw_data_index_header == RAW_DATA_INDEX_MATCHES_PREVIOUS:
-            log.debug("Object has same data structure as in the previous segment")
+            # Re-use previous object and ensure we set has data to true for this segment
             if not previous_segment_obj.has_data:
-                obj = copy(previous_segment_obj)
-                obj.has_data = True
+                segment_obj = copy(previous_segment_obj)
+                segment_obj.has_data = True
             else:
-                obj = previous_segment_obj
-            self.ordered_objects.append(obj)
+                segment_obj = previous_segment_obj
         else:
             # Changed metadata in this segment
             segment_obj = self._new_segment_object(object_path)
-            self.ordered_objects.append(segment_obj)
             segment_obj.has_data = True
             segment_obj.read_raw_data_index(file, raw_data_index_header)
+        self.ordered_objects.append(segment_obj)
 
     def _reuse_previous_segment_metadata(self, previous_segment):
         try:
