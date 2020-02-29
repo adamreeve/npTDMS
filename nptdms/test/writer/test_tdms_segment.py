@@ -11,16 +11,16 @@ from nptdms.writer import TdmsSegment, read_properties_dict
 from nptdms.types import *
 
 
-class TestObject(object):
+class StubObject(object):
     def __init__(self, **kwds):
         self.__dict__.update(kwds)
 
 
 class TdmsSegmentTests(unittest.TestCase):
     def test_write_leadin_with_one_channel(self):
-        data_type = TestObject(size=4)
+        data_type = StubObject(size=4)
 
-        channel = TestObject(
+        channel = StubObject(
             path="",
             has_data=True,
             data=[0] * 10,
@@ -43,7 +43,7 @@ class TdmsSegmentTests(unittest.TestCase):
         self.assert_sequence_equal(leadin, expected_values)
 
     def test_write_leadin_with_object_without_data(self):
-        channel = TestObject(
+        channel = StubObject(
             path="",
             has_data=False)
 
@@ -64,7 +64,7 @@ class TdmsSegmentTests(unittest.TestCase):
         self.assert_sequence_equal(leadin, expected_values)
 
     def test_write_metadata_with_properties(self):
-        data_type = TestObject(enum_value=3)
+        data_type = StubObject(enum_value=3)
 
         # Use an ordered dict for properties so that
         # the order of properties in metadata is guaranteed
@@ -72,7 +72,7 @@ class TdmsSegmentTests(unittest.TestCase):
         properties["prop1"] = String("foo")
         properties["prop2"] = Int32(42)
 
-        channel = TestObject(
+        channel = StubObject(
             path="channel_path",
             has_data=True,
             data=[1] * 10,
@@ -101,7 +101,7 @@ class TdmsSegmentTests(unittest.TestCase):
         self.assert_sequence_equal(metadata, expected_values)
 
     def test_write_metadata_with_no_data(self):
-        obj = TestObject(
+        obj = StubObject(
             path="object_path",
             has_data=False,
             properties={})

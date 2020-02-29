@@ -14,7 +14,7 @@ class TdmsFileTests(unittest.TestCase):
     def test_data_read(self):
         """Test reading data"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
@@ -30,7 +30,7 @@ class TdmsFileTests(unittest.TestCase):
     def test_get_objects(self):
         """Test reading data"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
         tdms_file = test_file.load()
 
@@ -44,7 +44,7 @@ class TdmsFileTests(unittest.TestCase):
     def test_property_read(self):
         """Test reading an object property"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
@@ -56,7 +56,7 @@ class TdmsFileTests(unittest.TestCase):
         segment with the same metadata as before,
         so there is only the lead in and binary data"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         data = (
@@ -80,7 +80,7 @@ class TdmsFileTests(unittest.TestCase):
         """Re-use an object without setting any new metadata and
         re-using the data structure"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         data = (
@@ -141,7 +141,7 @@ class TdmsFileTests(unittest.TestCase):
         """Add a new voltage channel, with the other two channels
         remaining unchanged, so only the new channel is in metadata section"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         toc = ("kTocMetaData", "kTocRawData")
@@ -188,7 +188,7 @@ class TdmsFileTests(unittest.TestCase):
         """In the second segment, increase the channel size
         of one channel"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         toc = ("kTocMetaData", "kTocRawData")
@@ -231,7 +231,7 @@ class TdmsFileTests(unittest.TestCase):
         """In the second segment, remove a channel.
         We need to write a new object list in this case"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         # Keep toc as it was before, with new object list set
@@ -270,7 +270,7 @@ class TdmsFileTests(unittest.TestCase):
         """Add segment and then a repeated segment without
         any lead in or metadata, so data is read in chunks"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         data = data + (
             "05 00 00 00"
@@ -291,7 +291,7 @@ class TdmsFileTests(unittest.TestCase):
     def test_interleaved(self):
         """Test reading interleaved data"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         toc = toc + ("kTocInterleavedData", )
         test_file.add_segment(metadata, data, toc)
@@ -311,7 +311,7 @@ class TdmsFileTests(unittest.TestCase):
         any lead in or metadata, so data is read in chunks,
         but the extra chunk does not have as much data as expected."""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         data = data + (
             "05 00 00 00"
@@ -333,7 +333,7 @@ class TdmsFileTests(unittest.TestCase):
         but the extra chunk does not have as much data as expected.
         This also uses interleaved data"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         toc = toc + ("kTocInterleavedData", )
         data = data + (
@@ -414,7 +414,7 @@ class TdmsFileTests(unittest.TestCase):
             data += hexlify_value("<Q", f)
             data += hexlify_value("<q", s)
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
         test_file.add_segment(metadata, data, toc)
         tdmsData = test_file.load()
@@ -430,7 +430,7 @@ class TdmsFileTests(unittest.TestCase):
 
         # Now test it interleaved
         toc = toc + ("kTocInterleavedData", )
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, toc)
         tdmsData = test_file.load()
         channel_data = tdmsData.channel_data("Group", "TimeChannel1")
@@ -445,7 +445,7 @@ class TdmsFileTests(unittest.TestCase):
     def test_time_track(self):
         """Add a time track to waveform data"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         tdmsData = test_file.load()
@@ -463,7 +463,7 @@ class TdmsFileTests(unittest.TestCase):
         Keep first segment the same but add a second
         segment with no data."""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         toc = ("kTocMetaData", "kTocRawData")
@@ -518,7 +518,7 @@ class TdmsFileTests(unittest.TestCase):
         to trigger a bug with the chunk size calculation.
         """
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
@@ -576,7 +576,7 @@ class TdmsFileTests(unittest.TestCase):
     def test_memmapped_read(self):
         """Test reading data into memmapped arrays"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
         tdmsData = test_file.load(memmap_dir=tempfile.gettempdir())
 
@@ -592,7 +592,7 @@ class TdmsFileTests(unittest.TestCase):
     def test_incomplete_data(self):
         """Test incomplete last segment, eg. if LabView crashed"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         (metadata, data, toc) = basic_segment()
         test_file.add_segment(metadata, data, toc)
         # Add second, incomplete segment
@@ -611,7 +611,7 @@ class TdmsFileTests(unittest.TestCase):
 
         strings = ["abcdefg", "qwertyuiop"]
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
         metadata = (
             # Number of objects
@@ -653,7 +653,7 @@ class TdmsFileTests(unittest.TestCase):
 
         complex_single_arr = np.array([1+2j, 3+4j], dtype=np.complex64)
         complex_double_arr = np.array([5+6j, 7+8j], dtype=np.complex128)
-        test_file = TestFile()
+        test_file = GeneratedFile()
         toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
         metadata = (
             # Number of objects
@@ -714,7 +714,7 @@ class TdmsFileTests(unittest.TestCase):
         group_2_name = "01/02/03 a"
         channel_2_name = "04/05/06 b"
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
 
         toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
 
@@ -772,7 +772,7 @@ class TdmsFileTests(unittest.TestCase):
 
     def test_root_object_paths(self):
         """Test the group and channel properties for the root object"""
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
@@ -782,7 +782,7 @@ class TdmsFileTests(unittest.TestCase):
 
     def test_group_object_paths(self):
         """Test the group and channel properties for a group"""
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
@@ -792,7 +792,7 @@ class TdmsFileTests(unittest.TestCase):
 
     def test_channel_object_paths(self):
         """Test the group and channel properties for a group"""
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
@@ -819,7 +819,7 @@ class TdmsFileTests(unittest.TestCase):
     def test_file_properties(self):
         """Test reading properties of the file (root object)"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
 
         tdms_file = test_file.load()

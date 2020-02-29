@@ -10,7 +10,7 @@ except ImportError:
 
 from nptdms import tdms
 from nptdms.test.util import (
-    TestFile,
+    GeneratedFile,
     basic_segment,
     string_hexlify,
     hexlify_value
@@ -140,7 +140,7 @@ class PandasTests(unittest.TestCase):
     def test_file_as_dataframe(self):
         """Test converting file to Pandas dataframe"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*timed_segment())
         tdmsData = test_file.load()
 
@@ -157,7 +157,7 @@ class PandasTests(unittest.TestCase):
         """Converting file to dataframe with time index should raise when
         time properties aren't present"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
@@ -168,7 +168,7 @@ class PandasTests(unittest.TestCase):
     def test_file_as_dataframe_with_time(self):
         """Test converting file to Pandas dataframe with a time index"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*timed_segment())
         tdmsData = test_file.load()
 
@@ -182,7 +182,7 @@ class PandasTests(unittest.TestCase):
     def test_file_as_dataframe_with_absolute_time(self):
         """Convert file to Pandas dataframe with absolute time index"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*timed_segment())
         tdmsData = test_file.load()
 
@@ -195,7 +195,7 @@ class PandasTests(unittest.TestCase):
     def test_group_as_dataframe(self):
         """Convert a group to dataframe"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*timed_segment())
         tdmsData = test_file.load()
 
@@ -211,7 +211,7 @@ class PandasTests(unittest.TestCase):
     def test_channel_as_dataframe(self):
         """Convert a channel to dataframe"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*timed_segment())
         tdmsData = test_file.load()
 
@@ -225,7 +225,7 @@ class PandasTests(unittest.TestCase):
     def test_channel_as_dataframe_with_time(self):
         """Convert a channel to dataframe with a time index"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*timed_segment())
         tdmsData = test_file.load()
 
@@ -239,7 +239,7 @@ class PandasTests(unittest.TestCase):
     def test_channel_as_dataframe_without_time(self):
         """Converting channel to dataframe should work correctly"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*basic_segment())
         tdmsData = test_file.load()
 
@@ -256,7 +256,7 @@ class PandasTests(unittest.TestCase):
     def test_channel_as_dataframe_with_absolute_time(self):
         """Convert channel to Pandas dataframe with absolute time index"""
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(*timed_segment())
         tdmsData = test_file.load()
 

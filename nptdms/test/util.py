@@ -133,7 +133,7 @@ def basic_segment():
     return (metadata, data, toc)
 
 
-class TestFile(object):
+class GeneratedFile(object):
     """Generate a TDMS file for testing"""
 
     def __init__(self):
@@ -182,7 +182,7 @@ class TestFile(object):
         return tdms.TdmsFile(self.file, *args, **kwargs)
 
 
-class BytesIoTestFile(TestFile):
+class BytesIoTestFile(GeneratedFile):
     def __init__(self):
         self.file = BytesIO()
         self.data = bytes()

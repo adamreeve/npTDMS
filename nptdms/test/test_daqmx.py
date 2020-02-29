@@ -6,7 +6,7 @@ import unittest
 import numpy as np
 
 from nptdms import tdms
-from nptdms.test.util import TestFile, hexlify_value, string_hexlify
+from nptdms.test.util import GeneratedFile, hexlify_value, string_hexlify
 
 
 class DaqmxDataTests(unittest.TestCase):
@@ -29,7 +29,7 @@ class DaqmxDataTests(unittest.TestCase):
             "FE FF"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
 
@@ -55,7 +55,7 @@ class DaqmxDataTests(unittest.TestCase):
             "FE FF"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
 
@@ -81,7 +81,7 @@ class DaqmxDataTests(unittest.TestCase):
             "FE FF FF FF"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
 
@@ -107,7 +107,7 @@ class DaqmxDataTests(unittest.TestCase):
             "FE FF FF FF"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
 
@@ -139,7 +139,7 @@ class DaqmxDataTests(unittest.TestCase):
             "14 00"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
 
@@ -172,7 +172,7 @@ class DaqmxDataTests(unittest.TestCase):
             "04 14 00 24 00 00 00"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
 
@@ -212,7 +212,7 @@ class DaqmxDataTests(unittest.TestCase):
             "14 00"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
         channel = tdms_data.object("Group", "Channel1")
@@ -246,7 +246,7 @@ class DaqmxDataTests(unittest.TestCase):
             "04 14 00 24 00 00 00"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
         channel = tdms_data.object("Group", "Channel1")
@@ -285,7 +285,7 @@ class DaqmxDataTests(unittest.TestCase):
             "0D 00" "0E 00" "0F 00" "10 00"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
 
@@ -330,7 +330,7 @@ class DaqmxDataTests(unittest.TestCase):
             "13 00 00 00" "14 00 00 00"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
 
@@ -373,7 +373,7 @@ class DaqmxDataTests(unittest.TestCase):
             "0D 00" "0E 00" "0F 00" "10 00"
         )
 
-        test_file = TestFile()
+        test_file = GeneratedFile()
         test_file.add_segment(metadata, data, segment_toc())
         tdms_data = test_file.load()
 
