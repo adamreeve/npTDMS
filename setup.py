@@ -43,6 +43,7 @@ setup(
   ],
   install_requires = ['numpy'],
   extras_require = {
+      'test': ['pytest'],
       'pandas': ['pandas'],
       'hdf': ['h5py'],
       'thermocouple_scaling': ['thermocouples_reference', 'scipy'],
