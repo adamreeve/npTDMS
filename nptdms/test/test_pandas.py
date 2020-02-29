@@ -9,7 +9,7 @@ except ImportError:
     pandas = None
 
 from nptdms import tdms
-from .util import (
+from nptdms.test.util import (
     TestFile,
     basic_segment,
     string_hexlify,
