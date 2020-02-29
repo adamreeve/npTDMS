@@ -791,8 +791,8 @@ def test_root_object_paths():
     tdms_data = test_file.load()
 
     obj = tdms_data.object()
-    assert obj.group == None
-    assert obj.channel == None
+    assert obj.group is None
+    assert obj.channel is None
 
 
 def test_group_object_paths():
@@ -803,7 +803,7 @@ def test_group_object_paths():
 
     obj = tdms_data.object("Group")
     assert obj.group == "Group"
-    assert obj.channel == None
+    assert obj.channel is None
 
 
 def test_channel_object_paths():
