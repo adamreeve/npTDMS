@@ -53,16 +53,16 @@ def test_no_metadata_segment():
     so there is only the lead in and binary data"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
-    test_file.add_segment(metadata, data, toc)
+    (toc, metadata, data) = basic_segment()
+    test_file.add_segment(toc, metadata, data)
     data = (
         "05 00 00 00"
         "06 00 00 00"
         "07 00 00 00"
         "08 00 00 00"
     )
-    toc = ("kTocRawData")
-    test_file.add_segment('', data, toc)
+    toc = ("kTocRawData", )
+    test_file.add_segment(toc, '', data)
     tdms_data = test_file.load()
 
     data = tdms_data.channel_data("Group", "Channel1")
@@ -78,8 +78,8 @@ def test_no_metadata_object():
     re-using the data structure"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
-    test_file.add_segment(metadata, data, toc)
+    (toc, metadata, data) = basic_segment()
+    test_file.add_segment(toc, metadata, data)
     data = (
         "05 00 00 00"
         "06 00 00 00"
@@ -124,7 +124,7 @@ def test_no_metadata_object():
         "00 00 00 00"
         # Number of properties
         "00 00 00 00")
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.channel_data("Group", "Channel1")
@@ -140,8 +140,8 @@ def test_new_channel():
     remaining unchanged, so only the new channel is in metadata section"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
-    test_file.add_segment(metadata, data, toc)
+    (toc, metadata, data) = basic_segment()
+    test_file.add_segment(toc, metadata, data)
     toc = ("kTocMetaData", "kTocRawData")
     metadata = (
         # Number of objects
@@ -169,7 +169,7 @@ def test_new_channel():
         "09 00 00 00"
         "0A 00 00 00"
     )
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.channel_data("Group", "Channel1")
@@ -188,8 +188,8 @@ def test_larger_channel():
     of one channel"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
-    test_file.add_segment(metadata, data, toc)
+    (toc, metadata, data) = basic_segment()
+    test_file.add_segment(toc, metadata, data)
     toc = ("kTocMetaData", "kTocRawData")
     metadata = (
         # Number of objects
@@ -217,7 +217,7 @@ def test_larger_channel():
         "09 00 00 00"
         "0A 00 00 00"
     )
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
     data = tdms_data.channel_data("Group", "Channel1")
     assert len(data) == 4
@@ -232,8 +232,8 @@ def test_remove_channel():
     We need to write a new object list in this case"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
-    test_file.add_segment(metadata, data, toc)
+    (toc, metadata, data) = basic_segment()
+    test_file.add_segment(toc, metadata, data)
     # Keep toc as it was before, with new object list set
     metadata = (
         # Number of objects
@@ -257,7 +257,7 @@ def test_remove_channel():
         "05 00 00 00"
         "06 00 00 00"
     )
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
     data = tdms_data.channel_data("Group", "Channel1")
     assert len(data) == 4
@@ -272,14 +272,14 @@ def test_no_lead_in():
     any lead in or metadata, so data is read in chunks"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
+    (toc, metadata, data) = basic_segment()
     data = data + (
         "05 00 00 00"
         "06 00 00 00"
         "07 00 00 00"
         "08 00 00 00"
     )
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.channel_data("Group", "Channel1")
@@ -294,9 +294,9 @@ def test_interleaved():
     """Test reading interleaved data"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
+    (toc, metadata, data) = basic_segment()
     toc = toc + ("kTocInterleavedData", )
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.channel_data("Group", "Channel1")
@@ -315,12 +315,12 @@ def test_less_data_than_expected():
     but the extra chunk does not have as much data as expected."""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
+    (toc, metadata, data) = basic_segment()
     data = data + (
         "05 00 00 00"
         "06 00 00 00"
     )
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.channel_data("Group", "Channel1")
@@ -338,13 +338,13 @@ def test_less_data_than_expected_interleaved():
     This also uses interleaved data"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
+    (toc, metadata, data) = basic_segment()
     toc = toc + ("kTocInterleavedData", )
     data = data + (
         "05 00 00 00"
         "06 00 00 00"
     )
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.channel_data("Group", "Channel1")
@@ -421,7 +421,7 @@ def test_timestamp_data():
 
     test_file = GeneratedFile()
     toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
     channel_data = tdms_data.channel_data("Group", "TimeChannel1")
     assert len(channel_data) == 2
@@ -436,7 +436,7 @@ def test_timestamp_data():
     # Now test it interleaved
     toc = toc + ("kTocInterleavedData", )
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
     channel_data = tdms_data.channel_data("Group", "TimeChannel1")
     assert len(channel_data) == 2
@@ -452,8 +452,8 @@ def test_time_track():
     """Add a time track to waveform data"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
-    test_file.add_segment(metadata, data, toc)
+    (toc, metadata, data) = basic_segment()
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     obj = tdms_data.object("Group", "Channel2")
@@ -471,8 +471,8 @@ def test_no_data_section():
     segment with no data."""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
-    test_file.add_segment(metadata, data, toc)
+    (toc, metadata, data) = basic_segment()
+    test_file.add_segment(toc, metadata, data)
     toc = ("kTocMetaData", "kTocRawData")
     metadata = (
         # Number of objects
@@ -509,7 +509,7 @@ def test_no_data_section():
         # Number of properties (0)
         "00 00 00 00")
     data = ""
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
     data = tdms_data.channel_data("Group", "Channel1")
     assert len(data) == 2
@@ -527,8 +527,8 @@ def test_repeated_object_without_data():
     """
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
-    test_file.add_segment(metadata, data, toc)
+    (toc, metadata, data) = basic_segment()
+    test_file.add_segment(toc, metadata, data)
     toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
     metadata = (
         # Number of objects
@@ -569,7 +569,7 @@ def test_repeated_object_without_data():
         "01 00 00 00"
         "02 00 00 00"
     )
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
     data = tdms_data.channel_data("Group", "Channel1")
     assert len(data) == 2
@@ -603,10 +603,10 @@ def test_incomplete_data():
     """Test incomplete last segment, eg. if LabView crashed"""
 
     test_file = GeneratedFile()
-    (metadata, data, toc) = basic_segment()
-    test_file.add_segment(metadata, data, toc)
+    (toc, metadata, data) = basic_segment()
+    test_file.add_segment(toc, metadata, data)
     # Add second, incomplete segment
-    test_file.add_segment(metadata, data, toc, incomplete=True)
+    test_file.add_segment(toc, metadata, data, incomplete=True)
     tdms_data = test_file.load()
 
     # We should be able to read the incomplete segment as well as
@@ -651,7 +651,7 @@ def test_string_data():
     )
     for string in strings:
         data += string_hexlify(string)
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.channel_data("Group", "StringChannel")
@@ -707,7 +707,7 @@ def test_complex_data():
         data += hexlify_value("<d", num.real)
         data += hexlify_value("<d", num.imag)
 
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.channel_data("Group", "ComplexSingleChannel")
@@ -772,7 +772,7 @@ def test_slash_and_space_in_name():
         "04 00 00 00"
     )
 
-    test_file.add_segment(metadata, data, toc)
+    test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
     assert len(tdms_data.groups()) == 2
