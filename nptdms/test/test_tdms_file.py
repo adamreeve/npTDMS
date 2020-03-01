@@ -1,24 +1,20 @@
 """Test reading of example TDMS files"""
 
 import numpy as np
+import pytest
 from nptdms.test.util import *
+from nptdms.test.scenarios import get_scenarios
 
 
-def test_data_read():
+@pytest.mark.parametrize("test_file,expected_data", get_scenarios())
+def test_read_channel_data(test_file, expected_data):
     """Test reading data"""
 
-    test_file = GeneratedFile()
-    test_file.add_segment(*basic_segment())
     tdms_data = test_file.load()
 
-    data = tdms_data.channel_data("Group", "Channel1")
-    assert len(data) == 2
-    assert data[0] == 1
-    assert data[1] == 2
-    data = tdms_data.channel_data("Group", "Channel2")
-    assert len(data) == 2
-    assert data[0] == 3
-    assert data[1] == 4
+    for ((group, channel), expected_data) in expected_data.items():
+        actual_data = tdms_data.object(group, channel).data
+        np.testing.assert_almost_equal(actual_data, expected_data)
 
 
 def test_get_objects():
