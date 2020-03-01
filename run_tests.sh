@@ -7,7 +7,8 @@ docker run -i -t --rm \
         export LC_ALL=C.UTF-8 &&
         cd /nptdms &&
         pep8 ./nptdms &&
-        pip install .[hdf,pandas,thermocouple_scaling] &&
-        nosetests &&
-        pip3 install .[hdf,pandas,thermocouple_scaling] &&
-        nosetests3"
+        pip install pytest==4.6.9 &&
+        pip install .[test,hdf,pandas,thermocouple_scaling] &&
+        python -m pytest &&
+        pip3 install .[test,hdf,pandas,thermocouple_scaling] &&
+        python3 -m pytest"

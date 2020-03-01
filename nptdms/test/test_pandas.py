@@ -1,16 +1,14 @@
 """Test exporting TDMS data to Pandas"""
 
-import unittest
-import logging
 from datetime import datetime
+import pytest
 try:
     import pandas
 except ImportError:
-    pandas = None
+    pytest.skip("Skipping Pandas tests as Pandas is not installed", allow_module_level=True)
 
-from nptdms import tdms
-from .util import (
-    TestFile,
+from nptdms.test.util import (
+    GeneratedFile,
     basic_segment,
     string_hexlify,
     hexlify_value
@@ -129,143 +127,134 @@ def timed_segment():
         "03 00 00 00"
         "04 00 00 00"
     )
-    return (metadata, data, toc)
+    return metadata, data, toc
 
 
-class PandasTests(unittest.TestCase):
-    def setUp(self):
-        logging.getLogger(tdms.__name__).setLevel(logging.DEBUG)
+def test_file_as_dataframe():
+    """Test converting file to Pandas dataframe"""
 
-    @unittest.skipIf(pandas is None, 'Pandas is not installed')
-    def test_file_as_dataframe(self):
-        """Test converting file to Pandas dataframe"""
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+    tdms_data = test_file.load()
 
-        test_file = TestFile()
-        test_file.add_segment(*timed_segment())
-        tdmsData = test_file.load()
+    df = tdms_data.as_dataframe()
 
-        df = tdmsData.as_dataframe()
+    assert len(df) == 2
+    assert "/'Group'/'Channel1'" in df.keys()
+    assert "/'Group'/'Channel2'" in df.keys()
 
-        self.assertEqual(len(df), 2)
-        self.assertIn("/'Group'/'Channel1'", df.keys())
-        self.assertIn("/'Group'/'Channel2'", df.keys())
-
-        self.assertTrue((df["/'Group'/'Channel1'"] == [1, 2]).all())
-
-    @unittest.skipIf(pandas is None, 'Pandas is not installed')
-    def test_file_as_dataframe_without_time(self):
-        """Converting file to dataframe with time index should raise when
-        time properties aren't present"""
-
-        test_file = TestFile()
-        test_file.add_segment(*basic_segment())
-        tdmsData = test_file.load()
-
-        with self.assertRaises(KeyError):
-            df = tdmsData.as_dataframe(time_index=True)
-
-    @unittest.skipIf(pandas is None, 'Pandas is not installed')
-    def test_file_as_dataframe_with_time(self):
-        """Test converting file to Pandas dataframe with a time index"""
-
-        test_file = TestFile()
-        test_file.add_segment(*timed_segment())
-        tdmsData = test_file.load()
-
-        df = tdmsData.as_dataframe(time_index=True)
-
-        self.assertEqual(len(df.index), 2)
-        self.assertTrue(within_tol(df.index[0], 2.0))
-        self.assertTrue(within_tol(df.index[1], 2.1))
-
-    @unittest.skipIf(pandas is None, 'Pandas is not installed')
-    def test_file_as_dataframe_with_absolute_time(self):
-        """Convert file to Pandas dataframe with absolute time index"""
-
-        test_file = TestFile()
-        test_file.add_segment(*timed_segment())
-        tdmsData = test_file.load()
-
-        df = tdmsData.as_dataframe(time_index=True, absolute_time=True)
-
-        expected_start = datetime(2015, 9, 8, 10, 5, 49)
-        self.assertTrue((df.index == expected_start)[0])
-
-    @unittest.skipIf(pandas is None, 'Pandas is not installed')
-    def test_group_as_dataframe(self):
-        """Convert a group to dataframe"""
-
-        test_file = TestFile()
-        test_file.add_segment(*timed_segment())
-        tdmsData = test_file.load()
-
-        df = tdmsData.object("Group").as_dataframe()
-        self.assertEqual(len(df), 2)
-        self.assertEqual(len(df.keys()), 2)
-        self.assertIn("Channel1", df.keys())
-        self.assertIn("Channel2", df.keys())
-        self.assertTrue((df["Channel1"] == [1, 2]).all())
-        self.assertTrue((df["Channel2"] == [3, 4]).all())
-
-    @unittest.skipIf(pandas is None, 'Pandas is not installed')
-    def test_channel_as_dataframe(self):
-        """Convert a channel to dataframe"""
-
-        test_file = TestFile()
-        test_file.add_segment(*timed_segment())
-        tdmsData = test_file.load()
-
-        df = tdmsData.object("Group", "Channel2").as_dataframe()
-        self.assertEqual(len(df), 2)
-        self.assertEqual(len(df.keys()), 1)
-        self.assertIn("/'Group'/'Channel2'", df.keys())
-        self.assertTrue((df["/'Group'/'Channel2'"] == [3, 4]).all())
-
-    @unittest.skipIf(pandas is None, 'Pandas is not installed')
-    def test_channel_as_dataframe_with_time(self):
-        """Convert a channel to dataframe with a time index"""
-
-        test_file = TestFile()
-        test_file.add_segment(*timed_segment())
-        tdmsData = test_file.load()
-
-        df = tdmsData.object("Group", "Channel2").as_dataframe()
-
-        self.assertEqual(len(df.index), 2)
-        self.assertTrue(within_tol(df.index[0], 2.0))
-        self.assertTrue(within_tol(df.index[1], 2.1))
-
-    @unittest.skipIf(pandas is None, 'Pandas is not installed')
-    def test_channel_as_dataframe_without_time(self):
-        """Converting channel to dataframe should work correctly"""
-
-        test_file = TestFile()
-        test_file.add_segment(*basic_segment())
-        tdmsData = test_file.load()
-
-        df = tdmsData.object("Group", "Channel2").as_dataframe()
-
-        self.assertEqual(len(df.index), 2)
-        self.assertEqual(len(df.values), 2)
-        self.assertTrue(within_tol(df.index[0], 0.0))
-        self.assertTrue(within_tol(df.index[1], 0.1))
-        self.assertTrue(within_tol(df.values[0], 3.0))
-        self.assertTrue(within_tol(df.values[1], 4.0))
-
-    @unittest.skipIf(pandas is None, 'Pandas is not installed')
-    def test_channel_as_dataframe_with_absolute_time(self):
-        """Convert channel to Pandas dataframe with absolute time index"""
-
-        test_file = TestFile()
-        test_file.add_segment(*timed_segment())
-        tdmsData = test_file.load()
-
-        df = tdmsData.object("Group", "Channel1").as_dataframe(
-            absolute_time=True)
-
-        expected_start = datetime(2015, 9, 8, 10, 5, 49)
-        self.assertTrue((df.index == expected_start)[0])
+    assert (df["/'Group'/'Channel1'"] == [1, 2]).all()
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_file_as_dataframe_without_time():
+    """Converting file to dataframe with time index should raise when
+    time properties aren't present"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    with pytest.raises(KeyError):
+        tdms_data.as_dataframe(time_index=True)
+
+
+def test_file_as_dataframe_with_time():
+    """Test converting file to Pandas dataframe with a time index"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+    tdms_data = test_file.load()
+
+    df = tdms_data.as_dataframe(time_index=True)
+
+    assert len(df.index) == 2
+    assert within_tol(df.index[0], 2.0)
+    assert within_tol(df.index[1], 2.1)
+
+
+def test_file_as_dataframe_with_absolute_time():
+    """Convert file to Pandas dataframe with absolute time index"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+    tdms_data = test_file.load()
+
+    df = tdms_data.as_dataframe(time_index=True, absolute_time=True)
+
+    expected_start = datetime(2015, 9, 8, 10, 5, 49)
+    assert (df.index == expected_start)[0]
+
+
+def test_group_as_dataframe():
+    """Convert a group to dataframe"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+    tdms_data = test_file.load()
+
+    df = tdms_data.object("Group").as_dataframe()
+    assert len(df) == 2
+    assert len(df.keys()) == 2
+    assert "Channel1" in df.keys()
+    assert "Channel2" in df.keys()
+    assert (df["Channel1"] == [1, 2]).all()
+    assert (df["Channel2"] == [3, 4]).all()
+
+
+def test_channel_as_dataframe():
+    """Convert a channel to dataframe"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+    tdms_data = test_file.load()
+
+    df = tdms_data.object("Group", "Channel2").as_dataframe()
+    assert len(df) == 2
+    assert len(df.keys()) == 1
+    assert "/'Group'/'Channel2'" in df.keys()
+    assert (df["/'Group'/'Channel2'"] == [3, 4]).all()
+
+
+def test_channel_as_dataframe_with_time():
+    """Convert a channel to dataframe with a time index"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+    tdms_data = test_file.load()
+
+    df = tdms_data.object("Group", "Channel2").as_dataframe()
+
+    assert len(df.index) == 2
+    assert within_tol(df.index[0], 2.0)
+    assert within_tol(df.index[1], 2.1)
+
+
+def test_channel_as_dataframe_without_time():
+    """Converting channel to dataframe should work correctly"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    df = tdms_data.object("Group", "Channel2").as_dataframe()
+
+    assert len(df.index) == 2
+    assert len(df.values) == 2
+    assert within_tol(df.index[0], 0.0)
+    assert within_tol(df.index[1], 0.1)
+    assert within_tol(df.values[0], 3.0)
+    assert within_tol(df.values[1], 4.0)
+
+
+def test_channel_as_dataframe_with_absolute_time():
+    """Convert channel to Pandas dataframe with absolute time index"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+    tdms_data = test_file.load()
+
+    df = tdms_data.object("Group", "Channel1").as_dataframe(
+        absolute_time=True)
+
+    expected_start = datetime(2015, 9, 8, 10, 5, 49)
+    assert (df.index == expected_start)[0]

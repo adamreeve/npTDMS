@@ -9,14 +9,15 @@ build:
     - script:
         name: Test on Python 2.7
         code: |
-          pip install .[hdf,pandas,thermocouple_scaling]
-          nosetests
+          pip install pytest==4.6.9
+          pip install .[test,hdf,pandas,thermocouple_scaling]
+          python -m pytest
     - script:
         name: Test on Python 3
         code: |
           export LC_ALL=C.UTF-8
-          pip3 install .[hdf,pandas,thermocouple_scaling]
-          nosetests3
+          pip3 install .[test,hdf,pandas,thermocouple_scaling]
+          python3 -m pytest
 
 deploy:
   steps:
