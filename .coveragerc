@@ -1,0 +1,7 @@
+[report]
+omit = nptdms/test/*
+exclude_lines =
+    # Ignore repr methods only used for debugging
+    def __repr__
+    # Ignore handling failing imports
+    except ImportError
