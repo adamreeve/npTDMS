@@ -6,6 +6,7 @@
 /MANIFEST
 *.pyc
 *.swp
+.tox
 
 # Wercker directories
 _builds
