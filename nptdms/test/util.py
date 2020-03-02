@@ -33,6 +33,51 @@ def segment_objects_metadata(*args):
     return num_objects_hex + "".join(args)
 
 
+def channel_metadata(channel_name, data_type, num_values):
+    return (
+        # Length of the object path
+        hexlify_value('<I', len(channel_name)) +
+        # Object path
+        string_hexlify(channel_name) +
+        # Length of index information
+        "14 00 00 00" +
+        # Raw data data type
+        hexlify_value('<I', data_type) +
+        # Dimension
+        "01 00 00 00" +
+        # Number of raw data values
+        hexlify_value('<Q', num_values) +
+        # Number of properties (0)
+        "00 00 00 00"
+    )
+
+
+def channel_metadata_with_repeated_structure(channel_name):
+    return (
+        # Length of the object path
+        hexlify_value('<I', len(channel_name)) +
+        # Object path
+        string_hexlify(channel_name) +
+        # Raw data index header meaning repeat previous data structure
+        "00 00 00 00" +
+        # Number of properties (0)
+        "00 00 00 00"
+    )
+
+
+def channel_metadata_with_no_data(channel_name):
+    return (
+        # Length of the object path
+        hexlify_value('<I', len(channel_name)) +
+        # Object path
+        string_hexlify(channel_name) +
+        # Raw data index header meaning no data in this segment
+        "FF FF FF FF" +
+        # Number of properties (0)
+        "00 00 00 00"
+    )
+
+
 def basic_segment():
     """Basic TDMS segment with one group and two channels"""
 
