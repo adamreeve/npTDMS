@@ -36,7 +36,7 @@ def single_segment_with_one_channel():
         "01 00 00 00" "02 00 00 00"
     )
     expected_data = {
-        ('group', 'channel1'): np.array([1.0, 2.0]),
+        ('group', 'channel1'): np.array([1, 2], dtype=np.int32),
     }
     return test_file, expected_data
 
@@ -54,8 +54,8 @@ def single_segment_with_two_channels():
         "03 00 00 00" "04 00 00 00"
     )
     expected_data = {
-        ('group', 'channel1'): np.array([1.0, 2.0]),
-        ('group', 'channel2'): np.array([3.0, 4.0]),
+        ('group', 'channel1'): np.array([1, 2], dtype=np.int32),
+        ('group', 'channel2'): np.array([3, 4], dtype=np.int32),
     }
     return test_file, expected_data
 
@@ -73,8 +73,8 @@ def single_segment_with_two_channels_interleaved():
         "03 00 00 00" "04 00 00 00"
     )
     expected_data = {
-        ('group', 'channel1'): np.array([1.0, 3.0]),
-        ('group', 'channel2'): np.array([2.0, 4.0]),
+        ('group', 'channel1'): np.array([1, 3], dtype=np.int32),
+        ('group', 'channel2'): np.array([2, 4], dtype=np.int32),
     }
     return test_file, expected_data
 

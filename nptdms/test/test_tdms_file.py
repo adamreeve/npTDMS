@@ -14,6 +14,7 @@ def test_read_channel_data(test_file, expected_data):
 
     for ((group, channel), expected_data) in expected_data.items():
         actual_data = tdms_data.object(group, channel).data
+        assert actual_data.dtype == expected_data.dtype
         np.testing.assert_almost_equal(actual_data, expected_data)
 
 
