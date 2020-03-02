@@ -152,7 +152,7 @@ def test_new_channel():
         "03 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -200,7 +200,7 @@ def test_larger_channel():
         "03 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "04 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -244,7 +244,7 @@ def test_remove_channel():
         "03 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -390,7 +390,7 @@ def test_timestamp_data():
         "44 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -405,7 +405,7 @@ def test_timestamp_data():
         "44 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -483,7 +483,7 @@ def test_no_data_section():
         "03 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "00 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -499,7 +499,7 @@ def test_no_data_section():
         "03 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "00 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -556,7 +556,7 @@ def test_repeated_object_without_data():
         "03 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -633,7 +633,7 @@ def test_string_data():
         "20 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of bytes in data
@@ -676,7 +676,7 @@ def test_complex_data():
         "0C 00 08 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -690,7 +690,7 @@ def test_complex_data():
         "0D 00 10 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -753,7 +753,7 @@ def test_slash_and_space_in_name():
             "03 00 00 00"
             # Dimension
             "01 00 00 00"
-            # Number of raw datata values
+            # Number of raw data values
             "02 00 00 00"
             "00 00 00 00"
             # Number of properties (0)

@@ -81,7 +81,7 @@ def basic_segment():
         "03 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
