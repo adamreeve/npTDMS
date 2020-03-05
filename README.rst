@@ -1,9 +1,9 @@
 npTDMS
 ======
 
-.. image:: https://app.wercker.com/status/446c67339f7d484188a35abc64dd3f51/s/master
-    :alt: wercker status
-    :target: https://app.wercker.com/project/bykey/446c67339f7d484188a35abc64dd3f51
+.. image:: https://travis-ci.com/adamreeve/npTDMS.svg?branch=master
+    :alt: Build status
+    :target: https://travis-ci.com/adamreeve/npTDMS
 
 npTDMS is a cross-platform Python package for reading and writing TDMS files as produced by LabVIEW,
 and is built on top of the `numpy <http://www.numpy.org/>`__ package.
