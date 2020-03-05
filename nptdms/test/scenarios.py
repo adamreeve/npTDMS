@@ -271,6 +271,95 @@ def remove_a_channel():
 
 
 @scenario
+def alternating_data_objects_with_new_obj_list():
+    """ Alternating segments with different objects with data
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
+            channel_metadata_with_no_data("/'group'/'channel2'"),
+        ),
+        "01 00 00 00" "02 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata_with_no_data("/'group'/'channel1'"),
+            channel_metadata("/'group'/'channel2'", TDS_TYPE_INT32, 2),
+        ),
+        "03 00 00 00" "04 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata_with_repeated_structure("/'group'/'channel1'"),
+            channel_metadata_with_no_data("/'group'/'channel2'"),
+        ),
+        "05 00 00 00" "06 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata_with_no_data("/'group'/'channel1'"),
+            channel_metadata_with_repeated_structure("/'group'/'channel2'"),
+        ),
+        "07 00 00 00" "08 00 00 00"
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([1, 2, 5, 6], dtype=np.int32),
+        ('group', 'channel2'): np.array([3, 4, 7, 8], dtype=np.int32),
+    }
+    return test_file, expected_data
+
+
+@scenario
+def alternating_data_objects_reusing_obj_list():
+    """ Alternating segments with different objects with data,
+        reusing the object list from the last segment.
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
+            channel_metadata_with_no_data("/'group'/'channel2'"),
+        ),
+        "01 00 00 00" "02 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData"),
+        segment_objects_metadata(
+            channel_metadata_with_no_data("/'group'/'channel1'"),
+            channel_metadata("/'group'/'channel2'", TDS_TYPE_INT32, 2),
+        ),
+        "03 00 00 00" "04 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData"),
+        segment_objects_metadata(
+            channel_metadata_with_repeated_structure("/'group'/'channel1'"),
+            channel_metadata_with_no_data("/'group'/'channel2'"),
+        ),
+        "05 00 00 00" "06 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData"),
+        segment_objects_metadata(
+            channel_metadata_with_no_data("/'group'/'channel1'"),
+            channel_metadata_with_repeated_structure("/'group'/'channel2'"),
+        ),
+        "07 00 00 00" "08 00 00 00"
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([1, 2, 5, 6], dtype=np.int32),
+        ('group', 'channel2'): np.array([3, 4, 7, 8], dtype=np.int32),
+    }
+    return test_file, expected_data
+
+
+@scenario
 def chunked_segment():
     """ Add segment and then a repeated segment without
         any lead in or metadata, so data is read in chunks
