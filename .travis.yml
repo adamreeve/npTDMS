@@ -1,7 +1,7 @@
 language: python
-sudo: false
+os: linux
 
-matrix:
+jobs:
   include:
     - python: 2.7
       env: TOXENV=py27
