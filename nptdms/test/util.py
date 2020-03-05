@@ -26,6 +26,58 @@ def hexlify_value(struct_type, value):
     return binascii.hexlify(struct.pack(struct_type, value)).decode('utf-8')
 
 
+def segment_objects_metadata(*args):
+    """ Metadata for multiple objects in a segment
+    """
+    num_objects_hex = hexlify_value("<I", len(args))
+    return num_objects_hex + "".join(args)
+
+
+def channel_metadata(channel_name, data_type, num_values):
+    return (
+        # Length of the object path
+        hexlify_value('<I', len(channel_name)) +
+        # Object path
+        string_hexlify(channel_name) +
+        # Length of index information
+        "14 00 00 00" +
+        # Raw data data type
+        hexlify_value('<I', data_type) +
+        # Dimension
+        "01 00 00 00" +
+        # Number of raw data values
+        hexlify_value('<Q', num_values) +
+        # Number of properties (0)
+        "00 00 00 00"
+    )
+
+
+def channel_metadata_with_repeated_structure(channel_name):
+    return (
+        # Length of the object path
+        hexlify_value('<I', len(channel_name)) +
+        # Object path
+        string_hexlify(channel_name) +
+        # Raw data index header meaning repeat previous data structure
+        "00 00 00 00" +
+        # Number of properties (0)
+        "00 00 00 00"
+    )
+
+
+def channel_metadata_with_no_data(channel_name):
+    return (
+        # Length of the object path
+        hexlify_value('<I', len(channel_name)) +
+        # Object path
+        string_hexlify(channel_name) +
+        # Raw data index header meaning no data in this segment
+        "FF FF FF FF" +
+        # Number of properties (0)
+        "00 00 00 00"
+    )
+
+
 def basic_segment():
     """Basic TDMS segment with one group and two channels"""
 
@@ -74,7 +126,7 @@ def basic_segment():
         "03 00 00 00"
         # Dimension
         "01 00 00 00"
-        # Number of raw datata values
+        # Number of raw data values
         "02 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
@@ -130,20 +182,18 @@ def basic_segment():
         "03 00 00 00"
         "04 00 00 00"
     )
-    return (metadata, data, toc)
+    return toc, metadata, data
 
 
 class GeneratedFile(object):
     """Generate a TDMS file for testing"""
 
     def __init__(self):
-        self._tempfile = tempfile.NamedTemporaryFile()
-        self.file = self._tempfile.file
-        self.data = bytes()
+        self._content = b''
 
-    def add_segment(self, metadata, data, toc=None, incomplete=False):
-        metadata = self.to_bytes(metadata)
-        data = self.to_bytes(data)
+    def add_segment(self, toc, metadata, data, incomplete=False):
+        metadata_bytes = _hex_to_bytes(metadata)
+        data_bytes = _hex_to_bytes(data)
         if toc is not None:
             lead_in = b'TDSm'
             toc_mask = long(0)
@@ -160,29 +210,36 @@ class GeneratedFile(object):
             if "kTocNewObjList" in toc:
                 toc_mask = toc_mask | long(1) << 2
             lead_in += struct.pack('<i', toc_mask)
-            lead_in += self.to_bytes("69 12 00 00")
-            next_segment_offset = len(metadata) + len(data)
-            raw_data_offset = len(metadata)
+            lead_in += _hex_to_bytes("69 12 00 00")
+            next_segment_offset = len(metadata_bytes) + len(data_bytes)
+            raw_data_offset = len(metadata_bytes)
             if incomplete:
-                lead_in += self.to_bytes('FF' * 8)
+                lead_in += _hex_to_bytes('FF' * 8)
             else:
                 lead_in += struct.pack('<Q', next_segment_offset)
             lead_in += struct.pack('<Q', raw_data_offset)
         else:
             lead_in = b''
-        self.data += lead_in + metadata + data
-
-    def to_bytes(self, hex_data):
-        return binascii.unhexlify(
-            hex_data.replace(" ", "").replace("\n", "").encode('utf-8'))
+        self._content += lead_in + metadata_bytes + data_bytes
 
     def load(self, *args, **kwargs):
-        self.file.write(self.data)
-        self.file.seek(0)
-        return tdms.TdmsFile(self.file, *args, **kwargs)
+        with tempfile.NamedTemporaryFile() as named_file:
+            file = named_file.file
+            file.write(self._content)
+            file.seek(0)
+            return tdms.TdmsFile(file, *args, **kwargs)
 
 
 class BytesIoTestFile(GeneratedFile):
-    def __init__(self):
-        self.file = BytesIO()
-        self.data = bytes()
+    def load(self, *args, **kwargs):
+        file = BytesIO()
+        file.write(self._content)
+        file.seek(0)
+        return tdms.TdmsFile(file, *args, **kwargs)
+
+
+def _hex_to_bytes(hex_data):
+    """ Converts a string of hex to a byte array
+    """
+    return binascii.unhexlify(
+        hex_data.replace(" ", "").replace("\n", "").encode('utf-8'))

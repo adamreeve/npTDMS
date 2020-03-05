@@ -3,7 +3,7 @@
 
 import numpy as np
 
-from nptdms.test.util import GeneratedFile, hexlify_value, string_hexlify
+from nptdms.test.util import GeneratedFile, hexlify_value, string_hexlify, segment_objects_metadata
 
 
 def test_single_channel_i16():
@@ -11,7 +11,7 @@ def test_single_channel_i16():
     """
 
     scaler_metadata = daqmx_scaler_metadata(0, 3, 0)
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [2], [scaler_metadata]))
@@ -23,7 +23,7 @@ def test_single_channel_i16():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.object("Group", "Channel1").raw_data
@@ -37,7 +37,7 @@ def test_single_channel_u16():
     """
 
     scaler_metadata = daqmx_scaler_metadata(0, 2, 0)
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [2], [scaler_metadata]))
@@ -50,7 +50,7 @@ def test_single_channel_u16():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.object("Group", "Channel1").raw_data
@@ -64,7 +64,7 @@ def test_single_channel_i32():
     """
 
     scaler_metadata = daqmx_scaler_metadata(0, 5, 0)
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [4], [scaler_metadata]))
@@ -77,7 +77,7 @@ def test_single_channel_i32():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.object("Group", "Channel1").raw_data
@@ -91,7 +91,7 @@ def test_single_channel_u32():
     """
 
     scaler_metadata = daqmx_scaler_metadata(0, 4, 0)
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [4], [scaler_metadata]))
@@ -104,7 +104,7 @@ def test_single_channel_u32():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
     data = tdms_data.object("Group", "Channel1").raw_data
@@ -119,7 +119,7 @@ def test_two_channel_i16():
 
     scaler_1 = daqmx_scaler_metadata(0, 3, 0)
     scaler_2 = daqmx_scaler_metadata(0, 3, 2)
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [4], [scaler_1]),
@@ -137,7 +137,7 @@ def test_two_channel_i16():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
     data_1 = tdms_data.object("Group", "Channel1").raw_data
@@ -156,7 +156,7 @@ def test_mixed_channel_widths():
     scaler_1 = daqmx_scaler_metadata(0, 1, 0)
     scaler_2 = daqmx_scaler_metadata(0, 3, 1)
     scaler_3 = daqmx_scaler_metadata(0, 5, 3)
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [7], [scaler_1]),
@@ -171,7 +171,7 @@ def test_mixed_channel_widths():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
     data_1 = tdms_data.object("Group", "Channel1").raw_data
@@ -195,7 +195,7 @@ def test_multiple_scalers_with_same_type():
     scaler_metadata = [
         daqmx_scaler_metadata(0, 3, 0),
         daqmx_scaler_metadata(1, 3, 2)]
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [4], scaler_metadata))
@@ -212,7 +212,7 @@ def test_multiple_scalers_with_same_type():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
     channel = tdms_data.object("Group", "Channel1")
 
@@ -234,7 +234,7 @@ def test_multiple_scalers_with_different_types():
         daqmx_scaler_metadata(0, 1, 0),
         daqmx_scaler_metadata(1, 3, 1),
         daqmx_scaler_metadata(2, 5, 3)]
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [7], scaler_metadata))
@@ -247,7 +247,7 @@ def test_multiple_scalers_with_different_types():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
     channel = tdms_data.object("Group", "Channel1")
 
@@ -272,7 +272,7 @@ def test_multiple_raw_data_buffers():
     scaler_2 = daqmx_scaler_metadata(0, 3, 2, 0)
     scaler_3 = daqmx_scaler_metadata(0, 3, 0, 1)
     scaler_4 = daqmx_scaler_metadata(0, 3, 2, 1)
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [4, 4], [scaler_1]),
@@ -287,7 +287,7 @@ def test_multiple_raw_data_buffers():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
     data_1 = tdms_data.object("Group", "Channel1").raw_data
@@ -313,7 +313,7 @@ def test_multiple_raw_data_buffers_with_different_widths():
     scaler_3 = daqmx_scaler_metadata(0, 3, 4, 0)
     scaler_4 = daqmx_scaler_metadata(0, 5, 0, 1)
     scaler_5 = daqmx_scaler_metadata(0, 5, 4, 1)
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [6, 8], [scaler_1]),
@@ -333,7 +333,7 @@ def test_multiple_raw_data_buffers_with_different_widths():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
     data_1 = tdms_data.object("Group", "Channel1").raw_data
@@ -362,7 +362,7 @@ def test_multiple_raw_data_buffers_with_scalers_split_across_buffers():
     scaler_2 = daqmx_scaler_metadata(1, 3, 0, 1)
     scaler_3 = daqmx_scaler_metadata(0, 3, 2, 0)
     scaler_4 = daqmx_scaler_metadata(1, 3, 2, 1)
-    metadata = combine_metadata(
+    metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata(
@@ -377,7 +377,7 @@ def test_multiple_raw_data_buffers_with_scalers_split_across_buffers():
     )
 
     test_file = GeneratedFile()
-    test_file.add_segment(metadata, data, segment_toc())
+    test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
     channel_1 = tdms_data.object("Group", "Channel1")
@@ -396,11 +396,6 @@ def test_multiple_raw_data_buffers_with_scalers_split_across_buffers():
     np.testing.assert_array_equal(scaler_data_2, [9, 11, 13, 15])
     np.testing.assert_array_equal(scaler_data_3, [2, 4, 6, 8])
     np.testing.assert_array_equal(scaler_data_4, [10, 12, 14, 16])
-
-
-def combine_metadata(*args):
-    num_objects_hex = hexlify_value("<I", len(args))
-    return num_objects_hex + "".join(args)
 
 
 def segment_toc():
