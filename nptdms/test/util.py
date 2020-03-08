@@ -233,6 +233,13 @@ class GeneratedFile(object):
             lead_in = b''
         self._content += lead_in + metadata_bytes + data_bytes
 
+    def get_tempfile(self):
+        named_file = tempfile.NamedTemporaryFile()
+        file = named_file.file
+        file.write(self._content)
+        file.seek(0)
+        return named_file
+
     def load(self, *args, **kwargs):
         with tempfile.NamedTemporaryFile() as named_file:
             file = named_file.file

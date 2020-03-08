@@ -40,6 +40,7 @@ class ListDataReceiver(object):
         """Initialise new data receiver for a TDMS object
         """
         self.data = []
+        self.scaler_data = {}
 
     def append_data(self, data):
         """Append data from a segment
@@ -63,6 +64,7 @@ class NumpyDataReceiver(object):
         self.path = obj.path
         self.data = _new_numpy_array(
             obj.data_type.nptype, obj.number_values, memmap_dir)
+        self.scaler_data = {}
         self._data_insert_position = 0
         log.debug(
             "Allocated %d sample slots for %s", len(self.data), obj.path)
@@ -93,6 +95,7 @@ class DaqmxDataReceiver(object):
         """
 
         self.path = obj.path
+        self.data = None
         self.scaler_data = {}
         self._scaler_insert_positions = {}
         for scaler_id, scaler_type in obj.scaler_data_types.items():

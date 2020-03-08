@@ -216,11 +216,11 @@ def test_multiple_scalers_with_same_type():
     tdms_data = test_file.load()
     channel = tdms_data.object("Group", "Channel1")
 
-    scaler_0_data = channel.raw_scaler_data(0)
+    scaler_0_data = channel.raw_scaler_data[0]
     assert scaler_0_data.dtype == np.int16
     np.testing.assert_array_equal(scaler_0_data, [1, 2, 3, 4])
 
-    scaler_1_data = channel.raw_scaler_data(1)
+    scaler_1_data = channel.raw_scaler_data[1]
     assert scaler_1_data.dtype == np.int16
     np.testing.assert_array_equal(scaler_1_data, [17, 18, 19, 20])
 
@@ -251,15 +251,15 @@ def test_multiple_scalers_with_different_types():
     tdms_data = test_file.load()
     channel = tdms_data.object("Group", "Channel1")
 
-    scaler_0_data = channel.raw_scaler_data(0)
+    scaler_0_data = channel.raw_scaler_data[0]
     assert scaler_0_data.dtype == np.int8
     np.testing.assert_array_equal(scaler_0_data, [1, 2, 3, 4])
 
-    scaler_1_data = channel.raw_scaler_data(1)
+    scaler_1_data = channel.raw_scaler_data[1]
     assert scaler_1_data.dtype == np.int16
     np.testing.assert_array_equal(scaler_1_data, [17, 18, 19, 20])
 
-    scaler_2_data = channel.raw_scaler_data(2)
+    scaler_2_data = channel.raw_scaler_data[2]
     assert scaler_2_data.dtype == np.int32
     np.testing.assert_array_equal(scaler_2_data, [33, 34, 35, 36])
 
@@ -383,10 +383,10 @@ def test_multiple_raw_data_buffers_with_scalers_split_across_buffers():
     channel_1 = tdms_data.object("Group", "Channel1")
     channel_2 = tdms_data.object("Group", "Channel2")
 
-    scaler_data_1 = channel_1.raw_scaler_data(0)
-    scaler_data_2 = channel_1.raw_scaler_data(1)
-    scaler_data_3 = channel_2.raw_scaler_data(0)
-    scaler_data_4 = channel_2.raw_scaler_data(1)
+    scaler_data_1 = channel_1.raw_scaler_data[0]
+    scaler_data_2 = channel_1.raw_scaler_data[1]
+    scaler_data_3 = channel_2.raw_scaler_data[0]
+    scaler_data_4 = channel_2.raw_scaler_data[1]
 
     for data in [
             scaler_data_1, scaler_data_2, scaler_data_3, scaler_data_4]:

@@ -199,6 +199,22 @@ class BaseSegment(object):
         for chunk in range(self.num_chunks):
             yield self._read_data_chunk(f, data_objects, chunk)
 
+    def read_raw_data_for_channel(self, f, channel_path):
+        """Read raw data from a TDMS segment
+
+        :returns: A generator of ChannelDataChunk objects with raw channel data for
+            objects in this segment.
+        """
+
+        if not self.toc_mask & toc_properties['kTocRawData']:
+            yield DataChunk.empty()
+
+        f.seek(self.data_position)
+
+        data_objects = [o for o in self.ordered_objects if o.has_data]
+        for chunk in range(self.num_chunks):
+            yield self._read_channel_data_chunk(f, data_objects, chunk, channel_path)
+
     def _calculate_chunks(self):
         """
         Work out the number of chunks the data is in, for cases
@@ -238,6 +254,21 @@ class BaseSegment(object):
 
     def _read_data_chunk(self, file, data_objects, chunk_index):
         raise NotImplementedError("Data chunk reading must be implemented in base classes")
+
+    def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
+        # In the base case we can read data for all channels
+        # and filter out the requested channel.
+        # Derived classes can implement more optimised reading.
+        data_chunk = self._read_data_chunk(file, data_objects, chunk_index)
+        try:
+            if data_chunk.raw_data is not None:
+                return ChannelDataChunk.channel_data(data_chunk.raw_data[channel_path])
+            elif data_chunk.daqmx_raw_data is not None:
+                return ChannelDataChunk.scaler_data(data_chunk.daqmx_raw_data[channel_path])
+            else:
+                return ChannelDataChunk.empty()
+        except KeyError:
+            return ChannelDataChunk.empty()
 
     def _new_segment_object(self, object_path):
         """ Create a new segment object for a segment
@@ -303,6 +334,32 @@ class DataChunk(object):
     @staticmethod
     def scaler_data(data):
         return DataChunk({}, data)
+
+
+class ChannelDataChunk(object):
+    """Data read for a single channel from a single chunk in a TDMS segment
+
+    :ivar raw_data: Raw data in this chunk for a standard TDMS channel.
+        Keys are object paths and values are numpy arrays.
+    :ivar daqmx_raw_data: A dictionary of scaler data in this segment for
+        DAQmx raw data. Keys are the scaler id.
+    """
+
+    def __init__(self, data, daqmx_data):
+        self.raw_data = data
+        self.daqmx_raw_data = daqmx_data
+
+    @staticmethod
+    def empty():
+        return ChannelDataChunk(None, None)
+
+    @staticmethod
+    def channel_data(data):
+        return ChannelDataChunk(data, None)
+
+    @staticmethod
+    def scaler_data(data):
+        return ChannelDataChunk(None, data)
 
 
 def read_property(f, endianness="<"):

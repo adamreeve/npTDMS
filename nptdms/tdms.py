@@ -25,70 +25,155 @@ class TdmsFile(object):
     """Reads and stores data from a TDMS file.
     """
 
-    def __init__(self, file, memmap_dir=None, read_metadata_only=False):
-        """Initialise a new TDMS file object, reading all data.
+    @staticmethod
+    def read(file, memmap_dir=None):
+        """ Creates a new TdmsFile object and reads all data in the file
 
         :param file: Either the path to the tdms file to read or an already
             opened file.
-        :param memmap_dir: The directory to store memmapped data files in,
+        :param memmap_dir: The directory to store memory mapped data files in,
+            or None to read data into memory. The data files are created
+            as temporary files and are deleted when the channel data is no
+            longer used. tempfile.gettempdir() can be used to get the default
+            temporary file directory.
+        """
+        return TdmsFile(file, memmap_dir=memmap_dir)
+
+    @staticmethod
+    def open(file, memmap_dir=None):
+        """ Creates a new TdmsFile object and reads metadata, leaving the file open
+            to allow reading data
+
+        :param file: Either the path to the tdms file to read or an already
+            opened file.
+        :param memmap_dir: The directory to store memory mapped data files in,
+            or None to read data into memory. The data files are created
+            as temporary files and are deleted when the channel data is no
+            longer used. tempfile.gettempdir() can be used to get the default
+            temporary file directory.
+        """
+        return TdmsFile(file, memmap_dir=memmap_dir, read_metadata_only=True, keep_open=True)
+
+    @staticmethod
+    def read_metadata(file):
+        """ Creates a new TdmsFile object and only reads the metadata
+
+        :param file: Either the path to the tdms file to read or an already
+            opened file.
+        """
+        return TdmsFile(file, read_metadata_only=True)
+
+    def __init__(self, file, memmap_dir=None, read_metadata_only=False, keep_open=False):
+        """Initialise a new TDMS file object
+
+        :param file: Either the path to the tdms file to read or an already
+            opened file.
+        :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
         :param read_metadata_only: If this parameter is enabled then only the
             metadata of the TDMS file will read.
+        :param keep_open: Keeps the file open so data can be read if only metadata
+            is read initially.
         """
 
         self._memmap_dir = memmap_dir
         self._channel_data = {}
         self._objects = OrderedDict()
+        self._file_path = None
+        self._file = None
+        self._reader = None
 
         if hasattr(file, "read"):
             # Is a file
-            self._read_file(file, memmap_dir, read_metadata_only)
+            self._read_file(file, read_metadata_only)
+            if keep_open:
+                self._file = file
         else:
             # Is path to a file
-            with open(file, 'rb') as open_file:
-                self._read_file(open_file, memmap_dir, read_metadata_only)
+            open_file = open(file, 'rb')
+            try:
+                self._read_file(open_file, read_metadata_only)
+            finally:
+                if keep_open:
+                    self._file_path = file
+                    self._file = open_file
+                else:
+                    open_file.close()
 
-    def _read_file(self, tdms_file, memmap_dir, read_metadata_only):
-        reader = TdmsReader(tdms_file)
-        reader.read_metadata()
+    def __enter__(self):
+        return self
 
-        for (path, obj) in reader.object_metadata.items():
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.close()
+
+    def close(self):
+        """ Close the underlying file if it was opened by this TdmsFile
+
+            If this TdmsFile was initialised with an already open file
+            then the reference to it is released but the file is not closed.
+        """
+        if self._file_path is not None:
+            # File path was provided so we opened the file
+            self._file.close()
+            self._file = None
+        elif self._file is not None:
+            # File was provided, release our reference to it
+            self._file = None
+
+    def _read_file(self, tdms_file, read_metadata_only):
+        self._reader = TdmsReader(tdms_file)
+        self._reader.read_metadata()
+
+        for (path, obj) in self._reader.object_metadata.items():
             self._objects[path] = TdmsObject(
                 self, path, obj.properties, obj.data_type,
                 obj.scaler_data_types, obj.num_values)
 
         if not read_metadata_only:
-            self._read_data(memmap_dir, reader)
+            self._read_data()
 
-    def _read_data(self, memmap_dir, tdms_reader):
+    def _read_data(self):
         with Timer(log, "Allocate space"):
             # Allocate space for data
             for (path, obj) in self._objects.items():
-                self._channel_data[path] = get_data_receiver(obj, memmap_dir)
+                self._channel_data[path] = get_data_receiver(obj, self._memmap_dir)
 
         with Timer(log, "Read data"):
             # Now actually read all the data
-            for chunk in tdms_reader.read_raw_data():
+            for chunk in self._reader.read_raw_data():
                 for (path, data) in chunk.raw_data.items():
-                    data_receiver = self._channel_data[path]
-                    data_receiver.append_data(data)
+                    channel_data = self._channel_data[path]
+                    channel_data.append_data(data)
                 for (path, data) in chunk.daqmx_raw_data.items():
-                    data_receiver = self._channel_data[path]
+                    channel_data = self._channel_data[path]
                     for scaler_id, scaler_data in data.items():
-                        data_receiver.append_scaler_data(
+                        channel_data.append_scaler_data(
                             scaler_id, scaler_data)
 
             for (path, obj) in self._objects.items():
-                data_receiver = self._channel_data[path]
-                if data_receiver is not None:
-                    if hasattr(data_receiver, 'scaler_data'):
-                        # Data is DAQmx scaler data
-                        obj._set_scaler_data(data_receiver.scaler_data)
-                    else:
-                        obj._set_raw_data(data_receiver.data)
+                channel_data = self._channel_data[path]
+                if channel_data is not None:
+                    obj._set_raw_data(channel_data)
+
+    def _read_channel_data(self, channel_path):
+        obj = self._objects[channel_path]
+        with Timer(log, "Allocate space"):
+            # Allocate space for data
+            channel_data = get_data_receiver(obj, self._memmap_dir)
+
+        with Timer(log, "Read data"):
+            # Now actually read all the data
+            for chunk in self._reader.read_raw_data_for_channel(channel_path):
+                if chunk.raw_data is not None:
+                    channel_data.append_data(chunk.raw_data)
+                if chunk.daqmx_raw_data is not None:
+                    for scaler_id, scaler_data in chunk.daqmx_raw_data.items():
+                        channel_data.append_scaler_data(scaler_id, scaler_data)
+
+        return channel_data
 
     def object(self, *path):
         """Get a TDMS object from the file
@@ -286,8 +371,7 @@ class TdmsObject(object):
         self.scaler_data_types = scaler_data_types
         self.has_data = number_values > 0
 
-        self._data = None
-        self._scaler_data = {}
+        self._raw_data = None
         self._data_scaled = None
 
     def __repr__(self):
@@ -428,18 +512,10 @@ class TdmsObject(object):
         NumPy array containing data if there is data for this object,
         otherwise None.
         """
-        if self._data is None and not self._scaler_data:
-            # self._data is None if data segment is empty
+        if self._raw_data is None:
             return np.empty((0, 1))
         if self._data_scaled is None:
-            scale = self._get_scaling()
-            if scale is None:
-                self._data_scaled = self._data
-            elif self._scaler_data:
-                self._data_scaled = scale.scale_daqmx(self._scaler_data)
-            else:
-                self._data_scaled = scale.scale(self._data)
-
+            self._data_scaled = self._scale_data(self._raw_data)
         return self._data_scaled
 
     @_property_builtin
@@ -448,24 +524,44 @@ class TdmsObject(object):
         The raw, unscaled data array.
         For unscaled objects this is the same as the data property.
         """
-        if self._scaler_data:
-            if len(self._scaler_data) == 1:
-                return next(v for v in self._scaler_data.values())
+        if self._raw_data is None:
+            return np.empty((0, 1))
+        if self._raw_data.scaler_data:
+            if len(self._raw_data.scaler_data) == 1:
+                return next(v for v in self._raw_data.scaler_data.values())
             else:
                 raise Exception(
                     "This object has data for multiple DAQmx scalers, "
-                    "use the raw_scaler_data method to get raw data "
+                    "use the raw_scaler_data property to get raw data "
                     "for a scale_id")
-        if self._data is None:
-            # self._data is None if data segment is empty
-            return np.empty((0, 1))
-        return self._data
+        return self._raw_data.data
 
-    def raw_scaler_data(self, scale_id):
+    def read_data(self):
+        """ Reads data for this channel from the TDMS file and returns it
+
+            This is for use when the TDMS file was opened without immediately reading all data,
+            otherwise the data attribute should be used.
         """
-        Raw DAQmx scaler data for the given scale id
+        raw_data = self.tdms_file._read_channel_data(self.path)
+        return self._scale_data(raw_data)
+
+    @_property_builtin
+    def raw_scaler_data(self):
+        """ Raw DAQmx scaler data as a dictionary mapping from scale id to raw data arrays
         """
-        return self._scaler_data[scale_id]
+        return self._raw_data.scaler_data
+
+    def _scale_data(self, raw_data):
+        scale = self._get_scaling()
+        if scale is not None:
+            if raw_data.scaler_data:
+                return scale.scale_daqmx(raw_data.scaler_data)
+            else:
+                return scale.scale(raw_data.data)
+        elif raw_data.scaler_data:
+            raise ValueError("Missing scaling information for DAQmx data")
+        else:
+            return raw_data.data
 
     def _get_scaling(self):
         try:
@@ -482,10 +578,7 @@ class TdmsObject(object):
             self.properties, group_properties, file_properties)
 
     def _set_raw_data(self, data):
-        self._data = data
-
-    def _set_scaler_data(self, data):
-        self._scaler_data = data
+        self._raw_data = data
 
 
 def _components_to_path(*args):

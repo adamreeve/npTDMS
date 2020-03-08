@@ -2,6 +2,7 @@
 
 import numpy as np
 import pytest
+from nptdms import TdmsFile
 from nptdms.test.util import *
 from nptdms.test.scenarios import get_scenarios
 
@@ -10,12 +11,25 @@ from nptdms.test.scenarios import get_scenarios
 def test_read_channel_data(test_file, expected_data):
     """Test reading data"""
 
-    tdms_data = test_file.load()
+    with test_file.get_tempfile() as temp_file:
+        tdms_data = TdmsFile.read(temp_file.file)
 
     for ((group, channel), expected_data) in expected_data.items():
         actual_data = tdms_data.object(group, channel).data
         assert actual_data.dtype == expected_data.dtype
         np.testing.assert_almost_equal(actual_data, expected_data)
+
+
+@pytest.mark.parametrize("test_file,expected_data", get_scenarios())
+def test_lazily_read_channel_data(test_file, expected_data):
+    """Test reading channel data lazily"""
+
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_data) in expected_data.items():
+                actual_data = tdms_file.object(group, channel).read_data()
+                assert actual_data.dtype == expected_data.dtype
+                np.testing.assert_almost_equal(actual_data, expected_data)
 
 
 def test_get_objects():

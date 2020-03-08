@@ -62,6 +62,19 @@ class TdmsReader(object):
             for chunk in segment.read_raw_data(self._file):
                 yield chunk
 
+    def read_raw_data_for_channel(self, channel_path):
+        """ Read raw data for a single channel, chunk by chunk
+
+        :param channel_path: The path of the channel object to read data for
+        :returns: A generator that yields ChannelDataChunk objects
+        """
+        if self._segments is None:
+            raise RuntimeError(
+                "Cannot read data unless metadata has first been read")
+        for segment in self._segments:
+            for chunk in segment.read_raw_data_for_channel(self._file, channel_path):
+                yield chunk
+
     def _update_object_metadata(self, segment):
         """ Update object metadata using the metadata read from a single segment
         """
