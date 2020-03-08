@@ -261,9 +261,9 @@ class BaseSegment(object):
         # Derived classes can implement more optimised reading.
         data_chunk = self._read_data_chunk(file, data_objects, chunk_index)
         try:
-            if data_chunk.raw_data is not None:
+            if data_chunk.raw_data:
                 return ChannelDataChunk.channel_data(data_chunk.raw_data[channel_path])
-            elif data_chunk.daqmx_raw_data is not None:
+            elif data_chunk.daqmx_raw_data:
                 return ChannelDataChunk.scaler_data(data_chunk.daqmx_raw_data[channel_path])
             else:
                 return ChannelDataChunk.empty()
