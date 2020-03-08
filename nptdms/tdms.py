@@ -554,10 +554,7 @@ class TdmsObject(object):
     def _scale_data(self, raw_data):
         scale = self._get_scaling()
         if scale is not None:
-            if raw_data.scaler_data:
-                return scale.scale_daqmx(raw_data.scaler_data)
-            else:
-                return scale.scale(raw_data.data)
+            return scale.scale(raw_data)
         elif raw_data.scaler_data:
             raise ValueError("Missing scaling information for DAQmx data")
         else:
