@@ -6,6 +6,7 @@ import pytest
 from nptdms.test.util import (
     GeneratedFile,
     hexlify_value,
+    string_hexlify,
     segment_objects_metadata,
     channel_metadata,
     channel_metadata_with_no_data,
@@ -616,5 +617,31 @@ def complex_data():
     expected_data = {
         ('group', 'complex_single_channel'): complex_single_arr,
         ('group', 'complex_double_channel'): complex_double_arr,
+    }
+    return test_file, expected_data
+
+
+@scenario
+def scaled_data():
+    properties = {
+        "NI_Number_Of_Scales":
+            (3, "01 00 00 00"),
+        "NI_Scale[0]_Scale_Type":
+            (0x20, hexlify_value("<I", len("Linear")) + string_hexlify("Linear")),
+        "NI_Scale[0]_Linear_Slope":
+            (10, hexlify_value("<d", 2.0)),
+        "NI_Scale[0]_Linear_Y_Intercept":
+            (10, hexlify_value("<d", 10.0))
+    }
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2, properties),
+        ),
+        "01 00 00 00" "02 00 00 00"
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([12, 14], dtype=np.float64),
     }
     return test_file, expected_data

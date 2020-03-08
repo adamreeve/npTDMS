@@ -33,7 +33,7 @@ def segment_objects_metadata(*args):
     return num_objects_hex + "".join(args)
 
 
-def channel_metadata(channel_name, data_type, num_values):
+def channel_metadata(channel_name, data_type, num_values, properties=None):
     return (
         # Length of the object path
         hexlify_value('<I', len(channel_name)) +
@@ -47,9 +47,20 @@ def channel_metadata(channel_name, data_type, num_values):
         "01 00 00 00" +
         # Number of raw data values
         hexlify_value('<Q', num_values) +
-        # Number of properties (0)
-        "00 00 00 00"
+        hex_properties(properties)
     )
+
+
+def hex_properties(properties):
+    if properties is None:
+        properties = {}
+    props_hex = hexlify_value('<I', len(properties))
+    for (prop_name, (prop_type, prop_value)) in properties.items():
+        props_hex += hexlify_value('<I', len(prop_name))
+        props_hex += string_hexlify(prop_name)
+        props_hex += hexlify_value('<I', prop_type)
+        props_hex += prop_value
+    return props_hex
 
 
 def channel_metadata_with_repeated_structure(channel_name):
