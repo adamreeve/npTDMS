@@ -203,11 +203,11 @@ class BaseSegment(object):
         """Read raw data from a TDMS segment
 
         :returns: A generator of ChannelDataChunk objects with raw channel data for
-            objects in this segment.
+            a single channel in this segment.
         """
 
         if not self.toc_mask & toc_properties['kTocRawData']:
-            yield DataChunk.empty()
+            yield ChannelDataChunk.empty()
 
         f.seek(self.data_position)
 
@@ -253,11 +253,15 @@ class BaseSegment(object):
             for o in self.ordered_objects if o.has_data])
 
     def _read_data_chunk(self, file, data_objects, chunk_index):
+        """ Read data from a chunk for all channels
+        """
         raise NotImplementedError("Data chunk reading must be implemented in base classes")
 
     def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
+        """ Read data from a chunk for a single channel
+        """
         # In the base case we can read data for all channels
-        # and filter out the requested channel.
+        # and then select only the requested channel.
         # Derived classes can implement more optimised reading.
         data_chunk = self._read_data_chunk(file, data_objects, chunk_index)
         try:
@@ -340,9 +344,8 @@ class ChannelDataChunk(object):
     """Data read for a single channel from a single chunk in a TDMS segment
 
     :ivar raw_data: Raw data in this chunk for a standard TDMS channel.
-        Keys are object paths and values are numpy arrays.
     :ivar daqmx_raw_data: A dictionary of scaler data in this segment for
-        DAQmx raw data. Keys are the scaler id.
+        DAQmx raw data. Keys are the scaler id and values are data arrays.
     """
 
     def __init__(self, data, daqmx_data):

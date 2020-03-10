@@ -122,6 +122,8 @@ class TdmsFile(object):
         elif self._file is not None:
             # File was provided, release our reference to it
             self._file = None
+        # Reader can also hold a reference to the file:
+        self._reader = None
 
     def _read_file(self, tdms_file, read_metadata_only):
         self._reader = TdmsReader(tdms_file)
