@@ -312,22 +312,18 @@ class MultiScaling(object):
     def __init__(self, scalings):
         self.scalings = scalings
 
-    def scale(self, data):
+    def scale(self, raw_channel_data):
         final_scale = len(self.scalings) - 1
-        return self._compute_scaled_data(final_scale, data, {})
+        return self._compute_scaled_data(final_scale, raw_channel_data)
 
-    def scale_daqmx(self, scaler_data):
-        final_scale = len(self.scalings) - 1
-        return self._compute_scaled_data(final_scale, None, scaler_data)
-
-    def _compute_scaled_data(self, scale_index, raw_data, scaler_data):
+    def _compute_scaled_data(self, scale_index, raw_channel_data):
         """ Compute output data from a single scale in the set of all scalings,
             computing any required input scales recursively.
         """
         if scale_index == RAW_DATA_INPUT_SOURCE:
-            if raw_data is None:
+            if raw_channel_data.data is None:
                 raise Exception("Invalid scaling input source for DAQmx data")
-            return raw_data
+            return raw_channel_data.data
 
         scaling = self.scalings[scale_index]
         if scaling is None:
@@ -335,17 +331,17 @@ class MultiScaling(object):
                 "Cannot compute data for scale %d" % scale_index)
 
         if isinstance(scaling, DaqMxScalerScaling):
-            return scaling.scale_daqmx(scaler_data)
+            return scaling.scale_daqmx(raw_channel_data.scaler_data)
         elif hasattr(scaling, 'input_source'):
             input_data = self._compute_scaled_data(
-                scaling.input_source, raw_data, scaler_data)
+                scaling.input_source, raw_channel_data)
             return scaling.scale(input_data)
         elif (hasattr(scaling, 'left_input_source') and
               hasattr(scaling, 'right_input_source')):
             left_input_data = self._compute_scaled_data(
-                scaling.left_input_source, raw_data, scaler_data)
+                scaling.left_input_source, raw_channel_data)
             right_input_data = self._compute_scaled_data(
-                scaling.right_input_source, raw_data, scaler_data)
+                scaling.right_input_source, raw_channel_data)
             return scaling.scale(left_input_data, right_input_data)
         else:
             raise ValueError("Cannot compute scaled data for %r" % scaling)
@@ -401,12 +397,11 @@ def _get_channel_scaling(properties):
                 properties, scale_index)
         else:
             log.warning("Unsupported scale type: %s", scale_type)
+            return None
 
     if not scalings:
         return None
-    if len(scalings) > 1:
-        return MultiScaling(scalings)
-    return scalings[0]
+    return MultiScaling(scalings)
 
 
 _scale_regex = re.compile(r"NI_Scale\[(\d+)\]_Scale_Type")

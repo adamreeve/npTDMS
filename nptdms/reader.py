@@ -17,12 +17,29 @@ class TdmsReader(object):
     def __init__(self, tdms_file):
         """ Initialise a new TdmsReader
 
-        :param tdms_file: An opened file object.
+        :param tdms_file: Either the path to the tdms file to read or an already
+            opened file.
         """
-        self._file = tdms_file
         self._segments = None
         self._prev_segment_objects = {}
         self.object_metadata = OrderedDict()
+        self._file_path = None
+
+        if hasattr(tdms_file, "read"):
+            # Is a file
+            self._file = tdms_file
+        else:
+            # Is path to a file
+            self._file = open(tdms_file, 'rb')
+            self._file_path = tdms_file
+
+    def close(self):
+        if self._file_path is not None:
+            # File path was provided so we opened the file and
+            # should close it.
+            self._file.close()
+        # Otherwise always remove reference to the file
+        self._file = None
 
     def read_metadata(self):
         """ Read all metadata and structure information from a TdmsFile
@@ -60,6 +77,19 @@ class TdmsReader(object):
                 "Cannot read data unless metadata has first been read")
         for segment in self._segments:
             for chunk in segment.read_raw_data(self._file):
+                yield chunk
+
+    def read_raw_data_for_channel(self, channel_path):
+        """ Read raw data for a single channel, chunk by chunk
+
+        :param channel_path: The path of the channel object to read data for
+        :returns: A generator that yields ChannelDataChunk objects
+        """
+        if self._segments is None:
+            raise RuntimeError(
+                "Cannot read data unless metadata has first been read")
+        for segment in self._segments:
+            for chunk in segment.read_raw_data_for_channel(self._file, channel_path):
                 yield chunk
 
     def _update_object_metadata(self, segment):

@@ -31,7 +31,7 @@ def test_unsupported_scaling_type():
 def test_linear_scaling():
     """Test linear scaling"""
 
-    data = np.array([1.0, 2.0, 3.0])
+    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
     expected_scaled_data = np.array([12.0, 14.0, 16.0])
 
     properties = {
@@ -49,7 +49,7 @@ def test_linear_scaling():
 def test_polynomial_scaling():
     """Test polynomial scaling"""
 
-    data = np.array([1.0, 2.0, 3.0])
+    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
     expected_scaled_data = np.array([16.0, 44.0, 112.0])
 
     properties = {
@@ -69,7 +69,7 @@ def test_polynomial_scaling():
 def test_polynomial_scaling_with_3_coefficients():
     """Test polynomial scaling"""
 
-    data = np.array([1.0, 2.0, 3.0])
+    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
     expected_scaled_data = np.array([13.0, 20.0, 31.0])
 
     properties = {
@@ -89,7 +89,7 @@ def test_polynomial_scaling_with_3_coefficients():
 def test_rtd_scaling():
     """Test RTD scaling"""
 
-    data = np.array([0.5, 0.6])
+    data = StubTdmsData(np.array([0.5, 0.6]))
     expected_scaled_data = np.array([1256.89628, 1712.83429])
 
     properties = {
@@ -114,7 +114,7 @@ def test_rtd_scaling():
 def test_table_scaling():
     """Test table scaling"""
 
-    data = np.array([0.5, 1.0, 1.5, 2.5, 3.0, 3.5])
+    data = StubTdmsData(np.array([0.5, 1.0, 1.5, 2.5, 3.0, 3.5]))
     expected_scaled_data = np.array([2.0, 2.0, 3.0, 6.0, 8.0, 8.0])
 
     # The scaled values are actually the range of inputs into the scaling,
@@ -142,10 +142,10 @@ def test_table_scaling():
 def test_add_scaling():
     """ Test scaling that adds two input scalings"""
 
-    scaler_data = {
+    scaler_data = StubDaqmxData({
         0: np.array([1.0, 2.0, 3.0]),
         1: np.array([2.0, 4.0, 6.0]),
-    }
+    })
     expected_scaled_data = np.array([3.0, 6.0, 9.0])
 
     properties = {
@@ -155,7 +155,7 @@ def test_add_scaling():
         "NI_Scale[2]_Add_Right_Operand_Input_Source": 1,
     }
     scaling = get_scaling(properties, {}, {})
-    scaled_data = scaling.scale_daqmx(scaler_data)
+    scaled_data = scaling.scale(scaler_data)
 
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
 
@@ -165,10 +165,10 @@ def test_subtract_scaling():
 
     # This behaves the opposite to what you'd expect, the left operand
     # is subtracted from the right operand.
-    scaler_data = {
+    scaler_data = StubDaqmxData({
         0: np.array([1.0, 2.0, 3.0]),
         1: np.array([2.0, 4.0, 6.0]),
-    }
+    })
     expected_scaled_data = np.array([1.0, 2.0, 3.0])
 
     properties = {
@@ -178,7 +178,7 @@ def test_subtract_scaling():
         "NI_Scale[2]_Subtract_Right_Operand_Input_Source": 1,
     }
     scaling = get_scaling(properties, {}, {})
-    scaled_data = scaling.scale_daqmx(scaler_data)
+    scaled_data = scaling.scale(scaler_data)
 
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
 
@@ -188,10 +188,8 @@ def test_subtract_scaling():
 def test_thermocouple_scaling_voltage_to_temperature():
     """Test thermocouple scaling from a voltage in uV to temperature"""
 
-    data = np.array([
-        0.0, 10.0, 100.0, 1000.0])
-    expected_scaled_data = np.array([
-        0.0, 0.2534448,  2.5309141, 24.9940185])
+    data = StubTdmsData(np.array([0.0, 10.0, 100.0, 1000.0]))
+    expected_scaled_data = np.array([0.0, 0.2534448,  2.5309141, 24.9940185])
 
     properties = {
         "NI_Number_Of_Scales": 1,
@@ -211,8 +209,7 @@ def test_thermocouple_scaling_voltage_to_temperature():
 def test_thermocouple_scaling_temperature_to_voltage():
     """Test thermocouple scaling from a temperature to voltage in uV"""
 
-    data = np.array([
-        0.0, 10.0, 50.0, 100.0])
+    data = StubTdmsData(np.array([0.0, 10.0, 50.0, 100.0]))
     expected_scaled_data = np.array([
         0.0, 396.8619078, 2023.0778862, 4096.2302187])
 
@@ -234,7 +231,7 @@ def test_multiple_scalings_applied_in_order():
     """Test all scalings applied from multiple scalings
     """
 
-    data = np.array([1.0, 2.0, 3.0])
+    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
     expected_scaled_data = np.array([21.0, 27.0, 33.0])
 
     properties = {
@@ -264,7 +261,7 @@ def test_multiple_scalings_but_all_with_raw_data_input():
        when it has the raw data as the input source
     """
 
-    data = np.array([1.0, 2.0, 3.0])
+    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
     expected_scaled_data = np.array([6.0, 9.0, 12.0])
 
     properties = {
@@ -291,7 +288,7 @@ def test_multiple_scalings_but_all_with_raw_data_input():
 def test_scaling_from_group():
     """Test linear scaling in a group"""
 
-    data = np.array([1.0, 2.0, 3.0])
+    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
     expected_scaled_data = np.array([12.0, 14.0, 16.0])
 
     group_properties = {
@@ -309,7 +306,7 @@ def test_scaling_from_group():
 def test_scaling_from_root():
     """Test linear scaling in the root object"""
 
-    data = np.array([1.0, 2.0, 3.0])
+    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
     expected_scaled_data = np.array([12.0, 14.0, 16.0])
 
     root_properties = {
@@ -322,3 +319,15 @@ def test_scaling_from_root():
     scaled_data = scaling.scale(data)
 
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+
+
+class StubTdmsData(object):
+    def __init__(self, data):
+        self.data = data
+        self.scaler_data = None
+
+
+class StubDaqmxData(object):
+    def __init__(self, scaler_data):
+        self.data = None
+        self.scaler_data = scaler_data

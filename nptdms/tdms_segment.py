@@ -5,7 +5,12 @@ import numpy as np
 from nptdms import types
 from nptdms.common import toc_properties
 from nptdms.base_segment import (
-    BaseSegment, BaseSegmentObject, DataChunk, read_interleaved_segment_bytes, fromfile)
+    BaseSegment,
+    BaseSegmentObject,
+    ChannelDataChunk,
+    DataChunk,
+    read_interleaved_segment_bytes,
+    fromfile)
 from nptdms.daqmx import DaqmxSegment
 from nptdms.log import log_manager
 
@@ -178,19 +183,40 @@ class ContiguousDataSegment(BaseSegment):
     def _new_segment_object(self, object_path):
         return TdmsSegmentObject(object_path, self.endianness)
 
-    def _read_data_chunk(self, file, data_objects, chunk):
+    def _read_data_chunk(self, file, data_objects, chunk_index):
         log.debug("Data is contiguous")
         object_data = {}
         for obj in data_objects:
-            if (chunk == (self.num_chunks - 1) and
-                    self.final_chunk_proportion != 1.0):
-                number_values = int(
-                    obj.number_values *
-                    self.final_chunk_proportion)
-            else:
-                number_values = obj.number_values
+            number_values = self._get_channel_number_values(obj, chunk_index)
             object_data[obj.path] = obj.read_values(file, number_values)
         return DataChunk.channel_data(object_data)
+
+    def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
+        """ Read data from a chunk for a single channel
+        """
+        channel_data = ChannelDataChunk.empty()
+        for obj in data_objects:
+            number_values = self._get_channel_number_values(obj, chunk_index)
+            if obj.path == channel_path:
+                channel_data = ChannelDataChunk.channel_data(obj.read_values(file, number_values))
+            elif number_values == obj.number_values:
+                # Seek over data for other channel data
+                file.seek(obj.data_size, os.SEEK_CUR)
+            else:
+                # In last chunk with reduced chunk size
+                if obj.data_type.size is None:
+                    # Type is unsized (eg. string), try reading number of values
+                    obj.read_values(file, number_values)
+                else:
+                    file.seek(obj.data_type.size * number_values, os.SEEK_CUR)
+        return channel_data
+
+    def _get_channel_number_values(self, obj, chunk_index):
+        if (chunk_index == (self.num_chunks - 1) and
+                self.final_chunk_proportion != 1.0):
+            return int(obj.number_values * self.final_chunk_proportion)
+        else:
+            return obj.number_values
 
 
 class TdmsSegmentObject(BaseSegmentObject):
