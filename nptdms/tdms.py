@@ -10,7 +10,7 @@ from nptdms.utils import Timer, OrderedDict
 from nptdms.log import log_manager
 from nptdms.common import path_components
 from nptdms.reader import TdmsReader
-from nptdms.channel_data import get_data_receiver, DaqmxDataReceiver
+from nptdms.channel_data import get_data_receiver
 
 
 log = log_manager.get_logger(__name__)
@@ -82,26 +82,16 @@ class TdmsFile(object):
         self._memmap_dir = memmap_dir
         self._channel_data = {}
         self._objects = OrderedDict()
-        self._file_path = None
-        self._file = None
         self._reader = None
 
-        if hasattr(file, "read"):
-            # Is a file
-            self._read_file(file, read_metadata_only)
+        reader = TdmsReader(file)
+        try:
+            self._read_file(reader, read_metadata_only)
+        finally:
             if keep_open:
-                self._file = file
-        else:
-            # Is path to a file
-            open_file = open(file, 'rb')
-            try:
-                self._read_file(open_file, read_metadata_only)
-            finally:
-                if keep_open:
-                    self._file_path = file
-                    self._file = open_file
-                else:
-                    open_file.close()
+                self._reader = reader
+            else:
+                reader.close()
 
     def __enter__(self):
         return self
@@ -115,29 +105,22 @@ class TdmsFile(object):
             If this TdmsFile was initialised with an already open file
             then the reference to it is released but the file is not closed.
         """
-        if self._file_path is not None:
-            # File path was provided so we opened the file
-            self._file.close()
-            self._file = None
-        elif self._file is not None:
-            # File was provided, release our reference to it
-            self._file = None
-        # Reader can also hold a reference to the file:
-        self._reader = None
+        if self._reader is not None:
+            self._reader.close()
+            self._reader = None
 
-    def _read_file(self, tdms_file, read_metadata_only):
-        self._reader = TdmsReader(tdms_file)
-        self._reader.read_metadata()
+    def _read_file(self, tdms_reader, read_metadata_only):
+        tdms_reader.read_metadata()
 
-        for (path, obj) in self._reader.object_metadata.items():
+        for (path, obj) in tdms_reader.object_metadata.items():
             self._objects[path] = TdmsObject(
                 self, path, obj.properties, obj.data_type,
                 obj.scaler_data_types, obj.num_values)
 
         if not read_metadata_only:
-            self._read_data()
+            self._read_data(tdms_reader)
 
-    def _read_data(self):
+    def _read_data(self, tdms_reader):
         with Timer(log, "Allocate space"):
             # Allocate space for data
             for (path, obj) in self._objects.items():
@@ -145,7 +128,7 @@ class TdmsFile(object):
 
         with Timer(log, "Read data"):
             # Now actually read all the data
-            for chunk in self._reader.read_raw_data():
+            for chunk in tdms_reader.read_raw_data():
                 for (path, data) in chunk.raw_data.items():
                     channel_data = self._channel_data[path]
                     channel_data.append_data(data)
@@ -161,6 +144,10 @@ class TdmsFile(object):
                     obj._set_raw_data(channel_data)
 
     def _read_channel_data(self, channel_path):
+        if self._reader is None:
+            raise RuntimeError(
+                "Cannot read channel data after the underlying TDMS reader is closed")
+
         obj = self._objects[channel_path]
         with Timer(log, "Allocate space"):
             # Allocate space for data
@@ -514,6 +501,9 @@ class TdmsObject(object):
         NumPy array containing data if there is data for this object,
         otherwise None.
         """
+        if self.has_data and self._raw_data is None:
+            raise RuntimeError("Channel data has not been read")
+
         if self._raw_data is None:
             return np.empty((0, 1))
         if self._data_scaled is None:
@@ -526,6 +516,9 @@ class TdmsObject(object):
         The raw, unscaled data array.
         For unscaled objects this is the same as the data property.
         """
+        if self.has_data and self._raw_data is None:
+            raise RuntimeError("Channel data has not been read")
+
         if self._raw_data is None:
             return np.empty((0, 1))
         if self._raw_data.scaler_data:
@@ -551,6 +544,9 @@ class TdmsObject(object):
     def raw_scaler_data(self):
         """ Raw DAQmx scaler data as a dictionary mapping from scale id to raw data arrays
         """
+        if self.has_data and self._raw_data is None:
+            raise RuntimeError("Channel data has not been read")
+
         return self._raw_data.scaler_data
 
     def _scale_data(self, raw_data):

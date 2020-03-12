@@ -4,10 +4,10 @@ import numpy as np
 import pytest
 from nptdms import TdmsFile
 from nptdms.test.util import *
-from nptdms.test.scenarios import get_scenarios
+from nptdms.test import scenarios
 
 
-@pytest.mark.parametrize("test_file,expected_data", get_scenarios())
+@pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
 def test_read_channel_data(test_file, expected_data):
     """Test reading data"""
 
@@ -20,7 +20,7 @@ def test_read_channel_data(test_file, expected_data):
         np.testing.assert_almost_equal(actual_data, expected_data)
 
 
-@pytest.mark.parametrize("test_file,expected_data", get_scenarios())
+@pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
 def test_lazily_read_channel_data(test_file, expected_data):
     """Test reading channel data lazily"""
 
@@ -30,6 +30,51 @@ def test_lazily_read_channel_data(test_file, expected_data):
                 actual_data = tdms_file.object(group, channel).read_data()
                 assert actual_data.dtype == expected_data.dtype
                 np.testing.assert_almost_equal(actual_data, expected_data)
+
+
+def test_read_data_after_close_throws():
+    """ Trying to read after opening and closing without reading data should throw
+    """
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    group, channel = list(expected_data.keys())[0]
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            pass
+        with pytest.raises(RuntimeError) as exc_info:
+            tdms_file.object(group, channel).read_data()
+        assert "Cannot read channel data after the underlying TDMS reader is closed" in str(exc_info.value)
+
+
+def test_read_data_after_open_in_read_mode_throws():
+    """ Trying to read channel data after reading all data initially should throw
+    """
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    group, channel = list(expected_data.keys())[0]
+    with test_file.get_tempfile() as temp_file:
+        tdms_file = TdmsFile.read(temp_file.file)
+        with pytest.raises(RuntimeError) as exc_info:
+            tdms_file.object(group, channel).read_data()
+        assert "Cannot read channel data after the underlying TDMS reader is closed" in str(exc_info.value)
+
+
+def test_access_data_property_after_opening_throws():
+    """ Accessing the data property after opening without reading data should throw
+    """
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    group, channel = list(expected_data.keys())[0]
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            with pytest.raises(RuntimeError) as exc_info:
+                _ = tdms_file.object(group, channel).data
+            assert "Channel data has not been read" in str(exc_info.value)
+
+            with pytest.raises(RuntimeError) as exc_info:
+                _ = tdms_file.object(group, channel).raw_data
+            assert "Channel data has not been read" in str(exc_info.value)
+
+            with pytest.raises(RuntimeError) as exc_info:
+                _ = tdms_file.object(group, channel).raw_scaler_data
+            assert "Channel data has not been read" in str(exc_info.value)
 
 
 def test_get_objects():
