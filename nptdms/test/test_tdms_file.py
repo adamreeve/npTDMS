@@ -49,6 +49,18 @@ def test_lazily_read_channel_data_with_file_path():
         os.remove(temp_file.name)
 
 
+def test_lazily_read_channel_data_with_channel_data_method():
+    """Test reading channel data lazily using the channel_data method of TdmsFile
+    """
+    test_file, expected_data = scenarios.single_segment_with_two_channels().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_data) in expected_data.items():
+                actual_data = tdms_file.channel_data(group, channel)
+                assert actual_data.dtype == expected_data.dtype
+                np.testing.assert_almost_equal(actual_data, expected_data)
+
+
 def test_read_data_after_close_throws():
     """ Trying to read after opening and closing without reading data should throw
     """

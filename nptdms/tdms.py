@@ -238,7 +238,12 @@ class TdmsFile(object):
 
         """
 
-        return self.object(group, channel).data
+        if self._reader is None:
+            # Data should have already been loaded
+            return self.object(group, channel).data
+        else:
+            # Data must be lazily loaded
+            return self.object(group, channel).read_data()
 
     @_property_builtin
     def properties(self):
