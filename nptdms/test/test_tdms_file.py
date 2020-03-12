@@ -1,5 +1,6 @@
 """Test reading of example TDMS files"""
 
+import os
 import numpy as np
 import pytest
 from nptdms import TdmsFile
@@ -30,6 +31,22 @@ def test_lazily_read_channel_data(test_file, expected_data):
                 actual_data = tdms_file.object(group, channel).read_data()
                 assert actual_data.dtype == expected_data.dtype
                 np.testing.assert_almost_equal(actual_data, expected_data)
+
+
+def test_lazily_read_channel_data_with_file_path():
+    """Test reading channel data lazily after initialising with a file path
+    """
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    temp_file = test_file.get_tempfile(delete=False)
+    try:
+        temp_file.file.close()
+        with TdmsFile.open(temp_file.name) as tdms_file:
+            for ((group, channel), expected_data) in expected_data.items():
+                actual_data = tdms_file.object(group, channel).read_data()
+                assert actual_data.dtype == expected_data.dtype
+                np.testing.assert_almost_equal(actual_data, expected_data)
+    finally:
+        os.remove(temp_file.name)
 
 
 def test_read_data_after_close_throws():
