@@ -7,6 +7,8 @@ from nptdms.log import log_manager
 log = log_manager.get_logger(__name__)
 
 RAW_DATA_INPUT_SOURCE = 0xFFFFFFFF
+VOLTAGE_EXCITATION = 10322
+CURRENT_EXCITATION = 10134
 
 
 class LinearScaling(object):
@@ -185,6 +187,70 @@ class TableScaling(object):
         """ Calculate scaled data
         """
         return np.interp(data, self.input_values, self.output_values)
+
+
+class ThermistorScaling(object):
+    """ Converts a voltage measurement from a Thermistor into temperature in Kelvin
+    """
+    def __init__(
+            self,
+            excitation_type,
+            excitation_value,
+            resistance_configuration,
+            r1_reference_resistance,
+            lead_wire_resistance,
+            a, b, c,
+            temperature_offset,
+            input_source):
+        self.excitation_type = excitation_type
+        self.excitation_value = excitation_value
+        self.resistance_configuration = resistance_configuration
+        self.r1_reference_resistance = r1_reference_resistance
+        self.lead_wire_resistance = lead_wire_resistance
+        self.a = a
+        self.b = b
+        self.c = c
+        self.temperature_offset = temperature_offset
+        self.input_source = input_source
+
+    @staticmethod
+    def from_properties(properties, scale_index):
+        prefix = "NI_Scale[%d]_Thermistor" % scale_index
+        excitation_type = properties["%s_Excitation_Type" % prefix]
+        excitation_value = properties["%s_Excitation_Value" % prefix]
+        resistance_configuration = properties["%s_Resistance_Configuration" % prefix]
+        r1_reference_resistance = properties["%s_R1_Reference_Resistance" % prefix]
+        lead_wire_resistance = properties["%s_Lead_Wire_Resistance" % prefix]
+        a = properties["%s_A" % prefix]
+        b = properties["%s_B" % prefix]
+        c = properties["%s_C" % prefix]
+        temperature_offset = properties["%s_Temperature_Offset" % prefix]
+        input_source = properties["%s_Input_Source" % prefix]
+        return ThermistorScaling(
+            excitation_type, excitation_value,
+            resistance_configuration, r1_reference_resistance, lead_wire_resistance,
+            a, b, c, temperature_offset, input_source)
+
+    def scale(self, data):
+        """ Convert voltage data to temperature in Kelvin
+        """
+        # Ensure data is double precision
+        data = data.astype(np.float64, copy=False)
+        if self.excitation_type == CURRENT_EXCITATION:
+            r_t = data / self.excitation_value
+        elif self.excitation_type == VOLTAGE_EXCITATION:
+            # Calculate resistance based on voltage divider circuit
+            # R_t = R1 / ((V_excitation / V_out) - 1)
+            r_t = self.r1_reference_resistance * np.reciprocal(self.excitation_value * np.reciprocal(data) - 1.0)
+        else:
+            raise ValueError("Invalid excitation type: %s" % self.excitation_type)
+
+        r_t = _adjust_for_lead_resistance(
+            r_t, self.excitation_type, self.resistance_configuration, self.lead_wire_resistance)
+
+        coefficients = [self.a, self.b, 0.0, self.c]
+        return np.reciprocal(
+            np.polynomial.polynomial.polyval(np.log(r_t), coefficients)) - self.temperature_offset
 
 
 class ThermocoupleScaling(object):
@@ -386,6 +452,9 @@ def _get_channel_scaling(properties):
         elif scale_type == 'Table':
             scalings[scale_index] = TableScaling.from_properties(
                 properties, scale_index)
+        elif scale_type == 'Thermistor':
+            scalings[scale_index] = ThermistorScaling.from_properties(
+                properties, scale_index)
         elif scale_type == 'Thermocouple':
             scalings[scale_index] = ThermocoupleScaling.from_properties(
                 properties, scale_index)
@@ -417,3 +486,14 @@ def _get_number_of_scalings(properties):
         return max(int(m.group(1)) for m in matches if m is not None) + 1
     except ValueError:
         return None
+
+
+def _adjust_for_lead_resistance(
+        measured_resistance, excitation_type, resistance_configuration, lead_wire_resistance):
+    """" Adjust a measured resistance to account for lead wire resistance
+    """
+    if resistance_configuration == 3:
+        return measured_resistance - lead_wire_resistance
+    if excitation_type == CURRENT_EXCITATION and resistance_configuration == 2:
+        return measured_resistance - 2.0 * lead_wire_resistance
+    return measured_resistance
