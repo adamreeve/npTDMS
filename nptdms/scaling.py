@@ -111,16 +111,10 @@ class RtdScaling(object):
         # R(T) = R(0)[1 + A*T + B*T^2 + (T - 100)*C*T^3]
         # R(T) = V/I
 
-        if self.lead_wire_resistance != 0.0:
-            # This is untested so throw an error.
-            # For 3 & 4 lead wire configuration the lead resistance should not
-            # be needed, but for configuration 2, we should have
-            # R_t = V/I - lead resistance
-            raise NotImplementedError(
-                "RTD scaling with non-zero lead wire resistance "
-                "is not implemented")
-
         r_t = data / self.current_excitation
+
+        r_t = _adjust_for_lead_resistance(
+            r_t, CURRENT_EXCITATION, self.resistance_configuration, self.lead_wire_resistance)
 
         if np.all(r_t >= self.r0_nominal_resistance):
             # For R(T) > R(0), temperature is positive and we can use the

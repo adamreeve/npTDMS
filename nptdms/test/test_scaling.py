@@ -86,11 +86,21 @@ def test_polynomial_scaling_with_3_coefficients():
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
 
 
-def test_rtd_scaling():
+@pytest.mark.parametrize(
+    "resistance_configuration,lead_resistance,expected_data",
+    [
+        (2, 0.0, [1256.89628, 1712.83429]),
+        (2, 100.0, [557.6879004146, 882.7374139697]),
+        (3, 0.0, [1256.89628, 1712.83429]),
+        (3, 100.0, [882.7374139697, 1256.896275222]),
+        (4, 0.0, [1256.89628, 1712.83429]),
+        (4, 100.0, [1256.89628, 1712.83429]),
+    ]
+)
+def test_rtd_scaling(resistance_configuration, lead_resistance, expected_data):
     """Test RTD scaling"""
 
     data = StubTdmsData(np.array([0.5, 0.6]))
-    expected_scaled_data = np.array([1256.89628, 1712.83429])
 
     properties = {
         "NI_Number_Of_Scales": 1,
@@ -100,15 +110,14 @@ def test_rtd_scaling():
         "NI_Scale[0]_RTD_A": 0.0039083,
         "NI_Scale[0]_RTD_B": -5.775e-07,
         "NI_Scale[0]_RTD_C": -4.183e-12,
-        "NI_Scale[0]_RTD_Lead_Wire_Resistance": 0.0,
-        "NI_Scale[0]_RTD_Resistance_Configuration": 3,
+        "NI_Scale[0]_RTD_Lead_Wire_Resistance": lead_resistance,
+        "NI_Scale[0]_RTD_Resistance_Configuration": resistance_configuration,
         "NI_Scale[0]_RTD_Input_Source": 0xFFFFFFFF,
     }
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(
-        expected_scaled_data, scaled_data, decimal=3)
+    np.testing.assert_almost_equal(expected_data, scaled_data, decimal=3)
 
 
 def test_table_scaling():
