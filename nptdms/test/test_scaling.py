@@ -86,11 +86,21 @@ def test_polynomial_scaling_with_3_coefficients():
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
 
 
-def test_rtd_scaling():
+@pytest.mark.parametrize(
+    "resistance_configuration,lead_resistance,expected_data",
+    [
+        (2, 0.0, [1256.89628, 1712.83429]),
+        (2, 100.0, [557.6879004146, 882.7374139697]),
+        (3, 0.0, [1256.89628, 1712.83429]),
+        (3, 100.0, [882.7374139697, 1256.896275222]),
+        (4, 0.0, [1256.89628, 1712.83429]),
+        (4, 100.0, [1256.89628, 1712.83429]),
+    ]
+)
+def test_rtd_scaling(resistance_configuration, lead_resistance, expected_data):
     """Test RTD scaling"""
 
     data = StubTdmsData(np.array([0.5, 0.6]))
-    expected_scaled_data = np.array([1256.89628, 1712.83429])
 
     properties = {
         "NI_Number_Of_Scales": 1,
@@ -100,15 +110,14 @@ def test_rtd_scaling():
         "NI_Scale[0]_RTD_A": 0.0039083,
         "NI_Scale[0]_RTD_B": -5.775e-07,
         "NI_Scale[0]_RTD_C": -4.183e-12,
-        "NI_Scale[0]_RTD_Lead_Wire_Resistance": 0.0,
-        "NI_Scale[0]_RTD_Resistance_Configuration": 3,
+        "NI_Scale[0]_RTD_Lead_Wire_Resistance": lead_resistance,
+        "NI_Scale[0]_RTD_Resistance_Configuration": resistance_configuration,
         "NI_Scale[0]_RTD_Input_Source": 0xFFFFFFFF,
     }
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(
-        expected_scaled_data, scaled_data, decimal=3)
+    np.testing.assert_almost_equal(expected_data, scaled_data, decimal=3)
 
 
 def test_table_scaling():
@@ -225,6 +234,99 @@ def test_thermocouple_scaling_temperature_to_voltage():
 
     np.testing.assert_almost_equal(
         expected_scaled_data, scaled_data, decimal=3)
+
+
+@pytest.mark.parametrize(
+    "resistance_configuration,lead_resistance,expected_data",
+    [
+        (2, 0.0, [287.1495569816, 290.71633623, 294.4862276706]),
+        (2, 100.0, [287.1495569816, 290.71633623, 294.4862276706]),
+        (3, 0.0, [287.1495569816, 290.71633623, 294.4862276706]),
+        (3, 100.0, [287.4248927942, 291.0482875767, 294.8892119392]),
+        (4, 0.0, [287.1495569816, 290.71633623, 294.4862276706]),
+        (4, 100.0, [287.1495569816, 290.71633623, 294.4862276706]),
+    ]
+)
+def test_thermistor_scaling_with_voltage_excitation(
+        resistance_configuration, lead_resistance, expected_data):
+    data = StubTdmsData(np.array([1.1, 1.0, 0.9]))
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Thermistor",
+        "NI_Scale[0]_Thermistor_Resistance_Configuration": resistance_configuration,
+        "NI_Scale[0]_Thermistor_Excitation_Type": 10322,
+        "NI_Scale[0]_Thermistor_Excitation_Value": 2.5,
+        "NI_Scale[0]_Thermistor_R1_Reference_Resistance": 10000.0,
+        "NI_Scale[0]_Thermistor_Lead_Wire_Resistance": lead_resistance,
+        "NI_Scale[0]_Thermistor_A": 0.0012873851,
+        "NI_Scale[0]_Thermistor_B": 0.00023575235,
+        "NI_Scale[0]_Thermistor_C": 9.497806e-8,
+        "NI_Scale[0]_Thermistor_Temperature_Offset": 1.0,
+        "NI_Scale[0]_Thermistor_Input_Source": 0xFFFFFFFF,
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(data)
+
+    np.testing.assert_almost_equal(expected_data, scaled_data)
+
+
+@pytest.mark.parametrize(
+    "resistance_configuration,lead_resistance,expected_data",
+    [
+        (2, 0.0, [335.5876272527, 338.303823856, 341.3530400858]),
+        (2, 100.0, [341.3530400858, 344.8212218133, 348.831282405]),
+        (3, 0.0, [335.5876272527, 338.303823856, 341.3530400858]),
+        (3, 100.0, [338.303823856, 341.3530400858, 344.8212218133]),
+        (4, 0.0, [335.5876272527, 338.303823856, 341.3530400858]),
+        (4, 100.0, [335.5876272527, 338.303823856, 341.3530400858]),
+    ]
+)
+def test_thermistor_scaling_with_current_excitation(
+        resistance_configuration, lead_resistance, expected_data):
+    data = StubTdmsData(np.array([1.1, 1.0, 0.9]))
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Thermistor",
+        "NI_Scale[0]_Thermistor_Resistance_Configuration": resistance_configuration,
+        "NI_Scale[0]_Thermistor_Excitation_Type": 10134,
+        "NI_Scale[0]_Thermistor_Excitation_Value": 1.0e-3,
+        "NI_Scale[0]_Thermistor_R1_Reference_Resistance": 0.0,
+        "NI_Scale[0]_Thermistor_Lead_Wire_Resistance": lead_resistance,
+        "NI_Scale[0]_Thermistor_A": 0.0012873851,
+        "NI_Scale[0]_Thermistor_B": 0.00023575235,
+        "NI_Scale[0]_Thermistor_C": 9.497806e-8,
+        "NI_Scale[0]_Thermistor_Temperature_Offset": 1.0,
+        "NI_Scale[0]_Thermistor_Input_Source": 0xFFFFFFFF,
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(data)
+
+    np.testing.assert_almost_equal(expected_data, scaled_data)
+
+
+def test_thermistor_scaling_with_invalid_excitation_type():
+    data = StubTdmsData(np.array([1.1, 1.0, 0.9]))
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Thermistor",
+        "NI_Scale[0]_Thermistor_Resistance_Configuration": 3,
+        "NI_Scale[0]_Thermistor_Excitation_Type": 12345,
+        "NI_Scale[0]_Thermistor_Excitation_Value": 2.5,
+        "NI_Scale[0]_Thermistor_R1_Reference_Resistance": 10000.0,
+        "NI_Scale[0]_Thermistor_Lead_Wire_Resistance": 0.0,
+        "NI_Scale[0]_Thermistor_A": 0.0012873851,
+        "NI_Scale[0]_Thermistor_B": 0.00023575235,
+        "NI_Scale[0]_Thermistor_C": 9.497806e-8,
+        "NI_Scale[0]_Thermistor_Temperature_Offset": 1.0,
+        "NI_Scale[0]_Thermistor_Input_Source": 0xFFFFFFFF,
+    }
+    scaling = get_scaling(properties, {}, {})
+    with pytest.raises(ValueError) as exc_info:
+        _ = scaling.scale(data)
+    assert "Invalid excitation type: 12345" in str(exc_info.value)
 
 
 def test_multiple_scalings_applied_in_order():
