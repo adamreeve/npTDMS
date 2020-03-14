@@ -15,7 +15,7 @@ jobs:
       env: TOXENV=py38
     - python: 3.8
       env: TOXENV=pep8
-    - stage deploy
+    - stage: deploy
       script: skip
       deploy:
         provider: pypi
