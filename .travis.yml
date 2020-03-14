@@ -15,18 +15,19 @@ jobs:
       env: TOXENV=py38
     - python: 3.8
       env: TOXENV=pep8
+    - stage deploy
+      script: skip
+      deploy:
+        provider: pypi
+        user: "__token__"
+        password:
+          secure: "FbKwm4x3ghVjprYrD4XWlw1KqJKmDOYnVKOWZWWO17mMxGpYNa1uLQQ9DGQwfNdbw9dYr0UvqZuxizWCJNSCS/40kifJFJxt2nP/k/fhrsQEy0x3NwJmdy+6hQXsB3spg4terwHm1aMEKHl3S5Vuqy+iKWnAroWCtxKorvjoWaSVcpCuTohHhmE2qqnMtsd8G44fQwGFvFXCrG7DKgaeYTWX86jyjPHzgReNsD2TaCfHBPLtVwqvi0Cwf2eQAIsrYBTa9kqNG/+MgZBVeiDqwLaA1Qf3+WA+OdYPZceBV8LcoYzHLHBRTslc8Dpa0K2WDIzVR6/X06A/rbQkieyyXTfNowtSsm2eCHTp8xhiNuN5aLyfjyE8HDRZJu/lecF37twGyWDga0D8GNsd0nCJDymiLtoy7ZK2Lp7GiP0ttc/rK7FyLFrIiHl5d9JAb8WoOBQ1TneqPfvsLZnEhEJeiikJX23vv2jXVNcFKdI8I7ygV0NtmxxjeQir17Jg56v7j94jYBgyjfVjDYdTA+eRQ5KcuAEssiIKKmhxExJuRuYWzIr8uw0bKNDNdZu7wxXBiJsJhX6nO9uor6Hse8CRg8ie5w9wSt9YkMCBHW3Hd9yZVtvKCHseqIdnTE2YcpU8fMXLWhaPECdCTGAyumcL+aMZYshMXboIlCYGQrsUXg0="
+        on:
+          branch: master
+          tags: true
 
 install:
   - pip install tox
 
 script:
   - tox
-
-deploy:
-  provider: pypi
-  user: "__token__"
-  password:
-    secure: "FbKwm4x3ghVjprYrD4XWlw1KqJKmDOYnVKOWZWWO17mMxGpYNa1uLQQ9DGQwfNdbw9dYr0UvqZuxizWCJNSCS/40kifJFJxt2nP/k/fhrsQEy0x3NwJmdy+6hQXsB3spg4terwHm1aMEKHl3S5Vuqy+iKWnAroWCtxKorvjoWaSVcpCuTohHhmE2qqnMtsd8G44fQwGFvFXCrG7DKgaeYTWX86jyjPHzgReNsD2TaCfHBPLtVwqvi0Cwf2eQAIsrYBTa9kqNG/+MgZBVeiDqwLaA1Qf3+WA+OdYPZceBV8LcoYzHLHBRTslc8Dpa0K2WDIzVR6/X06A/rbQkieyyXTfNowtSsm2eCHTp8xhiNuN5aLyfjyE8HDRZJu/lecF37twGyWDga0D8GNsd0nCJDymiLtoy7ZK2Lp7GiP0ttc/rK7FyLFrIiHl5d9JAb8WoOBQ1TneqPfvsLZnEhEJeiikJX23vv2jXVNcFKdI8I7ygV0NtmxxjeQir17Jg56v7j94jYBgyjfVjDYdTA+eRQ5KcuAEssiIKKmhxExJuRuYWzIr8uw0bKNDNdZu7wxXBiJsJhX6nO9uor6Hse8CRg8ie5w9wSt9YkMCBHW3Hd9yZVtvKCHseqIdnTE2YcpU8fMXLWhaPECdCTGAyumcL+aMZYshMXboIlCYGQrsUXg0="
-  on:
-    branch: master
-    tags: true
