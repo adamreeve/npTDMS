@@ -5,7 +5,7 @@
 
 import numpy as np
 
-from nptdms import scaling
+from nptdms import scaling, types
 from nptdms.utils import Timer, OrderedDict
 from nptdms.log import log_manager
 from nptdms.common import path_components
@@ -338,7 +338,13 @@ class TdmsFile(object):
                 for prop_name, prop_value in channel.properties.items():
                     container_group.attrs[prop_name] = prop_value
 
-                container_group[group_name+'/'+channel.channel] = channel.data
+                channel_data = None
+                if channel.data_type is types.String:
+                    channel_data = np.string_(channel.data)
+                else:
+                    channel_data = channel.data
+
+                container_group[group_name+'/'+channel.channel] = channel_data
 
         return h5file
 
