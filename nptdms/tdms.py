@@ -326,25 +326,27 @@ class TdmsFile(object):
                 group = self.object(group_name)
 
                 # Write the group's properties
+                container_group.create_group(group_name)
                 for prop_name, prop_value in group.properties.items():
                     container_group[group_name].attrs[prop_name] = prop_value
 
-            except KeyError:
+            except KeyError as exc:
                 # No group object present
                 pass
 
             # Write properties and data for each channel
             for channel in self.group_channels(group_name):
-                for prop_name, prop_value in channel.properties.items():
-                    container_group.attrs[prop_name] = prop_value
+                channel_key = group_name + '/' + channel.channel
 
                 channel_data = None
                 if channel.data_type is types.String:
                     channel_data = np.string_(channel.data)
                 else:
                     channel_data = channel.data
+                container_group[channel_key] = channel_data
 
-                container_group[group_name+'/'+channel.channel] = channel_data
+                for prop_name, prop_value in channel.properties.items():
+                    container_group[channel_key].attrs[prop_name] = prop_value
 
         return h5file
 

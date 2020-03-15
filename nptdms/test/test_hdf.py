@@ -1,6 +1,7 @@
-"""Test exporting TDMS data to HDF"""
-
+""" Test exporting TDMS data to HDF
+"""
 import pytest
+import numpy as np
 try:
     import h5py
 except ImportError:
@@ -8,12 +9,52 @@ except ImportError:
 
 from nptdms.test.util import (
     GeneratedFile,
-    string_hexlify
+    basic_segment,
+    string_hexlify,
 )
+from nptdms.test import scenarios
+
+
+def test_hdf_channel_data(tmp_path):
+    """ Test basic conversion of channel data to HDF
+    """
+    test_file, expected_data = scenarios.single_segment_with_two_channels().values
+
+    tdms_data = test_file.load()
+    h5_path = tmp_path / 'h5_data_test.h5'
+    h5 = tdms_data.as_hdf(h5_path)
+
+    for ((group, channel), expected_data) in expected_data.items():
+        h5_channel = h5[group][channel]
+        assert h5_channel.dtype.kind == 'i'
+        np.testing.assert_almost_equal(h5_channel.value, expected_data)
+    h5.close()
+
+
+def test_hdf_properties(tmp_path):
+    """ Test properties are converted to attributes in HDF files
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    h5_path = tmp_path / 'h5_properties_test.h5'
+    h5 = tdms_data.as_hdf(h5_path)
+
+    # File level properties
+    assert h5.attrs['num'] == 15
+
+    # Group properties
+    assert h5['Group'].attrs['prop'] == 'value'
+    assert h5['Group'].attrs['num'] == 10
+
+    # Channel properties
+    assert h5['Group']['Channel2'].attrs['wf_start_offset'] == 0.0
+    assert h5['Group']['Channel2'].attrs['wf_increment'] == 0.1
 
 
 def test_as_hdf_string(tmp_path):
-    """Test HDF5 conversion for string datatype
+    """ Test HDF5 conversion for string datatype
     """
     strings = ["abc123", "?<>~`!@#$%^&*()-=_+,.;'[]:{}|"]
 
