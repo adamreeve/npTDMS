@@ -438,7 +438,7 @@ def test_as_hdf_string():
         "02 00 00 00"
         "00 00 00 00"
         # Number of bytes in data
-        "25 00 00 00"
+        "2B 00 00 00"
         "00 00 00 00"
         # Number of properties (0)
         "00 00 00 00")
