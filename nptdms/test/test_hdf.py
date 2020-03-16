@@ -10,6 +10,7 @@ except ImportError:
 from nptdms.test.util import (
     GeneratedFile,
     basic_segment,
+    hexlify_value,
     string_hexlify,
 )
 from nptdms.test import scenarios
@@ -102,4 +103,58 @@ def test_as_hdf_string(tmp_path):
     assert h5_strings.shape[0] == len(strings)
     for expected, read in zip(strings, h5_strings.value):
         assert expected == read.decode('utf8')
+    h5.close()
+
+
+def test_unicode_string_data(tmp_path):
+    """ Test HDF5 conversion for string datatype with non-ASCII data
+    """
+    strings = ["Hello, \u4E16\u754C", "\U0001F600"]
+    sizes = [len(s.encode('utf-8')) for s in strings]
+
+    test_file = GeneratedFile()
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+    metadata = (
+        # Number of objects
+        "01 00 00 00"
+        # Length of the object path
+        "11 00 00 00")
+    metadata += string_hexlify("/'Group'/'String'")
+    metadata += (
+        # Length of index information
+        "1C 00 00 00"
+        # Raw data data type
+        "20 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00" +
+        # Number of bytes in data, including index
+        hexlify_value('q', sum(sizes) + 4 * len(sizes)) +
+        # Number of properties (0)
+        "00 00 00 00")
+    data = ""
+    offset = 0
+    for size in sizes:
+        # Index gives end positions of strings:
+        offset += size
+        data += hexlify_value('i', offset)
+    for string in strings:
+        data += string_hexlify(string)
+    test_file.add_segment(toc, metadata, data)
+    tdms_data = test_file.load()
+
+    data = tdms_data.channel_data("Group", "String")
+    assert len(data) == len(strings)
+    for expected, read in zip(strings, data):
+        assert expected == read
+
+    h5_path = tmp_path / 'h5_unicode_strings_test.h5'
+    h5 = tdms_data.as_hdf(h5_path)
+    h5_strings = h5['Group']['String']
+    assert h5_strings.dtype.kind == 'O'
+    assert h5_strings.shape[0] == len(strings)
+    for expected, read in zip(strings, h5_strings.value):
+        assert expected == read
     h5.close()

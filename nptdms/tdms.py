@@ -338,12 +338,17 @@ class TdmsFile(object):
             for channel in self.group_channels(group_name):
                 channel_key = group_name + '/' + channel.channel
 
-                channel_data = None
                 if channel.data_type is types.String:
-                    channel_data = np.string_(channel.data)
+                    try:
+                        # Try to encode as fixed width ASCII by default, for best compatibility
+                        container_group[channel_key] = np.string_(channel.data)
+                    except UnicodeEncodeError:
+                        # Otherwise encode as UTF-8 strings
+                        channel_data = container_group.create_dataset(
+                            channel_key, (len(channel.data), ), dtype=h5py.string_dtype())
+                        channel_data[...] = channel.data
                 else:
-                    channel_data = channel.data
-                container_group[channel_key] = channel_data
+                    container_group[channel_key] = channel.data
 
                 for prop_name, prop_value in channel.properties.items():
                     container_group[channel_key].attrs[prop_name] = prop_value
