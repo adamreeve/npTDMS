@@ -330,7 +330,7 @@ class TdmsFile(object):
                 for prop_name, prop_value in group.properties.items():
                     container_group[group_name].attrs[prop_name] = prop_value
 
-            except KeyError as exc:
+            except KeyError:
                 # No group object present
                 pass
 
