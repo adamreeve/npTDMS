@@ -339,14 +339,10 @@ class TdmsFile(object):
                 channel_key = group_name + '/' + channel.channel
 
                 if channel.data_type is types.String:
-                    try:
-                        # Try to encode as fixed width ASCII by default, for best compatibility
-                        container_group[channel_key] = np.string_(channel.data)
-                    except UnicodeEncodeError:
-                        # Otherwise encode as UTF-8 strings
-                        channel_data = container_group.create_dataset(
-                            channel_key, (len(channel.data), ), dtype=h5py.string_dtype())
-                        channel_data[...] = channel.data
+                    # Otherwise encode as UTF-8 strings
+                    channel_data = container_group.create_dataset(
+                        channel_key, (len(channel.data), ), dtype=h5py.string_dtype())
+                    channel_data[...] = channel.data
                 else:
                     container_group[channel_key] = channel.data
 

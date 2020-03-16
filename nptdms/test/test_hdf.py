@@ -1,5 +1,6 @@
 """ Test exporting TDMS data to HDF
 """
+import sys
 import pytest
 import numpy as np
 try:
@@ -28,7 +29,7 @@ def test_hdf_channel_data(tmp_path):
     for ((group, channel), expected_data) in expected_data.items():
         h5_channel = h5[group][channel]
         assert h5_channel.dtype.kind == 'i'
-        np.testing.assert_almost_equal(h5_channel.value, expected_data)
+        np.testing.assert_almost_equal(h5_channel[...], expected_data)
     h5.close()
 
 
@@ -99,10 +100,10 @@ def test_as_hdf_string(tmp_path):
     h5_path = tmp_path / 'h5_strings_test.h5'
     h5 = tdms_data.as_hdf(h5_path)
     h5_strings = h5['Group']['String']
-    assert h5_strings.dtype.kind == 'S'
+    assert h5_strings.dtype.kind == 'O'
     assert h5_strings.shape[0] == len(strings)
-    for expected, read in zip(strings, h5_strings.value):
-        assert expected == read.decode('utf8')
+    for expected, read in zip(strings, h5_strings[...]):
+        assert expected == read
     h5.close()
 
 
@@ -155,6 +156,6 @@ def test_unicode_string_data(tmp_path):
     h5_strings = h5['Group']['String']
     assert h5_strings.dtype.kind == 'O'
     assert h5_strings.shape[0] == len(strings)
-    for expected, read in zip(strings, h5_strings.value):
+    for expected, read in zip(strings, h5_strings[...]):
         assert expected == read
     h5.close()
