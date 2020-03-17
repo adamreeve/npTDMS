@@ -124,7 +124,7 @@ class TdmsFile(object):
         with Timer(log, "Allocate space"):
             # Allocate space for data
             for (path, obj) in self._objects.items():
-                self._channel_data[path] = get_data_receiver(obj, self._memmap_dir)
+                self._channel_data[path] = get_data_receiver(obj, obj.number_values, self._memmap_dir)
 
         with Timer(log, "Read data"):
             # Now actually read all the data
@@ -151,11 +151,15 @@ class TdmsFile(object):
         obj = self._objects[channel_path]
         with Timer(log, "Allocate space"):
             # Allocate space for data
-            channel_data = get_data_receiver(obj, self._memmap_dir)
+            if length is None:
+                num_values = obj.number_values - offset
+            else:
+                num_values = min(length, obj.number_values - offset)
+            channel_data = get_data_receiver(obj, num_values, self._memmap_dir)
 
         with Timer(log, "Read data"):
             # Now actually read all the data
-            for chunk in self._reader.read_raw_data_for_channel(channel_path):
+            for chunk in self._reader.read_raw_data_for_channel(channel_path, offset, length):
                 if chunk.raw_data is not None:
                     channel_data.append_data(chunk.raw_data)
                 if chunk.daqmx_raw_data is not None:
