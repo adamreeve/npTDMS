@@ -11,6 +11,7 @@ from nptdms.test.util import (
     GeneratedFile,
     basic_segment,
     channel_metadata,
+    compare_arrays,
     hexlify_value,
     segment_objects_metadata,
     string_hexlify,
@@ -112,6 +113,25 @@ def test_floating_point_data_types(tmp_path):
     h5.close()
 
 
+def test_timestamp_data(tmp_path):
+    """ Test conversion of timestamp channel data to HDF
+        HDF doesn't support timestamps natively, so these are converted to strings
+    """
+
+    test_file, expected_data = scenarios.timestamp_data().values
+    tdms_data = test_file.load()
+    h5_path = tmp_path / 'h5_timestamp_test.h5'
+    h5 = tdms_data.as_hdf(h5_path)
+
+    for (group, channel), expected_values in expected_data.items():
+        h5_channel = h5[group][channel]
+        assert h5_channel.dtype.kind == 'S'
+        expected_strings = np.datetime_as_string(expected_values, unit='us', timezone='UTC')
+        expected_ascii = [s.encode('ascii') for s in expected_strings]
+        compare_arrays(h5_channel[...], expected_ascii)
+    h5.close()
+
+
 def test_hdf_properties(tmp_path):
     """ Test properties are converted to attributes in HDF files
     """
@@ -132,6 +152,29 @@ def test_hdf_properties(tmp_path):
     # Channel properties
     assert h5['Group']['Channel2'].attrs['wf_start_offset'] == 0.0
     assert h5['Group']['Channel2'].attrs['wf_increment'] == 0.1
+
+
+def test_timestamp_property(tmp_path):
+    """ Test a timestamp property is converted to an attribute in an HDF file
+        HDF doesn't support timestamps natively, so these are converted to strings
+    """
+    test_file = GeneratedFile()
+    properties = {
+        "wf_start_time": (0x44, hexlify_value("<Q", 0) + hexlify_value("<q", 3524551547))
+    }
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 2, properties),
+        ),
+        "01 00 00 00" "02 00 00 00"
+    )
+    tdms_data = test_file.load()
+
+    h5_path = tmp_path / 'h5_properties_test.h5'
+    h5 = tdms_data.as_hdf(h5_path)
+
+    assert h5['group']['channel1'].attrs['wf_start_time'] == b'2015-09-08T10:05:47.000000Z'
 
 
 def test_as_hdf_string(tmp_path):

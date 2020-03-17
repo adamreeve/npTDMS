@@ -18,7 +18,7 @@ def test_read_channel_data(test_file, expected_data):
     for ((group, channel), expected_data) in expected_data.items():
         actual_data = tdms_data.object(group, channel).data
         assert actual_data.dtype == expected_data.dtype
-        np.testing.assert_almost_equal(actual_data, expected_data)
+        compare_arrays(actual_data, expected_data)
 
 
 @pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
@@ -30,7 +30,7 @@ def test_lazily_read_channel_data(test_file, expected_data):
             for ((group, channel), expected_data) in expected_data.items():
                 actual_data = tdms_file.object(group, channel).read_data()
                 assert actual_data.dtype == expected_data.dtype
-                np.testing.assert_almost_equal(actual_data, expected_data)
+                compare_arrays(actual_data, expected_data)
 
 
 def test_lazily_read_channel_data_with_file_path():
@@ -44,7 +44,7 @@ def test_lazily_read_channel_data_with_file_path():
             for ((group, channel), expected_data) in expected_data.items():
                 actual_data = tdms_file.object(group, channel).read_data()
                 assert actual_data.dtype == expected_data.dtype
-                np.testing.assert_almost_equal(actual_data, expected_data)
+                compare_arrays(actual_data, expected_data)
     finally:
         os.remove(temp_file.name)
 
@@ -130,99 +130,6 @@ def test_property_read():
 
     object = tdms_data.object("Group")
     assert object.property("num") == 10
-
-
-def test_timestamp_data():
-    """Test reading contiguous and interleaved timestamp data,
-    which isn't read by numpy"""
-
-    times = [
-        np.datetime64('2012-08-23T00:00:00.123'),
-        np.datetime64('2012-08-23T01:02:03.456'),
-        np.datetime64('2012-08-23T12:00:00.0'),
-        np.datetime64('2012-08-23T12:02:03.9999'),
-    ]
-    epoch = np.datetime64('1904-01-01T00:00:00')
-
-    def total_seconds(td):
-        return int(td / np.timedelta64(1, 's'))
-
-    def microseconds(dt):
-        diff = dt - epoch
-        seconds = total_seconds(diff)
-        remainder = diff - np.timedelta64(seconds, 's')
-        return int(remainder / np.timedelta64(1, 'us'))
-
-    seconds = [total_seconds(t - epoch) for t in times]
-    fractions = [
-        int(float(microseconds(t)) * 2 ** 58 / 5 ** 6)
-        for t in times]
-
-    metadata = (
-        # Number of objects
-        "02 00 00 00"
-        # Length of the object path
-        "17 00 00 00")
-    metadata += string_hexlify("/'Group'/'TimeChannel1'")
-    metadata += (
-        # Length of index information
-        "14 00 00 00"
-        # Raw data data type
-        "44 00 00 00"
-        # Dimension
-        "01 00 00 00"
-        # Number of raw data values
-        "02 00 00 00"
-        "00 00 00 00"
-        # Number of properties (0)
-        "00 00 00 00")
-    metadata += (
-        "17 00 00 00")
-    metadata += string_hexlify("/'Group'/'TimeChannel2'")
-    metadata += (
-        # Length of index information
-        "14 00 00 00"
-        # Raw data data type
-        "44 00 00 00"
-        # Dimension
-        "01 00 00 00"
-        # Number of raw data values
-        "02 00 00 00"
-        "00 00 00 00"
-        # Number of properties (0)
-        "00 00 00 00")
-    data = ""
-    for f, s in zip(fractions, seconds):
-        data += hexlify_value("<Q", f)
-        data += hexlify_value("<q", s)
-
-    test_file = GeneratedFile()
-    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
-    test_file.add_segment(toc, metadata, data)
-    tdms_data = test_file.load()
-    channel_data = tdms_data.channel_data("Group", "TimeChannel1")
-    assert len(channel_data) == 2
-    assert channel_data[0] == times[0]
-    assert channel_data[1] == times[1]
-    # Read fraction of second
-    channel_data = tdms_data.channel_data("Group", "TimeChannel2")
-    assert len(channel_data) == 2
-    assert channel_data[0] == times[2]
-    assert channel_data[1] == times[3]
-
-    # Now test it interleaved
-    toc = toc + ("kTocInterleavedData", )
-    test_file = GeneratedFile()
-    test_file.add_segment(toc, metadata, data)
-    tdms_data = test_file.load()
-    channel_data = tdms_data.channel_data("Group", "TimeChannel1")
-    assert len(channel_data) == 2
-    assert channel_data[0] == times[0]
-    assert channel_data[1] == times[2]
-    channel_data = tdms_data.channel_data("Group", "TimeChannel2")
-    assert len(channel_data) == 2
-    assert channel_data[0] == times[1]
-    assert channel_data[1] == times[3]
 
 
 def test_time_track():

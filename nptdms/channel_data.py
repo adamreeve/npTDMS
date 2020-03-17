@@ -39,13 +39,17 @@ class ListDataReceiver(object):
     def __init__(self):
         """Initialise new data receiver for a TDMS object
         """
-        self.data = []
+        self._data = []
         self.scaler_data = {}
 
     def append_data(self, data):
         """Append data from a segment
         """
-        self.data.extend(data)
+        self._data.extend(data)
+
+    @property
+    def data(self):
+        return np.array(self._data)
 
 
 class NumpyDataReceiver(object):

@@ -314,7 +314,7 @@ class TdmsFile(object):
         try:
             root = self.object()
             for property_name, property_value in root.properties.items():
-                container_group.attrs[property_name] = property_value
+                container_group.attrs[property_name] = _hdf_attr_value(property_value)
         except KeyError:
             # No root object present
             pass
@@ -328,7 +328,7 @@ class TdmsFile(object):
                 # Write the group's properties
                 container_group.create_group(group_name)
                 for prop_name, prop_value in group.properties.items():
-                    container_group[group_name].attrs[prop_name] = prop_value
+                    container_group[group_name].attrs[prop_name] = _hdf_attr_value(prop_value)
 
             except KeyError:
                 # No group object present
@@ -339,15 +339,23 @@ class TdmsFile(object):
                 channel_key = group_name + '/' + channel.channel
 
                 if channel.data_type is types.String:
-                    # Otherwise encode as UTF-8 strings
+                    # Encode as variable length UTF-8 strings
                     channel_data = container_group.create_dataset(
                         channel_key, (len(channel.data), ), dtype=h5py.string_dtype())
                     channel_data[...] = channel.data
+                elif channel.data_type is types.TimeStamp:
+                    # Timestamps are represented as fixed length ASCII strings
+                    # because HDF doesn't natively support timestamps
+                    channel_data = container_group.create_dataset(
+                        channel_key, (len(channel.data), ), dtype='S27')
+                    string_data = np.datetime_as_string(channel.data, unit='us', timezone='UTC')
+                    encoded_data = [s.encode('ascii') for s in string_data]
+                    channel_data[...] = encoded_data
                 else:
                     container_group[channel_key] = channel.data
 
                 for prop_name, prop_value in channel.properties.items():
-                    container_group[channel_key].attrs[prop_name] = prop_value
+                    container_group[channel_key].attrs[prop_name] = _hdf_attr_value(prop_value)
 
         return h5file
 
@@ -595,3 +603,11 @@ def _components_to_path(*args):
 
     return ('/' + '/'.join(
         ["'" + arg.replace("'", "''") + "'" for arg in args]))
+
+
+def _hdf_attr_value(value):
+    """ Convert a value into a format suitable for an HDF attribute
+    """
+    if isinstance(value, np.datetime64):
+        return np.string_(np.datetime_as_string(value, unit='us', timezone='UTC'))
+    return value
