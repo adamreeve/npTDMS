@@ -5,6 +5,7 @@ import binascii
 from io import BytesIO
 import struct
 import tempfile
+import numpy as np
 
 from nptdms import tdms
 
@@ -261,3 +262,13 @@ def _hex_to_bytes(hex_data):
     """
     return binascii.unhexlify(
         hex_data.replace(" ", "").replace("\n", "").encode('utf-8'))
+
+
+def compare_arrays(actual_data, expected_data):
+    try:
+        np.testing.assert_almost_equal(actual_data, expected_data)
+    except TypeError:
+        # Cannot compare given types
+        assert len(actual_data) == len(expected_data)
+        for (actual, expected) in zip(actual_data, expected_data):
+            assert actual == expected

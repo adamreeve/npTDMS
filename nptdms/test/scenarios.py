@@ -645,3 +645,143 @@ def scaled_data():
         ('group', 'channel1'): np.array([12, 14], dtype=np.float64),
     }
     return test_file, expected_data
+
+
+@scenario
+def timestamp_data():
+    """Test reading contiguous timestamp data
+    """
+
+    times = [
+        np.datetime64('2012-08-23T00:00:00.123', 'us'),
+        np.datetime64('2012-08-23T01:02:03.456', 'us'),
+        np.datetime64('2012-08-23T12:00:00.0', 'us'),
+        np.datetime64('2012-08-23T12:02:03.9999', 'us'),
+    ]
+
+    metadata = (
+        # Number of objects
+        "02 00 00 00"
+        # Length of the object path
+        "17 00 00 00")
+    metadata += string_hexlify("/'Group'/'TimeChannel1'")
+    metadata += (
+        # Length of index information
+        "14 00 00 00"
+        # Raw data data type
+        "44 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+    metadata += (
+        "17 00 00 00")
+    metadata += string_hexlify("/'Group'/'TimeChannel2'")
+    metadata += (
+        # Length of index information
+        "14 00 00 00"
+        # Raw data data type
+        "44 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+
+    test_file = GeneratedFile()
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+    test_file.add_segment(toc, metadata, _timestamp_data(times))
+
+    expected_data = {
+        ('Group', 'TimeChannel1'): np.array([times[0], times[1]]),
+        ('Group', 'TimeChannel2'): np.array([times[2], times[3]]),
+    }
+
+    return test_file, expected_data
+
+
+@scenario
+def interleaved_timestamp_data():
+    """Test reading interleaved timestamp data
+    """
+
+    times = [
+        np.datetime64('2012-08-23T00:00:00.123', 'us'),
+        np.datetime64('2012-08-23T01:02:03.456', 'us'),
+        np.datetime64('2012-08-23T12:00:00.0', 'us'),
+        np.datetime64('2012-08-23T12:02:03.9999', 'us'),
+    ]
+
+    metadata = (
+        # Number of objects
+        "02 00 00 00"
+        # Length of the object path
+        "17 00 00 00")
+    metadata += string_hexlify("/'Group'/'TimeChannel1'")
+    metadata += (
+        # Length of index information
+        "14 00 00 00"
+        # Raw data data type
+        "44 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+    metadata += (
+        "17 00 00 00")
+    metadata += string_hexlify("/'Group'/'TimeChannel2'")
+    metadata += (
+        # Length of index information
+        "14 00 00 00"
+        # Raw data data type
+        "44 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+
+    test_file = GeneratedFile()
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData")
+    test_file.add_segment(toc, metadata, _timestamp_data(times))
+
+    expected_data = {
+        ('Group', 'TimeChannel1'): np.array([times[0], times[2]]),
+        ('Group', 'TimeChannel2'): np.array([times[1], times[3]]),
+    }
+
+    return test_file, expected_data
+
+
+def _timestamp_data(times):
+    epoch = np.datetime64('1904-01-01T00:00:00')
+
+    def total_seconds(td):
+        return int(td / np.timedelta64(1, 's'))
+
+    def microseconds(dt):
+        diff = dt - epoch
+        secs = total_seconds(diff)
+        remainder = diff - np.timedelta64(secs, 's')
+        return int(remainder / np.timedelta64(1, 'us'))
+
+    seconds = [total_seconds(t - epoch) for t in times]
+    fractions = [
+        int(float(microseconds(t)) * 2 ** 58 / 5 ** 6)
+        for t in times]
+
+    data = ""
+    for f, s in zip(fractions, seconds):
+        data += hexlify_value("<Q", f)
+        data += hexlify_value("<q", s)
+    return data
