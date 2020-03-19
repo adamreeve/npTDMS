@@ -1,6 +1,7 @@
 """ Lower level TDMS reader API that allows finer grained reading of data
 """
 
+import numpy as np
 from nptdms.utils import Timer, OrderedDict
 from nptdms.tdms_segment import read_segment_metadata
 from nptdms.log import log_manager
@@ -24,6 +25,9 @@ class TdmsReader(object):
         self._prev_segment_objects = {}
         self.object_metadata = OrderedDict()
         self._file_path = None
+
+        self._segment_channel_offsets = None
+        self._segment_chunk_sizes = None
 
         if hasattr(tdms_file, "read"):
             # Is a file
@@ -91,6 +95,11 @@ class TdmsReader(object):
         if self._segments is None:
             raise RuntimeError(
                 "Cannot read data unless metadata has first been read")
+
+        if self._segment_channel_offsets is None:
+            with Timer(log, "Build data index"):
+                self._build_index()
+
         # TODO: Compute segments + chunks to read, then filter chunk data to requested range
         for segment in self._segments:
             for chunk in segment.read_raw_data_for_channel(self._file, channel_path):
@@ -104,8 +113,7 @@ class TdmsReader(object):
             self._prev_segment_objects[path] = segment_object
 
             object_metadata = self._get_or_create_object(path)
-            if segment_object.has_data:
-                object_metadata.num_values += _number_of_segment_values(segment_object, segment)
+            object_metadata.num_values += _number_of_segment_values(segment_object, segment)
             _update_object_data_type(path, object_metadata, segment_object)
             _update_object_scaler_data_types(path, object_metadata, segment_object)
 
@@ -128,10 +136,40 @@ class TdmsReader(object):
             self.object_metadata[path] = obj
             return obj
 
+    def _build_index(self):
+        """ Builds an index into the segment data for faster lookup of values
+
+            _segment_channel_offsets provides data offset at the end of each segment per channel
+            _segment_chunk_sizes provides chunk sizes in each segment per channel
+        """
+        data_objects = [
+            path
+            for (path, obj) in self.object_metadata.items()
+            if obj.num_values > 0]
+        num_segments = len(self._segments)
+
+        segment_num_values = {
+            path: np.zeros(num_segments, dtype=np.int64) for path in data_objects}
+        segment_chunk_sizes = {
+            path: np.zeros(num_segments, dtype=np.int32) for path in data_objects}
+
+        for i, segment in enumerate(self._segments):
+            for obj in segment.ordered_objects:
+                if not obj.has_data:
+                    continue
+                segment_chunk_sizes[obj.path][i] = obj.number_values if obj.has_data else 0
+                segment_num_values[obj.path][i] = _number_of_segment_values(obj, segment)
+
+        self._segment_chunk_sizes = segment_chunk_sizes
+        self._segment_channel_offsets = {
+            path: np.cumsum(segment_count) for (path, segment_count) in segment_num_values.items()}
+
 
 def _number_of_segment_values(segment_object, segment):
     """ Compute the number of values an object has in a segment
     """
+    if not segment_object.has_data:
+        return 0
     num_chunks = segment.num_chunks
     final_chunk_proportion = segment.final_chunk_proportion
     if final_chunk_proportion == 1.0:
