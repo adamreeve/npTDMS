@@ -4,6 +4,7 @@
 import numpy as np
 from nptdms.utils import Timer, OrderedDict
 from nptdms.tdms_segment import read_segment_metadata
+from nptdms.base_segment import ChannelDataChunk
 from nptdms.log import log_manager
 
 log = log_manager.get_logger(__name__)
@@ -89,21 +90,58 @@ class TdmsReader(object):
         :param channel_path: The path of the channel object to read data for
         :param offset: Initial position to read data from.
         :param length: Number of values to attempt to read.
+            If None, then all values starting from the offset will be read.
             Fewer values will be returned if attempting to read beyond the end of the available data.
         :returns: A generator that yields ChannelDataChunk objects
         """
         if self._segments is None:
-            raise RuntimeError(
-                "Cannot read data unless metadata has first been read")
+            raise RuntimeError("Cannot read data unless metadata has first been read")
 
         if self._segment_channel_offsets is None:
             with Timer(log, "Build data index"):
                 self._build_index()
+        segment_offsets = self._segment_channel_offsets[channel_path]
+        chunk_sizes = self._segment_chunk_sizes[channel_path]
 
-        # TODO: Compute segments + chunks to read, then filter chunk data to requested range
-        for segment in self._segments:
-            for chunk in segment.read_raw_data_for_channel(self._file, channel_path):
-                yield chunk
+        object_metadata = self.object_metadata[channel_path]
+        if length is None:
+            length = object_metadata.num_values - offset
+        end_index = offset + length
+
+        # Binary search to find first and last segments to read
+        start_segment = np.searchsorted(segment_offsets, offset, side='right')
+        end_segment = np.searchsorted(segment_offsets, end_index, side='left')
+
+        segment_index = start_segment
+        for segment in self._segments[start_segment:end_segment + 1]:
+            # By default, read all chunks in a segment
+            chunk_offset = 0
+            num_chunks = segment.num_chunks
+            chunk_size = chunk_sizes[segment_index]
+            segment_start_index = 0 if segment_index == 0 else segment_offsets[segment_index - 1]
+            remaining_values_to_skip = 0
+            remaining_values_to_trim = 0
+
+            # For the first and last segments, we may not need to read all chunks,
+            # and may need to trim some data from the beginning or end of the chunk.
+            if segment_index == start_segment:
+                num_values_to_skip = offset - segment_start_index
+                chunk_offset = num_values_to_skip // chunk_size
+                remaining_values_to_skip = num_values_to_skip % chunk_size
+                num_chunks -= chunk_offset
+            if segment_index == end_segment:
+                # Note: segment_index may be both start and end
+                num_values_to_trim = segment_offsets[segment_index] - end_index
+                remaining_values_to_trim = num_values_to_trim % chunk_size
+                num_chunks -= num_values_to_trim // chunk_size
+
+            for i, chunk in enumerate(
+                    segment.read_raw_data_for_channel(self._file, channel_path, chunk_offset, num_chunks)):
+                skip = remaining_values_to_skip if i == 0 else 0
+                trim = remaining_values_to_trim if i == (num_chunks - 1) else 0
+                yield _trim_channel_chunk(chunk, skip, trim)
+
+            segment_index += 1
 
     def _update_object_metadata(self, segment):
         """ Update object metadata using the metadata read from a single segment
@@ -210,3 +248,17 @@ class ObjectMetadata(object):
         self.data_type = None
         self.scaler_data_types = None
         self.num_values = 0
+
+
+def _trim_channel_chunk(chunk, skip=0, trim=0):
+    if skip == 0 and trim == 0:
+        return chunk
+    raw_data = None
+    daqmx_raw_data = None
+    if chunk.raw_data is not None:
+        raw_data = chunk.raw_data[skip:len(chunk.raw_data) - trim]
+    if chunk.daqmx_raw_data is not None:
+        daqmx_raw_data = {
+            scale_id: d[skip:len(d) - trim]
+            for (scale_id, d) in chunk.daqmx_raw_data.items()}
+    return ChannelDataChunk(raw_data, daqmx_raw_data)

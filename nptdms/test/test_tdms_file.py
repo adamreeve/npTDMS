@@ -78,6 +78,7 @@ def test_lazily_read_channel_data_with_channel_data_method():
     (0, 10),
     (5, 5),
     (10, 5),
+    (10, 50),
     (6, 7),
     (6, 60),
     (95, 10),
