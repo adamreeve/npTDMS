@@ -155,6 +155,7 @@ class TdmsFile(object):
                 num_values = obj.number_values - offset
             else:
                 num_values = min(length, obj.number_values - offset)
+            num_values = max(0, num_values)
             channel_data = get_data_receiver(obj, num_values, self._memmap_dir)
 
         with Timer(log, "Read data"):
