@@ -144,6 +144,10 @@ class TdmsFile(object):
                     obj._set_raw_data(channel_data)
 
     def _read_channel_data(self, channel_path, offset=0, length=None):
+        if offset < 0:
+            raise ValueError("offset must be non-negative")
+        if length is not None and length < 0:
+            raise ValueError("length must be non-negative")
         if self._reader is None:
             raise RuntimeError(
                 "Cannot read channel data after the underlying TDMS reader is closed")

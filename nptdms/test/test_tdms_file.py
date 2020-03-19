@@ -122,6 +122,30 @@ def test_reading_subset_of_data_for_scenario(test_file, expected_data, length, o
                 compare_arrays(actual_data, expected_data[offset:offset + length])
 
 
+def test_invalid_offset_throws():
+    """ Exception is thrown when reading a subset of data with an invalid offset
+    """
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    group, channel = list(expected_data.keys())[0]
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            with pytest.raises(ValueError) as exc_info:
+                tdms_file.object(group, channel).read_data(-1, 5)
+            assert "offset must be non-negative" in str(exc_info.value)
+
+
+def test_invalid_length_throws():
+    """ Exception is thrown when reading a subset of data with an invalid length
+    """
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    group, channel = list(expected_data.keys())[0]
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            with pytest.raises(ValueError) as exc_info:
+                tdms_file.object(group, channel).read_data(0, -5)
+            assert "length must be non-negative" in str(exc_info.value)
+
+
 def test_read_data_after_close_throws():
     """ Trying to read after opening and closing without reading data should throw
     """
