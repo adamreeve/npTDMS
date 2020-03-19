@@ -114,7 +114,7 @@ def test_reading_subset_of_data(offset, length):
 def test_reading_subset_of_data_for_scenario(test_file, expected_data, length, offset):
     """Test reading a subset of a channel's data
     """
-    assume(all(offset <= len(d) for d in expected_data.values()))
+    assume(any(offset <= len(d) for d in expected_data.values()))
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             for ((group, channel), expected_data) in expected_data.items():
