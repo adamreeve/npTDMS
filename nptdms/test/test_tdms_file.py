@@ -2,6 +2,7 @@
 
 import os
 import tempfile
+from hypothesis import (assume, given, example, strategies)
 import numpy as np
 import pytest
 from nptdms import TdmsFile
@@ -71,19 +72,11 @@ def test_lazily_read_channel_data_with_channel_data_method():
                 np.testing.assert_almost_equal(actual_data, expected_data)
 
 
-@pytest.mark.parametrize("offset,length", [
-    (0, 101),
-    (0, 0),
-    (0, 5),
-    (0, 10),
-    (5, 5),
-    (10, 5),
-    (10, 50),
-    (6, 7),
-    (6, 60),
-    (95, 10),
-    (105, 10),
-])
+@given(offset=strategies.integers(0, 100), length=strategies.integers(0, 100))
+@example(offset=0, length=0)
+@example(offset=0, length=100)
+@example(offset=0, length=5)
+@example(offset=0, length=10)
 def test_reading_subset_of_data(offset, length):
     channel_data = np.arange(0, 100, 1, dtype=np.int32)
     # Split data into different sized segments
@@ -114,6 +107,19 @@ def test_reading_subset_of_data(offset, length):
             expected_data = channel_data[offset:offset + length]
             assert len(channel_subset) == len(expected_data)
             np.testing.assert_equal(channel_subset, expected_data)
+
+
+@pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
+@given(offset=strategies.integers(0, 10), length=strategies.integers(0, 10))
+def test_reading_subset_of_data_for_scenario(test_file, expected_data, length, offset):
+    """Test reading a subset of a channel's data
+    """
+    assume(all(offset <= len(d) for d in expected_data.values()))
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_data) in expected_data.items():
+                actual_data = tdms_file.object(group, channel).read_data(offset, length)
+                compare_arrays(actual_data, expected_data[offset:offset + length])
 
 
 def test_read_data_after_close_throws():
