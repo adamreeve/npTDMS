@@ -7,6 +7,7 @@
 *.pyc
 *.swp
 .tox
+.hypothesis
 
 # Wercker directories
 _builds

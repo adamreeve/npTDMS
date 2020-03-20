@@ -1,5 +1,6 @@
 from copy import copy
 from io import UnsupportedOperation
+import os
 import numpy as np
 
 from nptdms import types
@@ -199,9 +200,13 @@ class BaseSegment(object):
         for chunk in range(self.num_chunks):
             yield self._read_data_chunk(f, data_objects, chunk)
 
-    def read_raw_data_for_channel(self, f, channel_path):
+    def read_raw_data_for_channel(self, f, channel_path, chunk_offset=0, num_chunks=None):
         """Read raw data from a TDMS segment
 
+        :param f: Open TDMS file object
+        :param channel_path: Path of channel to read data for
+        :param chunk_offset: Index of chunk to begin reading from
+        :param num_chunks: Number of chunks to read, or None to read to the end
         :returns: A generator of ChannelDataChunk objects with raw channel data for
             a single channel in this segment.
         """
@@ -212,8 +217,15 @@ class BaseSegment(object):
         f.seek(self.data_position)
 
         data_objects = [o for o in self.ordered_objects if o.has_data]
-        for chunk in range(self.num_chunks):
-            yield self._read_channel_data_chunk(f, data_objects, chunk, channel_path)
+        chunk_size = self._get_chunk_size()
+
+        for chunk_index in range(self.num_chunks):
+            if chunk_index < chunk_offset:
+                f.seek(chunk_size, os.SEEK_CUR)
+            elif num_chunks is None or chunk_index < num_chunks + chunk_offset:
+                yield self._read_channel_data_chunk(f, data_objects, chunk_index, channel_path)
+            else:
+                break
 
     def _calculate_chunks(self):
         """

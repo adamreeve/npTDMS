@@ -1,10 +1,21 @@
 """Test reading of example TDMS files"""
 
 import os
+import tempfile
+from hypothesis import (assume, given, example, strategies)
 import numpy as np
 import pytest
 from nptdms import TdmsFile
-from nptdms.test.util import *
+from nptdms.test.util import (
+    BytesIoTestFile,
+    GeneratedFile,
+    basic_segment,
+    channel_metadata,
+    compare_arrays,
+    hexlify_value,
+    segment_objects_metadata,
+    string_hexlify,
+)
 from nptdms.test import scenarios
 
 
@@ -59,6 +70,80 @@ def test_lazily_read_channel_data_with_channel_data_method():
                 actual_data = tdms_file.channel_data(group, channel)
                 assert actual_data.dtype == expected_data.dtype
                 np.testing.assert_almost_equal(actual_data, expected_data)
+
+
+@given(offset=strategies.integers(0, 100), length=strategies.integers(0, 100))
+@example(offset=0, length=0)
+@example(offset=0, length=100)
+@example(offset=0, length=5)
+@example(offset=0, length=10)
+def test_reading_subset_of_data(offset, length):
+    channel_data = np.arange(0, 100, 1, dtype=np.int32)
+    # Split data into different sized segments
+    segment_data = [
+        channel_data[0:10],
+        channel_data[10:20],
+        channel_data[20:60],
+        channel_data[60:80],
+        channel_data[80:90],
+        channel_data[90:100],
+    ]
+    hex_segment_data = [
+        "".join(hexlify_value('<i', x) for x in data) for data in segment_data]
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 5),
+        ),
+        hex_segment_data[0]
+    )
+    for hex_data in hex_segment_data[1:]:
+        test_file.add_segment(("kTocRawData", ), "", hex_data)
+
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            channel_subset = tdms_file.object('group', 'channel1').read_data(offset, length)
+            expected_data = channel_data[offset:offset + length]
+            assert len(channel_subset) == len(expected_data)
+            np.testing.assert_equal(channel_subset, expected_data)
+
+
+@pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
+@given(offset=strategies.integers(0, 10), length=strategies.integers(0, 10))
+def test_reading_subset_of_data_for_scenario(test_file, expected_data, offset, length):
+    """Test reading a subset of a channel's data
+    """
+    assume(any(offset <= len(d) for d in expected_data.values()))
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_data) in expected_data.items():
+                actual_data = tdms_file.object(group, channel).read_data(offset, length)
+                compare_arrays(actual_data, expected_data[offset:offset + length])
+
+
+def test_invalid_offset_throws():
+    """ Exception is thrown when reading a subset of data with an invalid offset
+    """
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    group, channel = list(expected_data.keys())[0]
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            with pytest.raises(ValueError) as exc_info:
+                tdms_file.object(group, channel).read_data(-1, 5)
+            assert "offset must be non-negative" in str(exc_info.value)
+
+
+def test_invalid_length_throws():
+    """ Exception is thrown when reading a subset of data with an invalid length
+    """
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    group, channel = list(expected_data.keys())[0]
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            with pytest.raises(ValueError) as exc_info:
+                tdms_file.object(group, channel).read_data(0, -5)
+            assert "length must be non-negative" in str(exc_info.value)
 
 
 def test_read_data_after_close_throws():
@@ -128,8 +213,8 @@ def test_property_read():
     test_file.add_segment(*basic_segment())
     tdms_data = test_file.load()
 
-    object = tdms_data.object("Group")
-    assert object.property("num") == 10
+    obj = tdms_data.object("Group")
+    assert obj.property("num") == 10
 
 
 def test_time_track():

@@ -10,10 +10,11 @@ from nptdms.log import log_manager
 log = log_manager.get_logger(__name__)
 
 
-def get_data_receiver(obj, memmap_dir=None):
+def get_data_receiver(obj, num_values, memmap_dir=None):
     """Return a new channel data receiver to use for the given TDMS object
 
     :param obj: TDMS channel object to receive data for
+    :param num_values: Number of values to be stored
     :param memmap_dir: Optional directory to store memory map files,
         or None to not use memory map files
     """
@@ -21,12 +22,12 @@ def get_data_receiver(obj, memmap_dir=None):
         return None
 
     if obj.data_type == types.DaqMxRawData:
-        return DaqmxDataReceiver(obj, memmap_dir)
+        return DaqmxDataReceiver(obj, num_values, memmap_dir)
 
     if obj.data_type.nptype is None:
         return ListDataReceiver()
 
-    return NumpyDataReceiver(obj, memmap_dir)
+    return NumpyDataReceiver(obj, num_values, memmap_dir)
 
 
 class ListDataReceiver(object):
@@ -58,16 +59,17 @@ class NumpyDataReceiver(object):
     :ivar data: Data that has been read for the object
     """
 
-    def __init__(self, obj, memmap_dir=None):
+    def __init__(self, obj, num_values, memmap_dir=None):
         """Initialise data receiver backed by a numpy array
 
         :param obj: Object to store data for
+        :param num_values: Number of values to be stored
         :param memmap_dir: Optional directory to store memory map files in.
         """
 
         self.path = obj.path
         self.data = _new_numpy_array(
-            obj.data_type.nptype, obj.number_values, memmap_dir)
+            obj.data_type.nptype, num_values, memmap_dir)
         self.scaler_data = {}
         self._data_insert_position = 0
         log.debug(
@@ -91,7 +93,7 @@ class DaqmxDataReceiver(object):
     :ivar scaler_data: Dictionary mapping from scaler id to data for a scaler
     """
 
-    def __init__(self, obj, memmap_dir=None):
+    def __init__(self, obj, num_values, memmap_dir=None):
         """Initialise data receiver for DAQmx backed by a numpy array
 
         :param obj: Object to store data for
@@ -104,7 +106,7 @@ class DaqmxDataReceiver(object):
         self._scaler_insert_positions = {}
         for scaler_id, scaler_type in obj.scaler_data_types.items():
             self.scaler_data[scaler_id] = _new_numpy_array(
-                scaler_type.nptype, obj.number_values, memmap_dir)
+                scaler_type.nptype, num_values, memmap_dir)
             self._scaler_insert_positions[scaler_id] = 0
 
     def append_scaler_data(self, scale_id, new_data):

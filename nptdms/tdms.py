@@ -124,7 +124,7 @@ class TdmsFile(object):
         with Timer(log, "Allocate space"):
             # Allocate space for data
             for (path, obj) in self._objects.items():
-                self._channel_data[path] = get_data_receiver(obj, self._memmap_dir)
+                self._channel_data[path] = get_data_receiver(obj, obj.number_values, self._memmap_dir)
 
         with Timer(log, "Read data"):
             # Now actually read all the data
@@ -143,7 +143,11 @@ class TdmsFile(object):
                 if channel_data is not None:
                     obj._set_raw_data(channel_data)
 
-    def _read_channel_data(self, channel_path):
+    def _read_channel_data(self, channel_path, offset=0, length=None):
+        if offset < 0:
+            raise ValueError("offset must be non-negative")
+        if length is not None and length < 0:
+            raise ValueError("length must be non-negative")
         if self._reader is None:
             raise RuntimeError(
                 "Cannot read channel data after the underlying TDMS reader is closed")
@@ -151,11 +155,16 @@ class TdmsFile(object):
         obj = self._objects[channel_path]
         with Timer(log, "Allocate space"):
             # Allocate space for data
-            channel_data = get_data_receiver(obj, self._memmap_dir)
+            if length is None:
+                num_values = obj.number_values - offset
+            else:
+                num_values = min(length, obj.number_values - offset)
+            num_values = max(0, num_values)
+            channel_data = get_data_receiver(obj, num_values, self._memmap_dir)
 
         with Timer(log, "Read data"):
             # Now actually read all the data
-            for chunk in self._reader.read_raw_data_for_channel(channel_path):
+            for chunk in self._reader.read_raw_data_for_channel(channel_path, offset, length):
                 if chunk.raw_data is not None:
                     channel_data.append_data(chunk.raw_data)
                 if chunk.daqmx_raw_data is not None:
@@ -553,13 +562,17 @@ class TdmsObject(object):
                     "for a scale_id")
         return self._raw_data.data
 
-    def read_data(self):
+    def read_data(self, offset=0, length=None):
         """ Reads data for this channel from the TDMS file and returns it
 
             This is for use when the TDMS file was opened without immediately reading all data,
             otherwise the data attribute should be used.
+
+            :param offset: Initial position to read data from.
+            :param length: Number of values to attempt to read.
+                Fewer values will be returned if attempting to read beyond the end of the available data.
         """
-        raw_data = self.tdms_file._read_channel_data(self.path)
+        raw_data = self.tdms_file._read_channel_data(self.path, offset, length)
         return self._scale_data(raw_data)
 
     @_property_builtin
