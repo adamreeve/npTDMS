@@ -131,9 +131,18 @@ class TdmsReader(object):
                 num_chunks -= chunk_offset
             if segment_index == end_segment:
                 # Note: segment_index may be both start and end
-                num_values_to_trim = segment_offsets[segment_index] - end_index
-                remaining_values_to_trim = num_values_to_trim % chunk_size
+                segment_end_index = segment_offsets[segment_index]
+                num_values_to_trim = segment_end_index - end_index
+
+                # Account for segments where the final chunk is truncated
+                final_chunk_size = (segment_end_index - segment_start_index) % chunk_size
+                final_chunk_size = chunk_size if final_chunk_size == 0 else final_chunk_size
+                if num_values_to_trim >= final_chunk_size:
+                    num_chunks -= 1
+                    num_values_to_trim -= final_chunk_size
+
                 num_chunks -= num_values_to_trim // chunk_size
+                remaining_values_to_trim = num_values_to_trim % chunk_size
 
             for i, chunk in enumerate(
                     segment.read_raw_data_for_channel(self._file, channel_path, chunk_offset, num_chunks)):

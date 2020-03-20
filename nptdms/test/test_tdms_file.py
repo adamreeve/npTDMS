@@ -111,7 +111,7 @@ def test_reading_subset_of_data(offset, length):
 
 @pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
 @given(offset=strategies.integers(0, 10), length=strategies.integers(0, 10))
-def test_reading_subset_of_data_for_scenario(test_file, expected_data, length, offset):
+def test_reading_subset_of_data_for_scenario(test_file, expected_data, offset, length):
     """Test reading a subset of a channel's data
     """
     assume(any(offset <= len(d) for d in expected_data.values()))
