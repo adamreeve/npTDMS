@@ -198,7 +198,7 @@ class TdmsReader(object):
         segment_num_values = {
             path: np.zeros(num_segments, dtype=np.int64) for path in data_objects}
         segment_chunk_sizes = {
-            path: np.zeros(num_segments, dtype=np.int32) for path in data_objects}
+            path: np.zeros(num_segments, dtype=np.int64) for path in data_objects}
 
         for i, segment in enumerate(self._segments):
             for obj in segment.ordered_objects:
