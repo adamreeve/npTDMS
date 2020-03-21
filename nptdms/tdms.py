@@ -1,16 +1,17 @@
 """ Python module for reading TDMS files produced by LabView
 
-    This module contains the public facing API
+    This module contains the public facing API for reading TDMS files
 """
 
 import numpy as np
 
-from nptdms import scaling, types
+from nptdms import scaling
 from nptdms.utils import Timer, OrderedDict
 from nptdms.log import log_manager
 from nptdms.common import path_components
 from nptdms.reader import TdmsReader
 from nptdms.channel_data import get_data_receiver
+from nptdms.export import hdf_export, pandas_export
 
 
 log = log_manager.get_logger(__name__)
@@ -284,89 +285,17 @@ class TdmsFile(object):
         :rtype: pandas.DataFrame
         """
 
-        import pandas as pd
-
-        dataframe_dict = OrderedDict()
-        for key, value in self._objects.items():
-            if value.has_data:
-                index = value.time_track(absolute_time) if time_index else None
-                dataframe_dict[key] = pd.Series(data=value.data, index=index)
-        return pd.DataFrame.from_dict(dataframe_dict)
+        return pandas_export.from_tdms_file(self, time_index, absolute_time)
 
     def as_hdf(self, filepath, mode='w', group='/'):
         """
         Converts the TDMS file into an HDF5 file
 
         :param filepath: The path of the HDF5 file you want to write to.
-        :param mode: The write mode of the HDF5 file. This can be w, a ...
+        :param mode: The write mode of the HDF5 file. This can be 'w' or 'a'
         :param group: A group in the HDF5 file that will contain the TDMS data.
         """
-        import h5py
-
-        # Groups in TDMS are mapped to the first level of the HDF5 hierarchy
-
-        # Channels in TDMS are then mapped to the second level of the HDF5
-        # hierarchy, under the appropriate groups.
-
-        # Properties in TDMS are mapped to attributes in HDF5.
-        # These all exist under the appropriate, channel group etc.
-
-        h5file = h5py.File(filepath, mode)
-
-        container_group = None
-        if group in h5file:
-            container_group = h5file[group]
-        else:
-            container_group = h5file.create_group(group)
-
-        # First write the properties at the root level
-        try:
-            root = self.object()
-            for property_name, property_value in root.properties.items():
-                container_group.attrs[property_name] = _hdf_attr_value(property_value)
-        except KeyError:
-            # No root object present
-            pass
-
-        # Now iterate through groups and channels,
-        # writing the properties and data
-        for group_name in self.groups():
-            try:
-                group = self.object(group_name)
-
-                # Write the group's properties
-                container_group.create_group(group_name)
-                for prop_name, prop_value in group.properties.items():
-                    container_group[group_name].attrs[prop_name] = _hdf_attr_value(prop_value)
-
-            except KeyError:
-                # No group object present
-                pass
-
-            # Write properties and data for each channel
-            for channel in self.group_channels(group_name):
-                channel_key = group_name + '/' + channel.channel
-
-                if channel.data_type is types.String:
-                    # Encode as variable length UTF-8 strings
-                    channel_data = container_group.create_dataset(
-                        channel_key, (len(channel.data), ), dtype=h5py.string_dtype())
-                    channel_data[...] = channel.data
-                elif channel.data_type is types.TimeStamp:
-                    # Timestamps are represented as fixed length ASCII strings
-                    # because HDF doesn't natively support timestamps
-                    channel_data = container_group.create_dataset(
-                        channel_key, (len(channel.data), ), dtype='S27')
-                    string_data = np.datetime_as_string(channel.data, unit='us', timezone='UTC')
-                    encoded_data = [s.encode('ascii') for s in string_data]
-                    channel_data[...] = encoded_data
-                else:
-                    container_group[channel_key] = channel.data
-
-                for prop_name, prop_value in channel.properties.items():
-                    container_group[channel_key].attrs[prop_name] = _hdf_attr_value(prop_value)
-
-        return h5file
+        return hdf_export.from_tdms_file(self, filepath, mode, group)
 
 
 class TdmsObject(object):
@@ -504,27 +433,10 @@ class TdmsObject(object):
         :rtype: pandas.DataFrame
         """
 
-        import pandas as pd
-
-        def get_data(chan):
-            if scaled_data:
-                return chan.data
-            else:
-                return chan.raw_data
-
-        # When absolute_time is True,
-        # use the wf_start_time as offset for the time_track()
-        try:
-            time = self.time_track(absolute_time)
-        except KeyError:
-            time = None
         if self.channel is None:
-            return pd.DataFrame.from_dict(OrderedDict(
-                (ch.channel, pd.Series(get_data(ch)))
-                for ch in self.tdms_file.group_channels(self.group)))
+            return pandas_export.from_group(self, scaled_data)
         else:
-            return pd.DataFrame(
-                get_data(self), index=time, columns=[self.path])
+            return pandas_export.from_channel(self, absolute_time, scaled_data)
 
     @_property_builtin
     def data(self):
@@ -616,11 +528,3 @@ def _components_to_path(*args):
 
     return ('/' + '/'.join(
         ["'" + arg.replace("'", "''") + "'" for arg in args]))
-
-
-def _hdf_attr_value(value):
-    """ Convert a value into a format suitable for an HDF attribute
-    """
-    if isinstance(value, np.datetime64):
-        return np.string_(np.datetime_as_string(value, unit='us', timezone='UTC'))
-    return value
