@@ -8,7 +8,7 @@ from datetime import datetime
 from io import UnsupportedOperation
 import logging
 import numpy as np
-from nptdms.common import toc_properties
+from nptdms.common import toc_properties, ObjectPath
 from nptdms.types import *
 
 log = logging.getLogger(__name__)
@@ -214,7 +214,7 @@ class GroupObject(TdmsObject):
     def path(self):
         """The string representation of this group's path
         """
-        return "/'%s'" % self.group.replace("'", "''")
+        return str(ObjectPath(self.group))
 
 
 class ChannelObject(TdmsObject):
@@ -253,9 +253,7 @@ class ChannelObject(TdmsObject):
     def path(self):
         """The string representation of this channel's path
         """
-        return "/'%s'/'%s'" % (
-            self.group.replace("'", "''"),
-            self.channel.replace("'", "''"))
+        return str(ObjectPath(self.group, self.channel))
 
 
 def read_properties_dict(properties_dict):

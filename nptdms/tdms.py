@@ -8,7 +8,7 @@ import numpy as np
 from nptdms import scaling
 from nptdms.utils import Timer, OrderedDict
 from nptdms.log import log_manager
-from nptdms.common import path_components
+from nptdms.common import ObjectPath
 from nptdms.reader import TdmsReader
 from nptdms.channel_data import get_data_receiver
 from nptdms.export import hdf_export, pandas_export
@@ -170,23 +170,22 @@ class TdmsFile(object):
         # Use object metadata to build group and channel objects
         group_properties = OrderedDict()
         group_channels = OrderedDict()
-        for (path, obj) in tdms_reader.object_metadata.items():
-            components = path_components(path)
-            if len(components) == 0:
+        for (path_string, obj) in tdms_reader.object_metadata.items():
+            path = ObjectPath.from_string(path_string)
+            if path.is_root:
                 # Root object provides properties for the whole file
                 self._properties = obj.properties
-            elif len(components) == 1:
-                # Object is a group
-                group_properties[components[0]] = obj.properties
+            elif path.is_group:
+                group_properties[path.group] = obj.properties
             else:
                 # Object is a channel
                 channel = TdmsChannel(
                     self, path, obj.properties, obj.data_type,
                     obj.scaler_data_types, obj.num_values)
-                if components[0] in group_channels:
-                    group_channels[components[0]].append(channel)
+                if path.group in group_channels:
+                    group_channels[path.group].append(channel)
                 else:
-                    group_channels[components[0]] = [channel]
+                    group_channels[path.group] = [channel]
 
         # Create group objects containing channels and properties
         for group_name, properties in group_properties.items():
@@ -194,12 +193,12 @@ class TdmsFile(object):
                 channels = group_channels[group_name]
             except KeyError:
                 channels = []
-            group_path = _components_to_path(group_name)
+            group_path = ObjectPath(group_name)
             self._groups[group_name] = TdmsGroup(group_path, properties, channels)
         for group_name, channels in group_channels.items():
             if group_name not in self._groups:
                 # Group with channels but without any corresponding object metadata in the file:
-                group_path = _components_to_path(group_name)
+                group_path = ObjectPath(group_name)
                 self._groups[group_name] = TdmsGroup(group_path, {}, channels)
 
         if not read_metadata_only:
@@ -281,9 +280,9 @@ class TdmsFile(object):
             object("group_name", "channel_name")
         """
 
-        object_path = _components_to_path(*path)
+        object_path = ObjectPath(*path)
         try:
-            return self.objects[object_path]
+            return self.objects[str(object_path)]
         except KeyError:
             raise KeyError("Invalid object path: %s" % object_path)
 
@@ -320,8 +319,8 @@ class TdmsFile(object):
         """ A dictionary of objects in the TDMS file, where the keys are the object paths.
         """
         objects = OrderedDict()
-        root_path = _components_to_path()
-        objects[root_path] = RootObject(self._properties)
+        root_path = ObjectPath()
+        objects[str(root_path)] = RootObject(self._properties)
 
         for group in self.groups():
             objects[group.path] = group
@@ -338,12 +337,11 @@ class TdmsGroup(object):
 
         channel = group[channel_name]
 
-    :ivar ~.path: The TDMS object path.
     :ivar ~.properties: Dictionary of TDMS properties defined for this group.
     """
 
     def __init__(self, path, properties, channels):
-        self.path = path
+        self._path = path
         self.properties = properties
         self._channels = {c.name: c for c in channels}
 
@@ -351,11 +349,16 @@ class TdmsGroup(object):
         return "<TdmsGroup with path %s>" % self.path
 
     @_property_builtin
+    def path(self):
+        """ Path to the TDMS object for this group
+        """
+        return str(self._path)
+
+    @_property_builtin
     def name(self):
         """ The name of this group
         """
-        path = path_components(self.path)
-        return path[0]
+        return self._path.group
 
     def channels(self):
         """ The list of channels in this group
@@ -406,10 +409,7 @@ class TdmsGroup(object):
         """ Returns the name of the group for this object,
             or None if it is the root object.
         """
-        path = path_components(self.path)
-        if len(path) > 0:
-            return path[0]
-        return None
+        return self._path.group
 
     @_property_builtin
     def channel(self):
@@ -426,7 +426,6 @@ class TdmsGroup(object):
 class TdmsChannel(object):
     """Represents a channel in a TDMS file.
 
-    :ivar ~.path: The TDMS object path.
     :ivar ~.properties: Dictionary of TDMS properties defined for this channel,
                       for example the start time and time increment for waveforms.
     """
@@ -435,7 +434,7 @@ class TdmsChannel(object):
             self, tdms_file, path, properties, data_type=None,
             scaler_data_types=None, number_values=0):
         self._tdms_file = tdms_file
-        self.path = path
+        self._path = path
         self.properties = properties
         self.number_values = number_values
         self.data_type = data_type
@@ -448,11 +447,16 @@ class TdmsChannel(object):
         return "<TdmsChannel with path %s>" % self.path
 
     @_property_builtin
+    def path(self):
+        """ Path to the TDMS object for this channel
+        """
+        return str(self._path)
+
+    @_property_builtin
     def name(self):
         """ The name of this channel
         """
-        path = path_components(self.path)
-        return path[1]
+        return self._path.channel
 
     @_property_builtin
     def data(self):
@@ -595,8 +599,7 @@ class TdmsChannel(object):
             return raw_data.data
 
     def _get_scaling(self):
-        path = path_components(self.path)
-        group_properties = self._tdms_file[path[0]].properties
+        group_properties = self._tdms_file[self._path.group].properties
         file_properties = self._tdms_file.properties
         return scaling.get_scaling(
             self.properties, group_properties, file_properties)
@@ -623,20 +626,14 @@ class TdmsChannel(object):
         """ Returns the name of the group for this object,
             or None if it is the root object.
         """
-        path = path_components(self.path)
-        if len(path) > 0:
-            return path[0]
-        return None
+        return self._path.group
 
     @_property_builtin
     def channel(self):
         """ Returns the name of the channel for this object,
             or None if it is a group or the root object.
         """
-        path = path_components(self.path)
-        if len(path) > 1:
-            return path[1]
-        return None
+        return self._path.channel
 
     @_property_builtin
     def has_data(self):
@@ -665,10 +662,3 @@ class RootObject(object):
     @_property_builtin
     def has_data(self):
         return False
-
-
-def _components_to_path(*args):
-    """Convert group and channel to object path"""
-
-    return ('/' + '/'.join(
-        ["'" + arg.replace("'", "''") + "'" for arg in args]))
