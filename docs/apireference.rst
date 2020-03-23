@@ -16,7 +16,7 @@ Reading TDMS Files
 
 .. autoclass:: TdmsChannel()
   :members:
-  :exclude-members: group, channel, has_data, property
+  :exclude-members: group, channel, has_data, property, number_values
 
 Writing TDMS Files
 ------------------

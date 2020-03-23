@@ -210,7 +210,7 @@ class TdmsFile(object):
             for group in self.groups():
                 for channel in group.channels():
                     self._channel_data[channel.path] = get_data_receiver(
-                        channel, channel.number_values, self._memmap_dir)
+                        channel, len(channel), self._memmap_dir)
 
         with Timer(log, "Read data"):
             # Now actually read all the data
@@ -242,9 +242,9 @@ class TdmsFile(object):
         with Timer(log, "Allocate space"):
             # Allocate space for data
             if length is None:
-                num_values = channel.number_values - offset
+                num_values = len(channel) - offset
             else:
-                num_values = min(length, channel.number_values - offset)
+                num_values = min(length, len(channel) - offset)
             num_values = max(0, num_values)
             channel_data = get_data_receiver(channel, num_values, self._memmap_dir)
 
@@ -424,7 +424,9 @@ class TdmsGroup(object):
 
 
 class TdmsChannel(object):
-    """Represents a channel in a TDMS file.
+    """ Represents a data channel in a TDMS file.
+
+    To find the number of data points in this channel use :code:`len(channel)`.
 
     :ivar ~.properties: Dictionary of TDMS properties defined for this channel,
                       for example the start time and time increment for waveforms.
@@ -436,7 +438,7 @@ class TdmsChannel(object):
         self._tdms_file = tdms_file
         self._path = path
         self.properties = properties
-        self.number_values = number_values
+        self._length = number_values
         self.data_type = data_type
         self.scaler_data_types = scaler_data_types
 
@@ -445,6 +447,9 @@ class TdmsChannel(object):
 
     def __repr__(self):
         return "<TdmsChannel with path %s>" % self.path
+
+    def __len__(self):
+        return self._length
 
     @_property_builtin
     def path(self):
@@ -463,7 +468,7 @@ class TdmsChannel(object):
         """
         NumPy array containing the data for this channel
         """
-        if self.number_values > 0 and self._raw_data is None:
+        if len(self) > 0 and self._raw_data is None:
             raise RuntimeError("Channel data has not been read")
 
         if self._raw_data is None:
@@ -478,7 +483,7 @@ class TdmsChannel(object):
         The raw, unscaled data array.
         For unscaled objects this is the same as the data property.
         """
-        if self.number_values > 0 and self._raw_data is None:
+        if len(self) > 0 and self._raw_data is None:
             raise RuntimeError("Channel data has not been read")
 
         if self._raw_data is None:
@@ -497,7 +502,7 @@ class TdmsChannel(object):
     def raw_scaler_data(self):
         """ Raw DAQmx scaler data as a dictionary mapping from scale id to raw data arrays
         """
-        if self.number_values > 0 and self._raw_data is None:
+        if len(self) > 0 and self._raw_data is None:
             raise RuntimeError("Channel data has not been read")
 
         return self._raw_data.scaler_data
@@ -548,8 +553,8 @@ class TdmsChannel(object):
 
         relative_time = np.linspace(
             offset,
-            offset + (self.number_values - 1) * increment,
-            self.number_values)
+            offset + (len(self) - 1) * increment,
+            len(self))
 
         if not absolute_time:
             return relative_time
@@ -638,6 +643,10 @@ class TdmsChannel(object):
     @_property_builtin
     def has_data(self):
         return True
+
+    @_property_builtin
+    def number_values(self):
+        return self._length
 
 
 class RootObject(object):
