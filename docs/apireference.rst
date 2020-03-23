@@ -6,13 +6,17 @@ Reading TDMS Files
 
 .. module:: nptdms
 
-.. autoclass:: TdmsFile
+.. autoclass:: TdmsFile()
   :members:
+  :exclude-members: object, objects, group_channels, channel_data
 
-  .. automethod:: __init__
-
-.. autoclass:: TdmsObject
+.. autoclass:: TdmsGroup()
   :members:
+  :exclude-members: group, channel, has_data, property
+
+.. autoclass:: TdmsChannel()
+  :members:
+  :exclude-members: group, channel, has_data, property
 
 Writing TDMS Files
 ------------------

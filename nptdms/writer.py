@@ -179,7 +179,7 @@ class TdmsObject(object):
 
 
 class RootObject(TdmsObject):
-    """The root TDMS object
+    """The root TDMS object containing properties for the TDMS file
     """
     def __init__(self, properties=None):
         """Initialise a new GroupObject

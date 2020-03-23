@@ -26,6 +26,7 @@ class TdmsFile(object):
     """ Reads and stores data from a TDMS file.
 
     Can be indexed by group name to access a group within the TDMS file, for example::
+
         tdms_file = TdmsFile.read(tdms_file_path)
         group = tdms_file[group_name]
     """
@@ -334,10 +335,11 @@ class TdmsGroup(object):
     """ Represents a group of channels in a TDMS file.
 
     Can be indexed by channel name to access a channel in this group, for example::
+
         channel = group[channel_name]
 
-    :ivar path: The TDMS object path.
-    :ivar properties: Dictionary of TDMS properties defined for this group.
+    :ivar ~.path: The TDMS object path.
+    :ivar ~.properties: Dictionary of TDMS properties defined for this group.
     """
 
     def __init__(self, path, properties, channels):
@@ -424,8 +426,8 @@ class TdmsGroup(object):
 class TdmsChannel(object):
     """Represents a channel in a TDMS file.
 
-    :ivar path: The TDMS object path.
-    :ivar properties: Dictionary of TDMS properties defined for this channel,
+    :ivar ~.path: The TDMS object path.
+    :ivar ~.properties: Dictionary of TDMS properties defined for this channel,
                       for example the start time and time increment for waveforms.
     """
 
@@ -451,6 +453,50 @@ class TdmsChannel(object):
         """
         path = path_components(self.path)
         return path[1]
+
+    @_property_builtin
+    def data(self):
+        """
+        NumPy array containing the data for this channel
+        """
+        if self.number_values > 0 and self._raw_data is None:
+            raise RuntimeError("Channel data has not been read")
+
+        if self._raw_data is None:
+            return np.empty((0, 1))
+        if self._data_scaled is None:
+            self._data_scaled = self._scale_data(self._raw_data)
+        return self._data_scaled
+
+    @_property_builtin
+    def raw_data(self):
+        """
+        The raw, unscaled data array.
+        For unscaled objects this is the same as the data property.
+        """
+        if self.number_values > 0 and self._raw_data is None:
+            raise RuntimeError("Channel data has not been read")
+
+        if self._raw_data is None:
+            return np.empty((0, 1))
+        if self._raw_data.scaler_data:
+            if len(self._raw_data.scaler_data) == 1:
+                return next(v for v in self._raw_data.scaler_data.values())
+            else:
+                raise Exception(
+                    "This object has data for multiple DAQmx scalers, "
+                    "use the raw_scaler_data property to get raw data "
+                    "for a scale_id")
+        return self._raw_data.data
+
+    @_property_builtin
+    def raw_scaler_data(self):
+        """ Raw DAQmx scaler data as a dictionary mapping from scale id to raw data arrays
+        """
+        if self.number_values > 0 and self._raw_data is None:
+            raise RuntimeError("Channel data has not been read")
+
+        return self._raw_data.scaler_data
 
     def read_data(self, offset=0, length=None):
         """ Reads data for this channel from the TDMS file and returns it
@@ -538,50 +584,6 @@ class TdmsChannel(object):
         """
 
         return pandas_export.from_channel(self, absolute_time, scaled_data)
-
-    @_property_builtin
-    def data(self):
-        """
-        NumPy array containing the data for this channel
-        """
-        if self.number_values > 0 and self._raw_data is None:
-            raise RuntimeError("Channel data has not been read")
-
-        if self._raw_data is None:
-            return np.empty((0, 1))
-        if self._data_scaled is None:
-            self._data_scaled = self._scale_data(self._raw_data)
-        return self._data_scaled
-
-    @_property_builtin
-    def raw_data(self):
-        """
-        The raw, unscaled data array.
-        For unscaled objects this is the same as the data property.
-        """
-        if self.number_values > 0 and self._raw_data is None:
-            raise RuntimeError("Channel data has not been read")
-
-        if self._raw_data is None:
-            return np.empty((0, 1))
-        if self._raw_data.scaler_data:
-            if len(self._raw_data.scaler_data) == 1:
-                return next(v for v in self._raw_data.scaler_data.values())
-            else:
-                raise Exception(
-                    "This object has data for multiple DAQmx scalers, "
-                    "use the raw_scaler_data property to get raw data "
-                    "for a scale_id")
-        return self._raw_data.data
-
-    @_property_builtin
-    def raw_scaler_data(self):
-        """ Raw DAQmx scaler data as a dictionary mapping from scale id to raw data arrays
-        """
-        if self.number_values > 0 and self._raw_data is None:
-            raise RuntimeError("Channel data has not been read")
-
-        return self._raw_data.scaler_data
 
     def _scale_data(self, raw_data):
         scale = self._get_scaling()
