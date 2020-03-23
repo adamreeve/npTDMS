@@ -57,7 +57,7 @@ class TdmsWriter(object):
     def close(self):
         if self._file_path is not None:
             self._file.close()
-            self._file = None
+        self._file = None
 
     def write_segment(self, objects):
         """ Write a segment of data to a TDMS file
