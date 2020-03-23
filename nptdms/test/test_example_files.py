@@ -24,8 +24,8 @@ def test_labview_file():
 def test_raw_format():
     """Test reading a file with DAQmx raw data"""
     test_file = tdms.TdmsFile(DATA_DIR + '/raw1.tdms')
-    obj_path = test_file.groups()[0]
-    data = test_file.object(obj_path, 'First  Channel').data
+    group = test_file.groups()[0]
+    data = group['First  Channel'].data
     np.testing.assert_almost_equal(data[:10],
                                    [-0.18402661, 0.14801477, -0.24506363,
                                     -0.29725028, -0.20020142, 0.18158513,

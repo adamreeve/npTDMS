@@ -16,10 +16,10 @@ def from_tdms_file(tdms_file, time_index=False, absolute_time=False):
     import pandas as pd
 
     dataframe_dict = OrderedDict()
-    for key, value in tdms_file.objects.items():
-        if value.has_data:
-            index = value.time_track(absolute_time) if time_index else None
-            dataframe_dict[key] = pd.Series(data=value.data, index=index)
+    for group in tdms_file.groups():
+        for channel in group.channels():
+            index = channel.time_track(absolute_time) if time_index else None
+            dataframe_dict[channel.path] = pd.Series(data=channel.data, index=index)
     return pd.DataFrame.from_dict(dataframe_dict)
 
 
@@ -36,8 +36,8 @@ def from_group(group, scaled_data=True):
     import pandas as pd
 
     return pd.DataFrame.from_dict(OrderedDict(
-        (ch.channel, pd.Series(_get_data(ch, scaled_data)))
-        for ch in group.tdms_file.group_channels(group.group)))
+        (ch.name, pd.Series(_get_data(ch, scaled_data)))
+        for ch in group.channels()))
 
 
 def from_channel(channel, absolute_time=False, scaled_data=True):
