@@ -60,6 +60,7 @@ def test_lazily_read_channel_data_with_file_path():
         os.remove(temp_file.name)
 
 
+@pytest.mark.filterwarnings('ignore:.* is deprecated')
 def test_lazily_read_channel_data_with_channel_data_method():
     """Test reading channel data lazily using the channel_data method of TdmsFile
     """
@@ -191,6 +192,7 @@ def test_access_data_property_after_opening_throws():
             assert "Channel data has not been read" in str(exc_info.value)
 
 
+@pytest.mark.filterwarnings('ignore:.* is deprecated')
 def test_get_objects():
     """Test reading data"""
 
@@ -344,6 +346,7 @@ def test_single_quote_in_name():
     assert len(data_1) == 2
 
 
+@pytest.mark.filterwarnings('ignore:.* is deprecated')
 def test_root_object_paths():
     """Test the group and channel properties for the root object"""
     test_file = GeneratedFile()
@@ -355,6 +358,7 @@ def test_root_object_paths():
     assert obj.channel is None
 
 
+@pytest.mark.filterwarnings('ignore:.* is deprecated')
 def test_group_object_paths():
     """Test the group and channel properties for a group"""
     test_file = GeneratedFile()
@@ -368,6 +372,7 @@ def test_group_object_paths():
     assert obj.channel is None
 
 
+@pytest.mark.filterwarnings('ignore:.* is deprecated')
 def test_channel_object_paths():
     """Test the group and channel properties for a group"""
     test_file = GeneratedFile()
