@@ -680,6 +680,7 @@ class RootObject(object):
         self.properties = properties
 
     def property(self, property_name):
+        _deprecated("RootObject", "Use TdmsFile.properties to access properties from the root object")
         try:
             return self.properties[property_name]
         except KeyError:
