@@ -3,7 +3,7 @@ from __future__ import print_function
 from argparse import ArgumentParser
 import logging
 
-from nptdms import tdms
+from nptdms import TdmsFile
 from nptdms.log import log_manager
 
 
@@ -28,28 +28,18 @@ def main():
 
 
 def tdmsinfo(file, show_properties=False):
-    tdmsfile = tdms.TdmsFile(file)
+    tdmsfile = TdmsFile.read_metadata(file)
 
     level = 0
     display('/', level)
-    try:
-        root = tdmsfile.object()
-        if show_properties:
-            display_properties(root, level)
-    except KeyError:
-        # Root object isn't present
-        pass
+    if show_properties:
+        display_properties(tdmsfile, level + 1)
     for group in tdmsfile.groups():
         level = 1
-        try:
-            group_obj = tdmsfile.object(group)
-            display("%s" % group_obj.path, level)
-            if show_properties:
-                display_properties(group_obj, level)
-        except KeyError:
-            # It is possible to have a group without an object
-            display("/'%s'" % group, level)
-        for channel in tdmsfile.group_channels(group):
+        display("%s" % group.path, level)
+        if show_properties:
+            display_properties(group, level + 1)
+        for channel in group.channels():
             level = 2
             display("%s" % channel.path, level)
             if show_properties:
@@ -64,7 +54,7 @@ def display_properties(tdms_object, level):
     if tdms_object.properties:
         display("properties:", level)
         for prop, val in tdms_object.properties.items():
-            display("%s: %s" % (prop, val), level)
+            display("%s: %s" % (prop, val), level + 1)
 
 
 def display(s, level):
