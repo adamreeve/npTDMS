@@ -20,7 +20,7 @@ setup(
   author = 'Adam Reeve',
   author_email = 'adreeve@gmail.com',
   url = 'https://github.com/adamreeve/npTDMS',
-  packages = ['nptdms', 'nptdms.test'],
+  packages = ['nptdms', 'nptdms.export', 'nptdms.test'],
   long_description=open('README.rst').read(),
   license = 'LGPL',
   classifiers = [
