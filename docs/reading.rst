@@ -51,6 +51,39 @@ classes provide access to these properties as a dictionary using their ``propert
     # Get a channel property
     property_value = tdms_file["group name"]["channel name"].properties["channel_property_name"]
 
+Reading large files
+-------------------
+
+TDMS files are often too large to easily fit in memory so npTDMS offers a few ways to deal with this.
+
+If you want to work with all file data as if it was in memory,
+you can pass the ``memmap_dir`` argument when reading a file.
+This will read data into memory mapped numpy arrays on disk,
+and your operating system will then page data in and out of memory as required.
+
+If you have a large file with multiple channels but only need to read them individually,
+you can open a TDMS file for reading without reading all the data immediately
+using the static :py:meth:`~nptdms.TdmsFile.open` method,
+then read channel data as required::
+
+    with TdmsFile.open(tdms_file_path) as tdms_file:
+        channel = tdms_file[group_name][channel_name]
+        channel_data = channel.read_data()
+
+You also have the option to read only a subset of the data.
+For example, to read 200 data points, beginning at offset 1,000::
+
+    with TdmsFile.open(tdms_file_path) as tdms_file:
+        channel = tdms_file[group_name][channel_name]
+        offset = 1000
+        length = 200
+        channel_data = channel.read_data(offset, length)
+
+In cases where you don't need to read the file data and only need to read metadata, you can
+also use the static :py:meth:`~nptdms.TdmsFile.read_metadata` method::
+
+    tdms_file = TdmsFile.read_metadata(tdms_file_path)
+
 Timestamps
 ----------
 
