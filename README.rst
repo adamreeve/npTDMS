@@ -17,12 +17,13 @@ and is built on top of the `numpy <http://www.numpy.org/>`__ package.
 Data read from a TDMS file is stored in numpy arrays,
 and numpy arrays are also used when writing TDMS file.
 
+TDMS files can contain multiple data channels organised intro groups.
 Typical usage when reading a TDMS file might look like::
 
     from nptdms import TdmsFile
 
-    tdms_file = TdmsFile("path_to_file.tdms")
-    channel = tdms_file.object('Group', 'Channel1')
+    tdms_file = TdmsFile.read("path_to_file.tdms")
+    channel = tdms_file['Group']['Channel1']
     data = channel.data
     time = channel.time_track()
     # do stuff with data
