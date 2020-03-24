@@ -3,6 +3,7 @@
     This module contains the public facing API for reading TDMS files
 """
 
+import warnings
 import numpy as np
 
 from nptdms import scaling
@@ -707,4 +708,4 @@ def _deprecated(name, detail=None):
     message = "'{0}' is deprecated and will be removed in a future release.".format(name)
     if detail is not None:
         message += " {0}".format(detail)
-    log.warning(message)
+    warnings.warn(message)
