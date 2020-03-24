@@ -28,7 +28,7 @@ def test_single_channel_i16():
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
-    data = tdms_data.object("Group", "Channel1").raw_data
+    data = tdms_data["Group"]["Channel1"].raw_data
 
     assert data.dtype == np.int16
     np.testing.assert_array_equal(data, [1, 2, -1, -2])
@@ -55,7 +55,7 @@ def test_single_channel_u16():
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
-    data = tdms_data.object("Group", "Channel1").raw_data
+    data = tdms_data["Group"]["Channel1"].raw_data
 
     assert data.dtype == np.uint16
     np.testing.assert_array_equal(data, [1, 2, 2**16 - 1, 2**16 - 2])
@@ -82,7 +82,7 @@ def test_single_channel_i32():
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
-    data = tdms_data.object("Group", "Channel1").raw_data
+    data = tdms_data["Group"]["Channel1"].raw_data
 
     assert data.dtype == np.int32
     np.testing.assert_array_equal(data, [1, 2, -1, -2])
@@ -109,7 +109,7 @@ def test_single_channel_u32():
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
-    data = tdms_data.object("Group", "Channel1").raw_data
+    data = tdms_data["Group"]["Channel1"].raw_data
 
     assert data.dtype == np.uint32
     np.testing.assert_array_equal(data, [1, 2, 2**32 - 1, 2**32 - 2])
@@ -142,11 +142,11 @@ def test_two_channel_i16():
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
-    data_1 = tdms_data.object("Group", "Channel1").raw_data
+    data_1 = tdms_data["Group"]["Channel1"].raw_data
     assert data_1.dtype == np.int16
     np.testing.assert_array_equal(data_1, [1, 2, 3, 4])
 
-    data_2 = tdms_data.object("Group", "Channel2").raw_data
+    data_2 = tdms_data["Group"]["Channel2"].raw_data
     assert data_2.dtype == np.int16
     np.testing.assert_array_equal(data_2, [17, 18, 19, 20])
 
@@ -176,15 +176,15 @@ def test_mixed_channel_widths():
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
-    data_1 = tdms_data.object("Group", "Channel1").raw_data
+    data_1 = tdms_data["Group"]["Channel1"].raw_data
     assert data_1.dtype == np.int8
     np.testing.assert_array_equal(data_1, [1, 2, 3, 4])
 
-    data_2 = tdms_data.object("Group", "Channel2").raw_data
+    data_2 = tdms_data["Group"]["Channel2"].raw_data
     assert data_2.dtype == np.int16
     np.testing.assert_array_equal(data_2, [17, 18, 19, 20])
 
-    data_3 = tdms_data.object("Group", "Channel3").raw_data
+    data_3 = tdms_data["Group"]["Channel3"].raw_data
     assert data_3.dtype == np.int32
     np.testing.assert_array_equal(data_3, [33, 34, 35, 36])
 
@@ -216,7 +216,7 @@ def test_multiple_scalers_with_same_type():
     test_file = GeneratedFile()
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
-    channel = tdms_data.object("Group", "Channel1")
+    channel = tdms_data["Group"]["Channel1"]
 
     scaler_0_data = channel.raw_scaler_data[0]
     assert scaler_0_data.dtype == np.int16
@@ -251,7 +251,7 @@ def test_multiple_scalers_with_different_types():
     test_file = GeneratedFile()
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
-    channel = tdms_data.object("Group", "Channel1")
+    channel = tdms_data["Group"]["Channel1"]
 
     scaler_0_data = channel.raw_scaler_data[0]
     assert scaler_0_data.dtype == np.int8
@@ -292,10 +292,10 @@ def test_multiple_raw_data_buffers():
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
-    data_1 = tdms_data.object("Group", "Channel1").raw_data
-    data_2 = tdms_data.object("Group", "Channel2").raw_data
-    data_3 = tdms_data.object("Group", "Channel3").raw_data
-    data_4 = tdms_data.object("Group", "Channel4").raw_data
+    data_1 = tdms_data["Group"]["Channel1"].raw_data
+    data_2 = tdms_data["Group"]["Channel2"].raw_data
+    data_3 = tdms_data["Group"]["Channel3"].raw_data
+    data_4 = tdms_data["Group"]["Channel4"].raw_data
 
     for data in [data_1, data_2, data_3, data_4]:
         assert data.dtype == np.int16
@@ -338,11 +338,11 @@ def test_multiple_raw_data_buffers_with_different_widths():
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
-    data_1 = tdms_data.object("Group", "Channel1").raw_data
-    data_2 = tdms_data.object("Group", "Channel2").raw_data
-    data_3 = tdms_data.object("Group", "Channel3").raw_data
-    data_4 = tdms_data.object("Group", "Channel4").raw_data
-    data_5 = tdms_data.object("Group", "Channel5").raw_data
+    data_1 = tdms_data["Group"]["Channel1"].raw_data
+    data_2 = tdms_data["Group"]["Channel2"].raw_data
+    data_3 = tdms_data["Group"]["Channel3"].raw_data
+    data_4 = tdms_data["Group"]["Channel4"].raw_data
+    data_5 = tdms_data["Group"]["Channel5"].raw_data
 
     for data in [data_1, data_2, data_3]:
         assert data.dtype == np.int16
@@ -382,8 +382,8 @@ def test_multiple_raw_data_buffers_with_scalers_split_across_buffers():
     test_file.add_segment(segment_toc(), metadata, data)
     tdms_data = test_file.load()
 
-    channel_1 = tdms_data.object("Group", "Channel1")
-    channel_2 = tdms_data.object("Group", "Channel2")
+    channel_1 = tdms_data["Group"]["Channel1"]
+    channel_2 = tdms_data["Group"]["Channel2"]
 
     scaler_data_1 = channel_1.raw_scaler_data[0]
     scaler_data_2 = channel_1.raw_scaler_data[1]
@@ -432,11 +432,11 @@ def test_lazily_reading_channel():
 
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
-            data_1 = tdms_file.object("Group", "Channel1").read_data()
+            data_1 = tdms_file["Group"]["Channel1"].read_data()
             assert data_1.dtype == np.int16
             np.testing.assert_array_equal(data_1, [1, 2, 3, 4])
 
-            data_2 = tdms_file.object("Group", "Channel2").read_data()
+            data_2 = tdms_file["Group"]["Channel2"].read_data()
             assert data_2.dtype == np.int16
             np.testing.assert_array_equal(data_2, [17, 18, 19, 20])
 
@@ -473,11 +473,11 @@ def test_lazily_reading_a_subset_of_channel_data():
 
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
-            data_1 = tdms_file.object("Group", "Channel1").read_data(1, 2)
+            data_1 = tdms_file["Group"]["Channel1"].read_data(1, 2)
             assert data_1.dtype == np.int16
             np.testing.assert_array_equal(data_1, [2, 3])
 
-            data_2 = tdms_file.object("Group", "Channel2").read_data(1, 2)
+            data_2 = tdms_file["Group"]["Channel2"].read_data(1, 2)
             assert data_2.dtype == np.int16
             np.testing.assert_array_equal(data_2, [18, 19])
 

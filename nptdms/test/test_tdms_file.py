@@ -27,7 +27,7 @@ def test_read_channel_data(test_file, expected_data):
         tdms_data = TdmsFile.read(temp_file.file)
 
     for ((group, channel), expected_data) in expected_data.items():
-        actual_data = tdms_data.object(group, channel).data
+        actual_data = tdms_data[group][channel].data
         assert actual_data.dtype == expected_data.dtype
         compare_arrays(actual_data, expected_data)
 
@@ -39,7 +39,7 @@ def test_lazily_read_channel_data(test_file, expected_data):
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             for ((group, channel), expected_data) in expected_data.items():
-                actual_data = tdms_file.object(group, channel).read_data()
+                actual_data = tdms_file[group][channel].read_data()
                 assert actual_data.dtype == expected_data.dtype
                 compare_arrays(actual_data, expected_data)
 
@@ -53,7 +53,7 @@ def test_lazily_read_channel_data_with_file_path():
         temp_file.file.close()
         with TdmsFile.open(temp_file.name) as tdms_file:
             for ((group, channel), expected_data) in expected_data.items():
-                actual_data = tdms_file.object(group, channel).read_data()
+                actual_data = tdms_file[group][channel].read_data()
                 assert actual_data.dtype == expected_data.dtype
                 compare_arrays(actual_data, expected_data)
     finally:
@@ -103,7 +103,7 @@ def test_reading_subset_of_data(offset, length):
 
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
-            channel_subset = tdms_file.object('group', 'channel1').read_data(offset, length)
+            channel_subset = tdms_file['group']['channel1'].read_data(offset, length)
             expected_data = channel_data[offset:offset + length]
             assert len(channel_subset) == len(expected_data)
             np.testing.assert_equal(channel_subset, expected_data)
@@ -118,7 +118,7 @@ def test_reading_subset_of_data_for_scenario(test_file, expected_data, offset, l
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             for ((group, channel), expected_data) in expected_data.items():
-                actual_data = tdms_file.object(group, channel).read_data(offset, length)
+                actual_data = tdms_file[group][channel].read_data(offset, length)
                 compare_arrays(actual_data, expected_data[offset:offset + length])
 
 
@@ -130,7 +130,7 @@ def test_invalid_offset_throws():
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             with pytest.raises(ValueError) as exc_info:
-                tdms_file.object(group, channel).read_data(-1, 5)
+                tdms_file[group][channel].read_data(-1, 5)
             assert "offset must be non-negative" in str(exc_info.value)
 
 
@@ -142,7 +142,7 @@ def test_invalid_length_throws():
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             with pytest.raises(ValueError) as exc_info:
-                tdms_file.object(group, channel).read_data(0, -5)
+                tdms_file[group][channel].read_data(0, -5)
             assert "length must be non-negative" in str(exc_info.value)
 
 
@@ -155,7 +155,7 @@ def test_read_data_after_close_throws():
         with TdmsFile.open(temp_file.file) as tdms_file:
             pass
         with pytest.raises(RuntimeError) as exc_info:
-            tdms_file.object(group, channel).read_data()
+            tdms_file[group][channel].read_data()
         assert "Cannot read channel data after the underlying TDMS reader is closed" in str(exc_info.value)
 
 
@@ -167,7 +167,7 @@ def test_read_data_after_open_in_read_mode_throws():
     with test_file.get_tempfile() as temp_file:
         tdms_file = TdmsFile.read(temp_file.file)
         with pytest.raises(RuntimeError) as exc_info:
-            tdms_file.object(group, channel).read_data()
+            tdms_file[group][channel].read_data()
         assert "Cannot read channel data after the underlying TDMS reader is closed" in str(exc_info.value)
 
 
@@ -179,15 +179,15 @@ def test_access_data_property_after_opening_throws():
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             with pytest.raises(RuntimeError) as exc_info:
-                _ = tdms_file.object(group, channel).data
+                _ = tdms_file[group][channel].data
             assert "Channel data has not been read" in str(exc_info.value)
 
             with pytest.raises(RuntimeError) as exc_info:
-                _ = tdms_file.object(group, channel).raw_data
+                _ = tdms_file[group][channel].raw_data
             assert "Channel data has not been read" in str(exc_info.value)
 
             with pytest.raises(RuntimeError) as exc_info:
-                _ = tdms_file.object(group, channel).raw_scaler_data
+                _ = tdms_file[group][channel].raw_scaler_data
             assert "Channel data has not been read" in str(exc_info.value)
 
 
@@ -206,15 +206,15 @@ def test_get_objects():
     assert "/'Group'/'Channel2'" in objects.keys()
 
 
-def test_property_read():
-    """Test reading an object property"""
+def test_group_property_read():
+    """Test reading property of a group"""
 
     test_file = GeneratedFile()
     test_file.add_segment(*basic_segment())
     tdms_data = test_file.load()
 
-    obj = tdms_data.object("Group")
-    assert obj.property("num") == 10
+    group = tdms_data["Group"]
+    assert group.properties["num"] == 10
 
 
 def test_time_track():
@@ -225,9 +225,9 @@ def test_time_track():
     test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
-    obj = tdms_data.object("Group", "Channel2")
-    time = obj.time_track()
-    assert len(time) == len(obj.data)
+    channel = tdms_data["Group"]["Channel2"]
+    time = channel.time_track()
+    assert len(time) == len(channel.data)
     epsilon = 1.0E-15
     assert abs(time[0]) < epsilon
     assert abs(time[1] - 0.1) < epsilon
@@ -240,11 +240,11 @@ def test_memmapped_read():
     test_file.add_segment(*basic_segment())
     tdms_data = test_file.load(memmap_dir=tempfile.gettempdir())
 
-    data = tdms_data.channel_data("Group", "Channel1")
+    data = tdms_data["Group"]["Channel1"].data
     assert len(data) == 2
     assert data[0] == 1
     assert data[1] == 2
-    data = tdms_data.channel_data("Group", "Channel2")
+    data = tdms_data["Group"]["Channel2"].data
     assert len(data) == 2
     assert data[0] == 3
     assert data[1] == 4
@@ -287,7 +287,7 @@ def test_string_data():
     test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
-    data = tdms_data.channel_data("Group", "StringChannel")
+    data = tdms_data["Group"]["StringChannel"].data
     assert len(data) == len(strings)
     for expected, read in zip(strings, data):
         assert expected == read
@@ -315,11 +315,11 @@ def test_slash_and_space_in_name():
     tdms_data = test_file.load()
 
     assert len(tdms_data.groups()) == 2
-    assert len(tdms_data.group_channels(group_1)) == 1
-    assert len(tdms_data.group_channels(group_2)) == 1
-    data_1 = tdms_data.channel_data(group_1, channel_1)
+    assert len(tdms_data[group_1].channels()) == 1
+    assert len(tdms_data[group_2].channels()) == 1
+    data_1 = tdms_data[group_1][channel_1].data
     assert len(data_1) == 2
-    data_2 = tdms_data.channel_data(group_2, channel_2)
+    data_2 = tdms_data[group_2][channel_2].data
     assert len(data_2) == 2
 
 
@@ -339,8 +339,8 @@ def test_single_quote_in_name():
     tdms_data = test_file.load()
 
     assert len(tdms_data.groups()) == 1
-    assert len(tdms_data.group_channels("group's name")) == 1
-    data_1 = tdms_data.channel_data("group's name", "channel's name")
+    assert len(tdms_data["group's name"].channels()) == 1
+    data_1 = tdms_data["group's name"]["channel's name"].data
     assert len(data_1) == 2
 
 
@@ -361,7 +361,9 @@ def test_group_object_paths():
     test_file.add_segment(*basic_segment())
     tdms_data = test_file.load()
 
-    obj = tdms_data.object("Group")
+    obj = tdms_data["Group"]
+    assert obj.path == "/'Group'"
+    assert obj.name == "Group"
     assert obj.group == "Group"
     assert obj.channel is None
 
@@ -372,7 +374,9 @@ def test_channel_object_paths():
     test_file.add_segment(*basic_segment())
     tdms_data = test_file.load()
 
-    obj = tdms_data.object("Group", "Channel1")
+    obj = tdms_data["Group"]["Channel1"]
+    assert obj.path == "/'Group'/'Channel1'"
+    assert obj.name == "Channel1"
     assert obj.group == "Group"
     assert obj.channel == "Channel1"
 
@@ -384,11 +388,11 @@ def test_data_read_from_bytes_io():
     test_file.add_segment(*basic_segment())
     tdms_data = test_file.load()
 
-    data = tdms_data.channel_data("Group", "Channel1")
+    data = tdms_data["Group"]["Channel1"].data
     assert len(data) == 2
     assert data[0] == 1
     assert data[1] == 2
-    data = tdms_data.channel_data("Group", "Channel2")
+    data = tdms_data["Group"]["Channel2"].data
     assert len(data) == 2
     assert data[0] == 3
     assert data[1] == 4

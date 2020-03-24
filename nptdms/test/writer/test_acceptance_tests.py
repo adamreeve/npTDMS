@@ -23,8 +23,8 @@ def test_can_read_tdms_file_after_writing():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    a_output = tdms_file.object("group", "a").data
-    b_output = tdms_file.object("group", "b").data
+    a_output = tdms_file["group"]["a"].data
+    b_output = tdms_file["group"]["b"].data
 
     assert len(a_output) == len(a_input)
     assert len(b_output) == len(b_input)
@@ -51,15 +51,15 @@ def test_can_read_tdms_file_properties_after_writing():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    a_output = tdms_file.object()
-    b_output = tdms_file.object("group_name")
+    file_properties = tdms_file.properties
+    b_output = tdms_file["group_name"]
 
-    assert "prop1" in a_output.properties, "prop1 not found"
-    assert "prop2" in a_output.properties, "prop2 not found"
+    assert "prop1" in file_properties, "prop1 not found"
+    assert "prop2" in file_properties, "prop2 not found"
     assert "prop3" in b_output.properties, "prop3 not found"
     assert "prop4" in b_output.properties, "prop4 not found"
-    assert a_output.properties["prop1"] == "foo"
-    assert a_output.properties["prop2"] == 3
+    assert file_properties["prop1"] == "foo"
+    assert file_properties["prop2"] == 3
     assert b_output.properties["prop3"] == 1.2345
     assert b_output.properties["prop4"] == test_time
 
@@ -79,7 +79,7 @@ def test_can_write_multiple_segments():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    output_data = tdms_file.object("group", "a").data
+    output_data = tdms_file["group"]["a"].data
 
     expected_data = np.append(input_1, input_2)
     assert len(output_data) == len(expected_data)
@@ -117,7 +117,7 @@ def test_can_append_to_file_using_path():
 
         tdms_file = TdmsFile(temppath)
 
-        output = tdms_file.object("group", "a").data
+        output = tdms_file["group"]["a"].data
 
         assert len(output) == 20
         np.testing.assert_almost_equal(
@@ -155,17 +155,16 @@ def test_can_write_tdms_objects_read_from_file():
             tdms_writer.write_segment([group_segment, channel_segment])
 
         tdms_file = TdmsFile(temppath)
-        read_group = tdms_file.object("group")
-        read_channel = tdms_file.object("group", "a")
+        read_group = tdms_file["group"]
+        read_channel = tdms_file["group"]["a"]
 
         with TdmsWriter(temppath) as tdms_writer:
             tdms_writer.write_segment([read_group, read_channel])
 
         tdms_file = TdmsFile(temppath)
-        read_group = tdms_file.object("group")
-        read_channel = tdms_file.object("group", "a")
+        read_group = tdms_file["group"]
+        read_channel = tdms_file["group"]["a"]
 
-        assert not read_group.has_data
         assert read_group.properties["prop1"] == "bar"
 
         assert len(read_channel.data) == 10
@@ -195,7 +194,7 @@ def test_can_write_timestamp_data():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    output_data = tdms_file.object("group", "timedata").data
+    output_data = tdms_file["group"]["timedata"].data
 
     assert len(output_data) == 3
     assert output_data[0] == input_data[0]
@@ -222,7 +221,7 @@ def test_can_write_timestamp_data_with_datetimes():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    output_data = tdms_file.object("group", "timedata").data
+    output_data = tdms_file["group"]["timedata"].data
 
     assert len(output_data) == 3
     assert output_data[0] == expected_data[0]
@@ -245,7 +244,7 @@ def test_can_write_numpy_timestamp_data_with_dates():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    output_data = tdms_file.object("group", "timedata").data
+    output_data = tdms_file["group"]["timedata"].data
 
     assert len(output_data) == 3
     assert output_data[0] == input_data[0]
@@ -267,7 +266,7 @@ def test_can_write_string_data():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    output_data = tdms_file.object("group", "string_data").data
+    output_data = tdms_file["group"]["string_data"].data
 
     assert len(output_data) == 2
     assert output_data[0] == input_data[0]
@@ -286,7 +285,7 @@ def test_can_write_floats_from_list():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    output_data = tdms_file.object("group", "data").data
+    output_data = tdms_file["group"]["data"].data
 
     assert output_data.dtype == np.float64
     assert len(output_data) == 3
@@ -335,7 +334,7 @@ def test_can_write_ints_from_list():
         output_file.seek(0)
         tdms_file = TdmsFile(output_file)
 
-        output_data = tdms_file.object("group", "data").data
+        output_data = tdms_file["group"]["data"].data
 
         assert output_data.dtype == expected_type, test_case
         assert len(output_data) == len(input_data), test_case
@@ -360,13 +359,13 @@ def test_can_write_complex():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    output_data = tdms_file.object("group", "complex64_data").data
+    output_data = tdms_file["group"]["complex64_data"].data
     assert output_data.dtype == np.complex64
     assert len(output_data) == 2
     assert output_data[0] == input_complex64_data[0]
     assert output_data[1] == input_complex64_data[1]
 
-    output_data = tdms_file.object("group", "complex128_data").data
+    output_data = tdms_file["group"]["complex128_data"].data
     assert output_data.dtype == np.complex128
     assert len(output_data) == 2
     assert output_data[0] == input_complex128_data[0]

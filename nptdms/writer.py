@@ -117,7 +117,7 @@ class TdmsSegment(object):
         return metadata
 
     def raw_data_index(self, obj):
-        if obj.has_data:
+        if hasattr(obj, 'data'):
             data_type = Int32(obj.data_type.enum_value)
             dimension = Uint32(1)
             num_values = Uint64(len(obj.data))
@@ -154,13 +154,13 @@ class TdmsSegment(object):
     def _data_size(self):
         data_size = 0
         for obj in self.objects:
-            if obj.has_data:
+            if hasattr(obj, 'data'):
                 data_size += object_data_size(obj.data_type, obj.data)
         return data_size
 
     def _write_data(self, file):
         for obj in self.objects:
-            if obj.has_data:
+            if hasattr(obj, 'data'):
                 write_data(file, obj)
 
 
