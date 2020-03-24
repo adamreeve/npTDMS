@@ -706,4 +706,4 @@ def _deprecated(name, detail=None):
     message = "'{0}' is deprecated and will be removed in a future release.".format(name)
     if detail is not None:
         message += " {0}".format(detail)
-    log.warn(message)
+    log.warning(message)
