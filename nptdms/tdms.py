@@ -118,18 +118,21 @@ class TdmsFile(object):
 
         return self._properties
 
-    def as_dataframe(self, time_index=False, absolute_time=False):
+    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
         """
-        Converts the TDMS file to a DataFrame
+        Converts the TDMS file to a DataFrame. DataFrame columns are named using the TDMS object paths.
 
         :param time_index: Whether to include a time index for the dataframe.
         :param absolute_time: If time_index is true, whether the time index
             values are absolute times or relative to the start time.
+        :param scaled_data: By default the scaled data will be used.
+            Set to False to use raw unscaled data.
+            For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
         :return: The full TDMS file data.
         :rtype: pandas.DataFrame
         """
 
-        return pandas_export.from_tdms_file(self, time_index, absolute_time)
+        return pandas_export.from_tdms_file(self, time_index, absolute_time, scaled_data)
 
     def as_hdf(self, filepath, mode='w', group='/'):
         """
@@ -381,18 +384,21 @@ class TdmsGroup(object):
         """
         return list(self._channels.values())
 
-    def as_dataframe(self, absolute_time=False, scaled_data=True):
+    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
         """
-        Converts the TDMS group to a DataFrame
+        Converts the TDMS group to a DataFrame. DataFrame columns are named using the channel names.
 
-        :param absolute_time: Whether times should be absolute rather than
-            relative to the start time.
-        :param scaled_data: Whether to return scaled or raw data.
+        :param time_index: Whether to include a time index for the dataframe.
+        :param absolute_time: If time_index is true, whether the time index
+            values are absolute times or relative to the start time.
+        :param scaled_data: By default the scaled data will be used.
+            Set to False to use raw unscaled data.
+            For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
         :return: The TDMS object data.
         :rtype: pandas.DataFrame
         """
 
-        return pandas_export.from_group(self, scaled_data)
+        return pandas_export.from_group(self, time_index, absolute_time, scaled_data)
 
     def __getitem__(self, channel_name):
         """ Retrieve a TDMS channel from this group by name
@@ -609,18 +615,21 @@ class TdmsChannel(object):
         return (np.datetime64(start_time) +
                 (relative_time * unit_correction).astype(time_type))
 
-    def as_dataframe(self, absolute_time=False, scaled_data=True):
+    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
         """
-        Converts the TDMS channel to a DataFrame
+        Converts the TDMS channel to a DataFrame. The DataFrame column is named using the channel path.
 
-        :param absolute_time: Whether times should be absolute rather than
-            relative to the start time.
-        :param scaled_data: Whether to return scaled or raw data.
+        :param time_index: Whether to include a time index for the dataframe.
+        :param absolute_time: If time_index is true, whether the time index
+            values are absolute times or relative to the start time.
+        :param scaled_data: By default the scaled data will be used.
+            Set to False to use raw unscaled data.
+            For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
         :return: The TDMS object data.
         :rtype: pandas.DataFrame
         """
 
-        return pandas_export.from_channel(self, absolute_time, scaled_data)
+        return pandas_export.from_channel(self, time_index, absolute_time, scaled_data)
 
     def _scale_data(self, raw_data):
         scale = self._get_scaling()
