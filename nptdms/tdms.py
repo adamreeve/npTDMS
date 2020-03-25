@@ -527,7 +527,7 @@ class TdmsChannel(object):
 
         return self._raw_data.scaler_data
 
-    def read_data(self, offset=0, length=None):
+    def read_data(self, offset=0, length=None, scaled=True):
         """ Reads data for this channel from the TDMS file and returns it
 
             This is for use when the TDMS file was opened without immediately reading all data,
@@ -536,9 +536,17 @@ class TdmsChannel(object):
             :param offset: Initial position to read data from.
             :param length: Number of values to attempt to read.
                 Fewer values will be returned if attempting to read beyond the end of the available data.
+            :param scaled: By default scaling will be applied to the returned data.
+                Set this parameter to False to return raw unscaled data.
+                For DAQmx data a dictionary of scaler id to raw scaler data will be returned.
         """
         raw_data = self._tdms_file._read_channel_data(self, offset, length)
-        return self._scale_data(raw_data)
+        if scaled:
+            return self._scale_data(raw_data)
+        else:
+            if raw_data.scaler_data:
+                return raw_data.scaler_data
+            return raw_data.data
 
     def time_track(self, absolute_time=False, accuracy='ns'):
         """Return an array of time or the independent variable for this channel
