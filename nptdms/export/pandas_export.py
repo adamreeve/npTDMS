@@ -64,12 +64,14 @@ def _channels_to_dataframe(channels_to_export, time_index=False, absolute_time=F
     dataframe_dict = OrderedDict()
     for column_name, channel in channels_to_export.items():
         index = channel.time_track(absolute_time) if time_index else None
-        dataframe_dict[column_name] = pd.Series(data=_get_data(channel, scaled_data), index=index)
+        if scaled_data:
+            dataframe_dict[column_name] = pd.Series(data=channel.data, index=index)
+        elif channel.scaler_data_types:
+            # Channel has DAQmx raw data
+            for scale_id, raw_data in channel.raw_scaler_data.items():
+                scaler_column_name = column_name + "[{0:d}]".format(scale_id)
+                dataframe_dict[scaler_column_name] = pd.Series(data=raw_data, index=index)
+        else:
+            # Raw data for normal TDMS file
+            dataframe_dict[column_name] = pd.Series(data=channel.raw_data, index=index)
     return pd.DataFrame.from_dict(dataframe_dict)
-
-
-def _get_data(chan, scaled_data):
-    if scaled_data:
-        return chan.data
-    else:
-        return chan.raw_data

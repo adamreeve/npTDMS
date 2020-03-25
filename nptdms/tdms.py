@@ -127,6 +127,7 @@ class TdmsFile(object):
             values are absolute times or relative to the start time.
         :param scaled_data: By default the scaled data will be used.
             Set to False to use raw unscaled data.
+            For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
         :return: The full TDMS file data.
         :rtype: pandas.DataFrame
         """
@@ -392,6 +393,7 @@ class TdmsGroup(object):
             values are absolute times or relative to the start time.
         :param scaled_data: By default the scaled data will be used.
             Set to False to use raw unscaled data.
+            For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
         :return: The TDMS object data.
         :rtype: pandas.DataFrame
         """
@@ -614,6 +616,7 @@ class TdmsChannel(object):
             values are absolute times or relative to the start time.
         :param scaled_data: By default the scaled data will be used.
             Set to False to use raw unscaled data.
+            For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
         :return: The TDMS object data.
         :rtype: pandas.DataFrame
         """

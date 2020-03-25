@@ -1,16 +1,20 @@
 """Test exporting TDMS data to Pandas"""
 
 from datetime import datetime
+import numpy as np
 import pytest
 try:
     import pandas
 except ImportError:
     pytest.skip("Skipping Pandas tests as Pandas is not installed", allow_module_level=True)
 
+from nptdms.test import scenarios
+from nptdms.test.test_daqmx import daqmx_channel_metadata, daqmx_scaler_metadata
 from nptdms.test.util import (
     GeneratedFile,
     basic_segment,
     string_hexlify,
+    segment_objects_metadata,
     hexlify_value
 )
 
@@ -257,3 +261,54 @@ def test_channel_as_dataframe_with_absolute_time():
 
     expected_start = datetime(2015, 9, 8, 10, 5, 49)
     assert (df.index == expected_start)[0]
+
+
+def test_channel_as_dataframe_with_raw_data():
+    """Convert channel to Pandas dataframe with absolute time index"""
+
+    test_file, _ = scenarios.scaled_data().values
+    expected_raw_data = np.array([1, 2], dtype=np.int32)
+    tdms_data = test_file.load()
+
+    df = tdms_data["group"]["channel1"].as_dataframe(scaled_data=False)
+
+    np.testing.assert_equal(df["/'group'/'channel1'"], expected_raw_data)
+
+
+def test_raw_daqmx_channel_export():
+    """ Test exporting raw daqmx data for a channel
+    """
+
+    scaler_metadata = [
+        daqmx_scaler_metadata(0, 3, 0),
+        daqmx_scaler_metadata(1, 3, 2)]
+    metadata = segment_objects_metadata(
+        daqmx_channel_metadata("Channel1", 4, [4], scaler_metadata))
+    data = (
+        # Data for segment
+        "01 00"
+        "11 00"
+        "02 00"
+        "12 00"
+        "03 00"
+        "13 00"
+        "04 00"
+        "14 00"
+    )
+
+    test_file = GeneratedFile()
+    segment_toc = (
+        "kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocDAQmxRawData")
+    test_file.add_segment(segment_toc, metadata, data)
+    tdms_data = test_file.load()
+    channel = tdms_data["Group"]["Channel1"]
+
+    dataframe = channel.as_dataframe(scaled_data=False)
+    expected_data = {
+        0: np.array([1, 2, 3, 4], dtype=np.int16),
+        1: np.array([17, 18, 19, 20], dtype=np.int16),
+    }
+    assert dataframe["/'Group'/'Channel1'[0]"].dtype == np.int16
+    assert dataframe["/'Group'/'Channel1'[1]"].dtype == np.int16
+    np.testing.assert_equal(dataframe["/'Group'/'Channel1'[0]"], expected_data[0])
+    np.testing.assert_equal(dataframe["/'Group'/'Channel1'[1]"], expected_data[1])
