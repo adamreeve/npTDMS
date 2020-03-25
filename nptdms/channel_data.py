@@ -122,6 +122,14 @@ class DaqmxDataReceiver(object):
         self._scaler_insert_positions[scale_id] += len(new_data)
 
 
+class RawChannelData(object):
+    """ Simple container for raw channel data that's already been read
+    """
+    def __init__(self, data, scaler_data):
+        self.data = data
+        self.scaler_data = scaler_data
+
+
 def _new_numpy_array(dtype, num_values, memmap_dir=None):
     """Initialise a new numpy array for data
 

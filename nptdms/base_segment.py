@@ -182,12 +182,12 @@ class BaseSegment(object):
     def read_raw_data(self, f):
         """Read raw data from a TDMS segment
 
-        :returns: A generator of DataChunk objects with raw channel data for
+        :returns: A generator of RawDataChunk objects with raw channel data for
             objects in this segment.
         """
 
         if not self.toc_mask & toc_properties['kTocRawData']:
-            yield DataChunk.empty()
+            yield RawDataChunk.empty()
 
         f.seek(self.data_position)
 
@@ -325,7 +325,7 @@ class BaseSegmentObject(object):
         return None
 
 
-class DataChunk(object):
+class RawDataChunk(object):
     """Data read from a single chunk in a TDMS segment
 
     :ivar raw_data: A dictionary of object data in this chunk for standard
@@ -341,15 +341,15 @@ class DataChunk(object):
 
     @staticmethod
     def empty():
-        return DataChunk({}, {})
+        return RawDataChunk({}, {})
 
     @staticmethod
     def channel_data(data):
-        return DataChunk(data, {})
+        return RawDataChunk(data, {})
 
     @staticmethod
     def scaler_data(data):
-        return DataChunk({}, data)
+        return RawDataChunk({}, data)
 
 
 class ChannelDataChunk(object):
