@@ -2,7 +2,7 @@ Reading TDMS files
 ==================
 
 To read a TDMS file, create an instance of the :py:class:`~nptdms.TdmsFile`
-class using the static read method, passing the path to the file, or an already opened file::
+class using the static :py:meth:`~nptdms.TdmsFile.read` method, passing the path to the file, or an already opened file::
 
     tdms_file = TdmsFile.read("my_file.tdms")
 
