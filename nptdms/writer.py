@@ -8,7 +8,7 @@ from datetime import datetime
 from io import UnsupportedOperation
 import logging
 import numpy as np
-from nptdms.common import toc_properties
+from nptdms.common import toc_properties, ObjectPath
 from nptdms.types import *
 
 log = logging.getLogger(__name__)
@@ -57,7 +57,7 @@ class TdmsWriter(object):
     def close(self):
         if self._file_path is not None:
             self._file.close()
-            self._file = None
+        self._file = None
 
     def write_segment(self, objects):
         """ Write a segment of data to a TDMS file
@@ -117,7 +117,7 @@ class TdmsSegment(object):
         return metadata
 
     def raw_data_index(self, obj):
-        if obj.has_data:
+        if hasattr(obj, 'data'):
             data_type = Int32(obj.data_type.enum_value)
             dimension = Uint32(1)
             num_values = Uint64(len(obj.data))
@@ -154,13 +154,13 @@ class TdmsSegment(object):
     def _data_size(self):
         data_size = 0
         for obj in self.objects:
-            if obj.has_data:
+            if hasattr(obj, 'data'):
                 data_size += object_data_size(obj.data_type, obj.data)
         return data_size
 
     def _write_data(self, file):
         for obj in self.objects:
-            if obj.has_data:
+            if hasattr(obj, 'data'):
                 write_data(file, obj)
 
 
@@ -179,7 +179,7 @@ class TdmsObject(object):
 
 
 class RootObject(TdmsObject):
-    """The root TDMS object
+    """The root TDMS object containing properties for the TDMS file
     """
     def __init__(self, properties=None):
         """Initialise a new GroupObject
@@ -214,7 +214,7 @@ class GroupObject(TdmsObject):
     def path(self):
         """The string representation of this group's path
         """
-        return "/'%s'" % self.group.replace("'", "''")
+        return str(ObjectPath(self.group))
 
 
 class ChannelObject(TdmsObject):
@@ -253,9 +253,7 @@ class ChannelObject(TdmsObject):
     def path(self):
         """The string representation of this channel's path
         """
-        return "/'%s'/'%s'" % (
-            self.group.replace("'", "''"),
-            self.channel.replace("'", "''"))
+        return str(ObjectPath(self.group, self.channel))
 
 
 def read_properties_dict(properties_dict):

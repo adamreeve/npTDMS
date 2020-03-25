@@ -28,7 +28,8 @@ instance of one of:
 - :py:class:`nptdms.RootObject`. This is the TDMS root object, and there may only be one root object in a segment.
 - :py:class:`nptdms.GroupObject`. This is used to group the channel objects.
 - :py:class:`nptdms.ChannelObject`. An object that contains data.
-- :py:class:`nptdms.TdmsObject`. A TDMS object that was read from a TDMS file using :py:class:`nptdms.TdmsFile`.
+- :py:class:`nptdms.TdmsGroup` or :py:class:`nptdms.TdmsChannel`.
+  A TDMS object that was read from a TDMS file using :py:class:`nptdms.TdmsFile`.
 
 Each of ``RootObject``, ``GroupObject`` and ``ChannelObject``
 may optionally have properties associated with them, which
@@ -67,14 +68,18 @@ is given below::
             group_object,
             channel_object])
 
-You could also read a TDMS file and then re-write it by passing :py:class:`nptdms.TdmsObject`
+You could also read a TDMS file and then re-write it by passing
+:py:class:`nptdms.TdmsGroup` and :py:class:`nptdms.TdmsChannel`
 instances to the ``write_segment`` method. If you want
-to only copy certain objects for example, you could do something like::
+to only copy certain channels for example, you could do something like::
 
-    from nptdms import TdmsFile, TdmsWriter
+    from nptdms import TdmsFile, TdmsWriter, RootObject
 
     original_file = TdmsFile("original_file.tdms")
+    original_groups = original_file.groups()
+    original_channels = [chan for group in original_groups for chan in group.channels()]
 
     with TdmsWriter("copied_file.tdms") as copied_file:
-        objects_to_copy = [obj for obj in original_file.objects.values() if include_object(obj)]
-        copied_file.write_segment(objects_to_copy)
+        root_object = RootObject(original_file.properties)
+        channels_to_copy = [chan for chan in original_channels if include_channel(chan)]
+        copied_file.write_segment([root_object] + original_groups + channels_to_copy)

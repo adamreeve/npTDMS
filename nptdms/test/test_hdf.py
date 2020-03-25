@@ -214,7 +214,7 @@ def test_as_hdf_string(tmp_path):
     test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
-    data = tdms_data.channel_data("Group", "String")
+    data = tdms_data["Group"]["String"].data
     assert len(data) == len(strings)
     for expected, read in zip(strings, data):
         assert expected == read
@@ -268,7 +268,7 @@ def test_unicode_string_data(tmp_path):
     test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
-    data = tdms_data.channel_data("Group", "String")
+    data = tdms_data["Group"]["String"].data
     assert len(data) == len(strings)
     for expected, read in zip(strings, data):
         assert expected == read

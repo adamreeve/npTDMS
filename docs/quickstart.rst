@@ -26,14 +26,18 @@ Typical usage when reading a TDMS file might look like::
 
     from nptdms import TdmsFile
 
-    tdms_file = TdmsFile("path_to_file.tdms")
+    tdms_file = TdmsFile.read("path_to_file.tdms")
     for group in tdms_file.groups():
-        for channel in tdms_file.group_channels(group):
+        for channel in group.channels():
             # Access dictionary of properties:
             properties = channel.properties
             # Access numpy array of data for channel:
             data = channel.data
             # do stuff with data and properties...
+
+Or to access a channel by group name and channel name directly::
+
+    channel = tdms_file[group_name][channel_name]
 
 And to write a TDMS file::
 

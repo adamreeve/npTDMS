@@ -192,7 +192,7 @@ def test_group_as_dataframe():
     test_file.add_segment(*timed_segment())
     tdms_data = test_file.load()
 
-    df = tdms_data.object("Group").as_dataframe()
+    df = tdms_data["Group"].as_dataframe()
     assert len(df) == 2
     assert len(df.keys()) == 2
     assert "Channel1" in df.keys()
@@ -208,7 +208,7 @@ def test_channel_as_dataframe():
     test_file.add_segment(*timed_segment())
     tdms_data = test_file.load()
 
-    df = tdms_data.object("Group", "Channel2").as_dataframe()
+    df = tdms_data["Group"]["Channel2"].as_dataframe()
     assert len(df) == 2
     assert len(df.keys()) == 1
     assert "/'Group'/'Channel2'" in df.keys()
@@ -222,7 +222,7 @@ def test_channel_as_dataframe_with_time():
     test_file.add_segment(*timed_segment())
     tdms_data = test_file.load()
 
-    df = tdms_data.object("Group", "Channel2").as_dataframe()
+    df = tdms_data["Group"]["Channel2"].as_dataframe()
 
     assert len(df.index) == 2
     assert within_tol(df.index[0], 2.0)
@@ -236,7 +236,7 @@ def test_channel_as_dataframe_without_time():
     test_file.add_segment(*basic_segment())
     tdms_data = test_file.load()
 
-    df = tdms_data.object("Group", "Channel2").as_dataframe()
+    df = tdms_data["Group"]["Channel2"].as_dataframe()
 
     assert len(df.index) == 2
     assert len(df.values) == 2
@@ -253,8 +253,7 @@ def test_channel_as_dataframe_with_absolute_time():
     test_file.add_segment(*timed_segment())
     tdms_data = test_file.load()
 
-    df = tdms_data.object("Group", "Channel1").as_dataframe(
-        absolute_time=True)
+    df = tdms_data["Group"]["Channel1"].as_dataframe(absolute_time=True)
 
     expected_start = datetime(2015, 9, 8, 10, 5, 49)
     assert (df.index == expected_start)[0]

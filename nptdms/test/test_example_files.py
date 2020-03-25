@@ -17,15 +17,15 @@ def test_labview_file():
     channel = "Dev1_port3_line7 - line 0"
     expected = np.array([0, 1, 0, 1, 0, 1, 0, 1, 0, 1], dtype=np.uint8)
 
-    data = test_file.object(group, channel).data
+    data = test_file[group][channel].data
     np.testing.assert_almost_equal(data[:10], expected)
 
 
 def test_raw_format():
     """Test reading a file with DAQmx raw data"""
     test_file = tdms.TdmsFile(DATA_DIR + '/raw1.tdms')
-    obj_path = test_file.groups()[0]
-    data = test_file.object(obj_path, 'First  Channel').data
+    group = test_file.groups()[0]
+    data = group['First  Channel'].data
     np.testing.assert_almost_equal(data[:10],
                                    [-0.18402661, 0.14801477, -0.24506363,
                                     -0.29725028, -0.20020142, 0.18158513,
@@ -36,7 +36,7 @@ def test_raw_format():
 def test_big_endian_format():
     """Test reading a file that encodes data in big endian mode"""
     test_file = tdms.TdmsFile(DATA_DIR + '/big_endian.tdms')
-    data = test_file.object('Measured Data', 'Phase sweep').data
+    data = test_file['Measured Data']['Phase sweep'].data
     np.testing.assert_almost_equal(data[:10],
                                    [0.0000000, 0.0634176, 0.1265799,
                                     0.1892325, 0.2511234, 0.3120033,
