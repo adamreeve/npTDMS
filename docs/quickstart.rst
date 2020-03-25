@@ -2,13 +2,9 @@ Installation and Quick Start
 ============================
 
 npTDMS is available from the Python Package Index, so the easiest way to
-install it is by running (as root)::
+install it is by running::
 
     pip install npTDMS
-
-Or you can install npTDMS as a non-root user inside your home directory::
-
-    pip install --user npTDMS
 
 There are optional features available that require additional dependencies.
 These are ``hdf`` for hdf export, ``pandas`` for pandas DataFrame export,
