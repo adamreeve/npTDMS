@@ -15,8 +15,8 @@ from nptdms.test.util import (
 )
 
 
-def within_tol(a, b, tol=1.0e-10):
-    return abs(a - b) < tol
+def assert_within_tol(a, b, tol=1.0e-10):
+    assert abs(a - b) < tol
 
 
 def timed_segment():
@@ -168,8 +168,8 @@ def test_file_as_dataframe_with_time():
     df = tdms_data.as_dataframe(time_index=True)
 
     assert len(df.index) == 2
-    assert within_tol(df.index[0], 2.0)
-    assert within_tol(df.index[1], 2.1)
+    assert_within_tol(df.index[0], 2.0)
+    assert_within_tol(df.index[1], 2.1)
 
 
 def test_file_as_dataframe_with_absolute_time():
@@ -222,11 +222,11 @@ def test_channel_as_dataframe_with_time():
     test_file.add_segment(*timed_segment())
     tdms_data = test_file.load()
 
-    df = tdms_data["Group"]["Channel2"].as_dataframe()
+    df = tdms_data["Group"]["Channel2"].as_dataframe(time_index=True)
 
     assert len(df.index) == 2
-    assert within_tol(df.index[0], 2.0)
-    assert within_tol(df.index[1], 2.1)
+    assert_within_tol(df.index[0], 2.0)
+    assert_within_tol(df.index[1], 2.1)
 
 
 def test_channel_as_dataframe_without_time():
@@ -240,10 +240,10 @@ def test_channel_as_dataframe_without_time():
 
     assert len(df.index) == 2
     assert len(df.values) == 2
-    assert within_tol(df.index[0], 0.0)
-    assert within_tol(df.index[1], 0.1)
-    assert within_tol(df.values[0], 3.0)
-    assert within_tol(df.values[1], 4.0)
+    assert_within_tol(df.index[0], 0)
+    assert_within_tol(df.index[1], 1)
+    assert_within_tol(df.values[0], 3.0)
+    assert_within_tol(df.values[1], 4.0)
 
 
 def test_channel_as_dataframe_with_absolute_time():
@@ -253,7 +253,7 @@ def test_channel_as_dataframe_with_absolute_time():
     test_file.add_segment(*timed_segment())
     tdms_data = test_file.load()
 
-    df = tdms_data["Group"]["Channel1"].as_dataframe(absolute_time=True)
+    df = tdms_data["Group"]["Channel1"].as_dataframe(time_index=True, absolute_time=True)
 
     expected_start = datetime(2015, 9, 8, 10, 5, 49)
     assert (df.index == expected_start)[0]
