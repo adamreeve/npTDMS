@@ -34,6 +34,7 @@ def from_tdms_file(tdms_file, filepath, mode='w', group='/'):
 
     # Now iterate through groups and channels,
     # writing the properties and creating data sets
+    datasets = {}
     for group in tdms_file.groups():
         # Write the group's properties
         container_group.create_group(group.name)
@@ -46,15 +47,15 @@ def from_tdms_file(tdms_file, filepath, mode='w', group='/'):
 
             if channel.data_type is types.String:
                 # Encode as variable length UTF-8 strings
-                container_group.create_dataset(
+                datasets[channel.path] = container_group.create_dataset(
                     channel_key, (len(channel),), dtype=h5py.string_dtype())
             elif channel.data_type is types.TimeStamp:
                 # Timestamps are represented as fixed length ASCII strings
                 # because HDF doesn't natively support timestamps
-                container_group.create_dataset(
+                datasets[channel.path] = container_group.create_dataset(
                     channel_key, (len(channel),), dtype='S27')
             else:
-                container_group.create_dataset(
+                datasets[channel.path] = container_group.create_dataset(
                     channel_key, (len(channel),), dtype=channel.dtype)
 
             for prop_name, prop_value in channel.properties.items():
@@ -64,18 +65,16 @@ def from_tdms_file(tdms_file, filepath, mode='w', group='/'):
     if tdms_file.data_read:
         for group in tdms_file.groups():
             for channel in group.channels():
-                channel_key = group.name + '/' + channel.name
-                container_group[channel_key][...] = _hdf_array(channel, channel.data)
+                datasets[channel.path][...] = _hdf_array(channel, channel.data)
     else:
         # Data hasn't been read into memory, stream it from disk
         for chunk in tdms_file.data_chunks():
             for group in chunk.groups():
                 for channel_chunk in group.channels():
                     channel = tdms_file[group.name][channel_chunk.name]
-                    channel_key = group.name + '/' + channel_chunk.name
                     offset = channel_chunk.offset
                     end = offset + len(channel_chunk)
-                    container_group[channel_key][offset:end] = _hdf_array(channel, channel_chunk[:])
+                    datasets[channel.path][offset:end] = _hdf_array(channel, channel_chunk[:])
 
     return h5file
 

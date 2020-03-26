@@ -791,7 +791,7 @@ class ChannelDataChunk(object):
     :ivar ~.offset: Starting index of this chunk of data in the entire channel
     """
     def __init__(self, tdms_file, channel, raw_data_chunk, offset):
-        self._path = ObjectPath.from_string(channel.path)
+        self._path = channel._path
         self._tdms_file = tdms_file
         self._channel = channel
         self.name = channel.name
