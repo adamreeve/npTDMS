@@ -23,7 +23,6 @@ def from_tdms_file(tdms_file, filepath, mode='w', group='/'):
 
     h5file = h5py.File(filepath, mode)
 
-    container_group = None
     if group in h5file:
         container_group = h5file[group]
     else:
@@ -34,7 +33,7 @@ def from_tdms_file(tdms_file, filepath, mode='w', group='/'):
         container_group.attrs[property_name] = _hdf_attr_value(property_value)
 
     # Now iterate through groups and channels,
-    # writing the properties and data
+    # writing the properties and creating data sets
     for group in tdms_file.groups():
         # Write the group's properties
         container_group.create_group(group.name)
@@ -47,24 +46,47 @@ def from_tdms_file(tdms_file, filepath, mode='w', group='/'):
 
             if channel.data_type is types.String:
                 # Encode as variable length UTF-8 strings
-                channel_data = container_group.create_dataset(
-                    channel_key, (len(channel.data),), dtype=h5py.string_dtype())
-                channel_data[...] = channel.data
+                container_group.create_dataset(
+                    channel_key, (len(channel),), dtype=h5py.string_dtype())
             elif channel.data_type is types.TimeStamp:
                 # Timestamps are represented as fixed length ASCII strings
                 # because HDF doesn't natively support timestamps
-                channel_data = container_group.create_dataset(
-                    channel_key, (len(channel.data),), dtype='S27')
-                string_data = np.datetime_as_string(channel.data, unit='us', timezone='UTC')
-                encoded_data = [s.encode('ascii') for s in string_data]
-                channel_data[...] = encoded_data
+                container_group.create_dataset(
+                    channel_key, (len(channel),), dtype='S27')
             else:
-                container_group[channel_key] = channel.data
+                container_group.create_dataset(
+                    channel_key, (len(channel),), dtype=channel.dtype)
 
             for prop_name, prop_value in channel.properties.items():
                 container_group[channel_key].attrs[prop_name] = _hdf_attr_value(prop_value)
 
+    # Set data
+    if tdms_file.data_read:
+        for group in tdms_file.groups():
+            for channel in group.channels():
+                channel_key = group.name + '/' + channel.name
+                container_group[channel_key][...] = _hdf_array(channel, channel.data)
+    else:
+        # Data hasn't been read into memory, stream it from disk
+        for chunk in tdms_file.data_chunks():
+            for group in chunk.groups():
+                for channel_chunk in group.channels():
+                    channel = tdms_file[group.name][channel_chunk.name]
+                    channel_key = group.name + '/' + channel_chunk.name
+                    offset = channel_chunk.offset
+                    end = offset + len(channel_chunk)
+                    container_group[channel_key][offset:end] = _hdf_array(channel, channel_chunk[:])
+
     return h5file
+
+
+def _hdf_array(channel, data):
+    """ Convert data array into a format suitable for initialising HDF data
+    """
+    if channel.data_type is types.TimeStamp:
+        string_data = np.datetime_as_string(data, unit='us', timezone='UTC')
+        return [s.encode('ascii') for s in string_data]
+    return data
 
 
 def _hdf_attr_value(value):

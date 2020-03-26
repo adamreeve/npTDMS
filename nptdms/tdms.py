@@ -7,7 +7,7 @@ from collections import defaultdict
 import warnings
 import numpy as np
 
-from nptdms import scaling
+from nptdms import scaling, types
 from nptdms.utils import Timer, OrderedDict
 from nptdms.log import log_manager
 from nptdms.common import ObjectPath
@@ -92,6 +92,7 @@ class TdmsFile(object):
         self._properties = {}
         self._channel_data = {}
         self._reader = None
+        self.data_read = False
 
         reader = TdmsReader(file)
         try:
@@ -252,6 +253,8 @@ class TdmsFile(object):
                     channel_data = self._channel_data[channel.path]
                     if channel_data is not None:
                         channel._set_raw_data(channel_data)
+
+        self.data_read = True
 
     def _read_channel_data(self, channel, offset=0, length=None):
         if offset < 0:
@@ -507,6 +510,24 @@ class TdmsChannel(object):
         """ The name of this channel
         """
         return self._path.channel
+
+    @_property_builtin
+    def dtype(self):
+        """ NumPy data type of the channel data
+
+        For data with a scaling this is the data type of the scaled data
+
+        :rtype: numpy.dtype
+        """
+        if self.data_type is types.String:
+            return np.dtype('O')
+        elif self.data_type is types.TimeStamp:
+            return np.dtype('<M8[us]')
+
+        channel_scaling = self._get_scaling()
+        if channel_scaling is not None:
+            return channel_scaling.get_dtype(self.data_type, self.scaler_data_types)
+        return self.data_type.nptype
 
     @_property_builtin
     def data(self):

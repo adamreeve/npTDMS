@@ -7,6 +7,7 @@ try:
 except ImportError:
     pytest.skip("Skipping HDF tests as h5py is not installed", allow_module_level=True)
 
+from nptdms import TdmsFile
 from nptdms.test.util import (
     GeneratedFile,
     basic_segment,
@@ -31,6 +32,22 @@ def test_hdf_channel_data(tmp_path):
     for ((group, channel), expected_data) in expected_data.items():
         h5_channel = h5[group][channel]
         assert h5_channel.dtype.kind == 'i'
+        np.testing.assert_almost_equal(h5_channel[...], expected_data)
+    h5.close()
+
+
+def test_streaming_to_hdf(tmp_path):
+    """ Test conversion of channel data to HDF when streaming data from disk
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            h5_path = tmp_path / 'h5_streaming_data_test.h5'
+            h5 = tdms_file.as_hdf(h5_path)
+
+    for ((group, channel), expected_data) in expected_data.items():
+        h5_channel = h5[group][channel]
         np.testing.assert_almost_equal(h5_channel[...], expected_data)
     h5.close()
 

@@ -28,8 +28,10 @@ def test_read_channel_data(test_file, expected_data):
         tdms_data = TdmsFile.read(temp_file.file)
 
     for ((group, channel), expected_data) in expected_data.items():
-        actual_data = tdms_data[group][channel].data
+        channel_obj = tdms_data[group][channel]
+        actual_data = channel_obj.data
         assert actual_data.dtype == expected_data.dtype
+        assert channel_obj.dtype == expected_data.dtype
         compare_arrays(actual_data, expected_data)
 
 
