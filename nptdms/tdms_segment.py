@@ -7,7 +7,7 @@ from nptdms.common import toc_properties
 from nptdms.base_segment import (
     BaseSegment,
     BaseSegmentObject,
-    ChannelDataChunk,
+    RawChannelDataChunk,
     RawDataChunk,
     read_interleaved_segment_bytes,
     fromfile)
@@ -194,11 +194,11 @@ class ContiguousDataSegment(BaseSegment):
     def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
         """ Read data from a chunk for a single channel
         """
-        channel_data = ChannelDataChunk.empty()
+        channel_data = RawChannelDataChunk.empty()
         for obj in data_objects:
             number_values = self._get_channel_number_values(obj, chunk_index)
             if obj.path == channel_path:
-                channel_data = ChannelDataChunk.channel_data(obj.read_values(file, number_values))
+                channel_data = RawChannelDataChunk.channel_data(obj.read_values(file, number_values))
             elif number_values == obj.number_values:
                 # Seek over data for other channel data
                 file.seek(obj.data_size, os.SEEK_CUR)

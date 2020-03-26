@@ -12,8 +12,9 @@ from nptdms.utils import Timer, OrderedDict
 from nptdms.log import log_manager
 from nptdms.common import ObjectPath
 from nptdms.reader import TdmsReader
-from nptdms.channel_data import get_data_receiver, RawChannelData
+from nptdms.channel_data import get_data_receiver
 from nptdms.export import hdf_export, pandas_export
+from nptdms.base_segment import RawChannelDataChunk
 
 
 log = log_manager.get_logger(__name__)
@@ -158,11 +159,8 @@ class TdmsFile(object):
         channel_offsets = defaultdict(int)
         for chunk in self._reader.read_raw_data():
             yield DataChunk(self, chunk, channel_offsets)
-            for path, data in chunk.raw_data.items():
+            for path, data in chunk.channel_data.items():
                 channel_offsets[path] += len(data)
-            for path, data in chunk.daqmx_raw_data.items():
-                first_scaler_data = next(d for d in data.values())
-                channel_offsets[path] += len(first_scaler_data)
 
     def close(self):
         """ Close the underlying file if it was opened by this TdmsFile
@@ -239,14 +237,13 @@ class TdmsFile(object):
         with Timer(log, "Read data"):
             # Now actually read all the data
             for chunk in tdms_reader.read_raw_data():
-                for (path, data) in chunk.raw_data.items():
+                for (path, data) in chunk.channel_data.items():
                     channel_data = self._channel_data[path]
-                    channel_data.append_data(data)
-                for (path, data) in chunk.daqmx_raw_data.items():
-                    channel_data = self._channel_data[path]
-                    for scaler_id, scaler_data in data.items():
-                        channel_data.append_scaler_data(
-                            scaler_id, scaler_data)
+                    if data.data is not None:
+                        channel_data.append_data(data.data)
+                    elif data.scaler_data is not None:
+                        for scaler_id, scaler_data in data.scaler_data.items():
+                            channel_data.append_scaler_data(scaler_id, scaler_data)
 
             for group in self.groups():
                 for channel in group.channels():
@@ -277,10 +274,10 @@ class TdmsFile(object):
         with Timer(log, "Read data"):
             # Now actually read all the data
             for chunk in self._reader.read_raw_data_for_channel(channel.path, offset, length):
-                if chunk.raw_data is not None:
-                    channel_data.append_data(chunk.raw_data)
-                if chunk.daqmx_raw_data is not None:
-                    for scaler_id, scaler_data in chunk.daqmx_raw_data.items():
+                if chunk.data is not None:
+                    channel_data.append_data(chunk.data)
+                if chunk.scaler_data is not None:
+                    for scaler_id, scaler_data in chunk.scaler_data.items():
                         channel_data.append_scaler_data(scaler_id, scaler_data)
 
         return channel_data
@@ -797,18 +794,13 @@ class ChannelDataChunk(object):
         self.name = channel.name
         self.offset = offset
         try:
-            raw_data = raw_data_chunk.raw_data[channel.path]
+            self._raw_data = raw_data_chunk.channel_data[channel.path]
         except KeyError:
-            raw_data = None
-        try:
-            daqmx_raw_data = raw_data_chunk.daqmx_raw_data[channel.path]
-        except KeyError:
-            daqmx_raw_data = None
-        self._raw_data = RawChannelData(raw_data, daqmx_raw_data)
+            self._raw_data = RawChannelDataChunk.empty()
         self._scaled_data = None
 
     def __len__(self):
-        return len(self._data())
+        return len(self._raw_data)
 
     def __getitem__(self, index):
         return self._data()[index]

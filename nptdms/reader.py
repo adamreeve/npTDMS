@@ -4,7 +4,7 @@
 import numpy as np
 from nptdms.utils import Timer, OrderedDict
 from nptdms.tdms_segment import read_segment_metadata
-from nptdms.base_segment import ChannelDataChunk
+from nptdms.base_segment import RawChannelDataChunk
 from nptdms.log import log_manager
 
 log = log_manager.get_logger(__name__)
@@ -75,7 +75,7 @@ class TdmsReader(object):
     def read_raw_data(self):
         """ Read raw data from all segments, chunk by chunk
 
-        :returns: A generator that yields DataChunk objects
+        :returns: A generator that yields RawDataChunk objects
         """
         if self._segments is None:
             raise RuntimeError(
@@ -92,7 +92,7 @@ class TdmsReader(object):
         :param length: Number of values to attempt to read.
             If None, then all values starting from the offset will be read.
             Fewer values will be returned if attempting to read beyond the end of the available data.
-        :returns: A generator that yields ChannelDataChunk objects
+        :returns: A generator that yields RawChannelDataChunk objects
         """
         if self._segments is None:
             raise RuntimeError("Cannot read data unless metadata has first been read")
@@ -262,12 +262,12 @@ class ObjectMetadata(object):
 def _trim_channel_chunk(chunk, skip=0, trim=0):
     if skip == 0 and trim == 0:
         return chunk
-    raw_data = None
-    daqmx_raw_data = None
-    if chunk.raw_data is not None:
-        raw_data = chunk.raw_data[skip:len(chunk.raw_data) - trim]
-    if chunk.daqmx_raw_data is not None:
-        daqmx_raw_data = {
+    data = None
+    scaler_data = None
+    if chunk.data is not None:
+        data = chunk.data[skip:len(chunk.data) - trim]
+    if chunk.scaler_data is not None:
+        scaler_data = {
             scale_id: d[skip:len(d) - trim]
-            for (scale_id, d) in chunk.daqmx_raw_data.items()}
-    return ChannelDataChunk(raw_data, daqmx_raw_data)
+            for (scale_id, d) in chunk.scaler_data.items()}
+    return RawChannelDataChunk(data, scaler_data)

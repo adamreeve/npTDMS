@@ -207,12 +207,12 @@ class BaseSegment(object):
         :param channel_path: Path of channel to read data for
         :param chunk_offset: Index of chunk to begin reading from
         :param num_chunks: Number of chunks to read, or None to read to the end
-        :returns: A generator of ChannelDataChunk objects with raw channel data for
+        :returns: A generator of RawChannelDataChunk objects with raw channel data for
             a single channel in this segment.
         """
 
         if not self.toc_mask & toc_properties['kTocRawData']:
-            yield ChannelDataChunk.empty()
+            yield RawChannelDataChunk.empty()
 
         f.seek(self.data_position)
 
@@ -277,14 +277,9 @@ class BaseSegment(object):
         # Derived classes can implement more optimised reading.
         data_chunk = self._read_data_chunk(file, data_objects, chunk_index)
         try:
-            if data_chunk.raw_data:
-                return ChannelDataChunk.channel_data(data_chunk.raw_data[channel_path])
-            elif data_chunk.daqmx_raw_data:
-                return ChannelDataChunk.scaler_data(data_chunk.daqmx_raw_data[channel_path])
-            else:
-                return ChannelDataChunk.empty()
+            return data_chunk.channel_data[channel_path]
         except KeyError:
-            return ChannelDataChunk.empty()
+            return RawChannelDataChunk.empty()
 
     def _new_segment_object(self, object_path):
         """ Create a new segment object for a segment
@@ -328,53 +323,64 @@ class BaseSegmentObject(object):
 class RawDataChunk(object):
     """Data read from a single chunk in a TDMS segment
 
-    :ivar raw_data: A dictionary of object data in this chunk for standard
-        TDMS channels. Keys are object paths and values are numpy arrays.
-    :ivar daqmx_raw_data: A dictionary of data in this segment for
-        DAQmx raw data. Keys are object paths and values are dictionaries of
-        numpy arrays keyed by scaler id.
+    :ivar channel_data: A dictionary of channel data chunks.
+        Keys are object paths and values are RawChannelDataChunk instances.
     """
 
-    def __init__(self, data, daqmx_data):
-        self.raw_data = data
-        self.daqmx_raw_data = daqmx_data
+    def __init__(self, channel_data):
+        self.channel_data = channel_data
 
     @staticmethod
     def empty():
-        return RawDataChunk({}, {})
+        return RawDataChunk({})
 
     @staticmethod
     def channel_data(data):
-        return RawDataChunk(data, {})
+        channel_chunks = {
+            path: RawChannelDataChunk.channel_data(d)
+            for (path, d) in data.items()
+        }
+        return RawDataChunk(channel_chunks)
 
     @staticmethod
     def scaler_data(data):
-        return RawDataChunk({}, data)
+        channel_chunks = {
+            path: RawChannelDataChunk.scaler_data(d)
+            for (path, d) in data.items()
+        }
+        return RawDataChunk(channel_chunks)
 
 
-class ChannelDataChunk(object):
+class RawChannelDataChunk(object):
     """Data read for a single channel from a single chunk in a TDMS segment
 
-    :ivar raw_data: Raw data in this chunk for a standard TDMS channel.
-    :ivar daqmx_raw_data: A dictionary of scaler data in this segment for
+    :ivar data: Raw data in this chunk for a standard TDMS channel.
+    :ivar scaler_data: A dictionary of scaler data in this segment for
         DAQmx raw data. Keys are the scaler id and values are data arrays.
     """
 
-    def __init__(self, data, daqmx_data):
-        self.raw_data = data
-        self.daqmx_raw_data = daqmx_data
+    def __init__(self, data, scaler_data):
+        self.data = data
+        self.scaler_data = scaler_data
+
+    def __len__(self):
+        if self.data is not None:
+            return len(self.data)
+        elif self.scaler_data is not None:
+            return next(len(d) for d in self.scaler_data.values())
+        return 0
 
     @staticmethod
     def empty():
-        return ChannelDataChunk(None, None)
+        return RawChannelDataChunk(None, None)
 
     @staticmethod
     def channel_data(data):
-        return ChannelDataChunk(data, None)
+        return RawChannelDataChunk(data, None)
 
     @staticmethod
     def scaler_data(data):
-        return ChannelDataChunk(None, data)
+        return RawChannelDataChunk(None, data)
 
 
 def read_property(f, endianness="<"):
