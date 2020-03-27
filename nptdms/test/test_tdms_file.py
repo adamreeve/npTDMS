@@ -323,9 +323,10 @@ def test_string_data():
     test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
-    data = tdms_data["Group"]["StringChannel"].data
-    assert len(data) == len(strings)
-    for expected, read in zip(strings, data):
+    channel = tdms_data["Group"]["StringChannel"]
+    assert len(channel.data) == len(strings)
+    assert channel.data.dtype == channel.dtype
+    for expected, read in zip(strings, channel.data):
         assert expected == read
 
 

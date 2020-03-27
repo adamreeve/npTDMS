@@ -25,7 +25,7 @@ def get_data_receiver(obj, num_values, memmap_dir=None):
         return DaqmxDataReceiver(obj, num_values, memmap_dir)
 
     if obj.data_type.nptype is None:
-        return ListDataReceiver()
+        return ListDataReceiver(obj)
 
     return NumpyDataReceiver(obj, num_values, memmap_dir)
 
@@ -37,9 +37,13 @@ class ListDataReceiver(object):
        :ivar data: List of data points
     """
 
-    def __init__(self):
+    def __init__(self, channel):
         """Initialise new data receiver for a TDMS object
         """
+        if channel.data_type == types.String:
+            self._dtype = np.dtype('O')
+        else:
+            self._dtype = None
         self._data = []
         self.scaler_data = {}
 
@@ -50,7 +54,7 @@ class ListDataReceiver(object):
 
     @property
     def data(self):
-        return np.array(self._data)
+        return np.array(self._data, dtype=self._dtype)
 
 
 class NumpyDataReceiver(object):
