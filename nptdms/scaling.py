@@ -388,9 +388,9 @@ class MultiScaling(object):
         if scale_index == RAW_DATA_INPUT_SOURCE:
             return raw_data_type.nptype
         scaling = self.scalings[scale_index]
-        if scaling is DaqMxScalerScaling:
-            return scaler_data_types[scaling.input_source].nptype
-        elif scaling is AddScaling or scaling is SubtractScaling:
+        if isinstance(scaling, DaqMxScalerScaling):
+            return scaler_data_types[scaling.scale_id].nptype
+        elif isinstance(scaling, AddScaling) or isinstance(scaling, SubtractScaling):
             return np.result_type(
                 self._compute_scale_dtype(scaling.left_input_source, raw_data_type, scaler_data_types),
                 self._compute_scale_dtype(scaling.right_input_source, raw_data_type, scaler_data_types))

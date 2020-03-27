@@ -3,6 +3,7 @@
 import numpy as np
 import pytest
 
+from nptdms import types
 from nptdms.scaling import get_scaling
 
 try:
@@ -31,7 +32,7 @@ def test_unsupported_scaling_type():
 def test_linear_scaling():
     """Test linear scaling"""
 
-    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
+    data = StubTdmsData(np.array([1, 2, 3], dtype=np.dtype('int32')))
     expected_scaled_data = np.array([12.0, 14.0, 16.0])
 
     properties = {
@@ -43,13 +44,15 @@ def test_linear_scaling():
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
+    assert scaling.get_dtype(types.Int32, None) == np.dtype('float64')
+    assert scaled_data.dtype == np.dtype('float64')
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
 
 
 def test_polynomial_scaling():
     """Test polynomial scaling"""
 
-    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
+    data = StubTdmsData(np.array([1, 2, 3], dtype=np.dtype('int32')))
     expected_scaled_data = np.array([16.0, 44.0, 112.0])
 
     properties = {
@@ -63,13 +66,15 @@ def test_polynomial_scaling():
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
+    assert scaling.get_dtype(types.Int32, None) == np.dtype('float64')
+    assert scaled_data.dtype == np.dtype('float64')
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
 
 
 def test_polynomial_scaling_with_3_coefficients():
     """Test polynomial scaling"""
 
-    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
+    data = StubTdmsData(np.array([1, 2, 3], dtype=np.dtype('int32')))
     expected_scaled_data = np.array([13.0, 20.0, 31.0])
 
     properties = {
@@ -117,6 +122,7 @@ def test_rtd_scaling(resistance_configuration, lead_resistance, expected_data):
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
+    assert scaling.get_dtype(types.DoubleFloat, None) == np.dtype('float64')
     np.testing.assert_almost_equal(expected_data, scaled_data, decimal=3)
 
 
@@ -145,6 +151,7 @@ def test_table_scaling():
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
+    assert scaling.get_dtype(types.DoubleFloat, None) == np.dtype('float64')
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
 
 
@@ -152,8 +159,8 @@ def test_add_scaling():
     """ Test scaling that adds two input scalings"""
 
     scaler_data = StubDaqmxData({
-        0: np.array([1.0, 2.0, 3.0]),
-        1: np.array([2.0, 4.0, 6.0]),
+        0: np.array([1, 2, 3], dtype=np.dtype('int32')),
+        1: np.array([2, 4, 6], dtype=np.dtype('uint32')),
     })
     expected_scaled_data = np.array([3.0, 6.0, 9.0])
 
@@ -166,7 +173,29 @@ def test_add_scaling():
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(scaler_data)
 
+    assert scaling.get_dtype(None, {0: types.Int32, 1: types.Uint32}) == np.dtype('int64')
+    assert scaled_data.dtype == np.dtype('int64')
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+
+
+def test_add_scaling_with_default_inputs():
+    """ Test scaling that adds two input scalings"""
+
+    data = StubTdmsData(np.array([1, 2, 3], dtype=np.dtype('int32')))
+    expected_scaled_data = np.array([2, 4, 6])
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Add",
+        "NI_Scale[0]_Add_Left_Operand_Input_Source": 0xFFFFFFFF,
+        "NI_Scale[0]_Add_Right_Operand_Input_Source": 0xFFFFFFFF,
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(data)
+
+    assert scaling.get_dtype(types.Int32, None) == np.dtype('int32')
+    assert scaled_data.dtype == np.dtype('int32')
+    np.testing.assert_equal(expected_scaled_data, scaled_data)
 
 
 def test_subtract_scaling():
@@ -175,8 +204,8 @@ def test_subtract_scaling():
     # This behaves the opposite to what you'd expect, the left operand
     # is subtracted from the right operand.
     scaler_data = StubDaqmxData({
-        0: np.array([1.0, 2.0, 3.0]),
-        1: np.array([2.0, 4.0, 6.0]),
+        0: np.array([1, 2, 3], dtype=np.dtype('int32')),
+        1: np.array([2, 4, 6], dtype=np.dtype('uint32')),
     })
     expected_scaled_data = np.array([1.0, 2.0, 3.0])
 
@@ -189,6 +218,8 @@ def test_subtract_scaling():
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(scaler_data)
 
+    assert scaling.get_dtype(None, {0: types.Int32, 1: types.Uint32}) == np.dtype('int64')
+    assert scaled_data.dtype == np.dtype('int64')
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
 
 
