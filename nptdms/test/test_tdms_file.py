@@ -157,7 +157,7 @@ def test_stream_data_chunks(test_file, expected_data):
         compare_arrays(actual_data, expected_data)
 
 
-def test_indexing_into_data_chunks():
+def test_indexing_and_iterating_data_chunks():
     """Test streaming chunks of data from a TDMS file and indexing into chunks
     """
     test_file, expected_data = scenarios.single_segment_with_two_channels().values
@@ -168,7 +168,7 @@ def test_indexing_into_data_chunks():
                 for (group, channel) in expected_data.keys():
                     key = (group, channel)
                     channel_chunk = chunk[group][channel]
-                    data_arrays[key].extend(channel_chunk[:])
+                    data_arrays[key].extend(list(channel_chunk))
 
     for ((group, channel), expected_data) in expected_data.items():
         actual_data = data_arrays[(group, channel)]

@@ -735,6 +735,10 @@ class DataChunk(object):
 
     Can be indexed by group name to get the data for a group in this channel,
     which can then be indexed by channel name to get the data for a channel in this chunk.
+    For example::
+
+        group_chunk = data_chunk[group_name]
+        channel_chunk = group_chunk[channel_name]
     """
     def __init__(self, tdms_file, raw_data_chunk, channel_offsets):
         self._groups = OrderedDict(
@@ -756,6 +760,9 @@ class GroupDataChunk(object):
     """ A chunk of data for a group in a TDMS file
 
     Can be indexed by channel name to get the data for a channel in this chunk.
+    For example::
+
+        channel_chunk = group_chunk[channel_name]
 
     :ivar ~.name: Name of the group
     """
@@ -804,6 +811,9 @@ class ChannelDataChunk(object):
 
     def __getitem__(self, index):
         return self._data()[index]
+
+    def __iter__(self):
+        return iter(self._data())
 
     def _data(self):
         if self._scaled_data is not None:

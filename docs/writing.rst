@@ -7,22 +7,22 @@ speeding up the writing of files and minimising file size are not
 implemented by npTDMS, but the basic functionality required to
 write TDMS files is available.
 
-To write a TDMS file, the :py:class:`nptdms.TdmsWriter` class is used, which
+To write a TDMS file, the :py:class:`~nptdms.TdmsWriter` class is used, which
 should be used as a context manager.
-The ``__init__`` method accepts the path to the file to create, or a file
+The :py:meth:`~nptdms.TdmsWriter.__init__` method accepts the path to the file to create, or a file
 that has already been opened in binary write mode::
 
     with TdmsWriter("my_file.tdms") as tdms_writer:
         # write data
 
-The :py:meth:`nptdms.TdmsWriter.write_segment` method is used to write
+The :py:meth:`~nptdms.TdmsWriter.write_segment` method is used to write
 a segment of data to the TDMS file. Because the TDMS file format is designed
 for streaming data applications, it supports writing data one segment at a time
 as data becomes available.
 If you don't require this functionality you can simple call ``write_segment`` once
 with all of your data.
 
-The ``write_segment`` method takes a list of objects, each of which must be an
+The :py:meth:`~nptdms.TdmsWriter.write_segment` method takes a list of objects, each of which must be an
 instance of one of:
 
 - :py:class:`nptdms.RootObject`. This is the TDMS root object, and there may only be one root object in a segment.
@@ -69,7 +69,7 @@ is given below::
             channel_object])
 
 You could also read a TDMS file and then re-write it by passing
-:py:class:`nptdms.TdmsGroup` and :py:class:`nptdms.TdmsChannel`
+:py:class:`~nptdms.TdmsGroup` and :py:class:`~nptdms.TdmsChannel`
 instances to the ``write_segment`` method. If you want
 to only copy certain channels for example, you could do something like::
 
@@ -83,3 +83,6 @@ to only copy certain channels for example, you could do something like::
         root_object = RootObject(original_file.properties)
         channels_to_copy = [chan for chan in original_channels if include_channel(chan)]
         copied_file.write_segment([root_object] + original_groups + channels_to_copy)
+
+Note that this isn't suitable for copying channels with scaled data, as the channel data
+will already have scaling applied.

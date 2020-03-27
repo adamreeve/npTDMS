@@ -7,5 +7,5 @@ from __future__ import absolute_import
 from .version import __version_info__, __version__
 
 # Export public objects
-from .tdms import TdmsFile, TdmsGroup, TdmsChannel
+from .tdms import TdmsFile, TdmsGroup, TdmsChannel, DataChunk, GroupDataChunk, ChannelDataChunk
 from .writer import TdmsWriter, RootObject, GroupObject, ChannelObject
