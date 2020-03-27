@@ -157,6 +157,24 @@ def test_stream_data_chunks(test_file, expected_data):
         compare_arrays(actual_data, expected_data)
 
 
+def test_indexing_into_data_chunks():
+    """Test streaming chunks of data from a TDMS file and indexing into chunks
+    """
+    test_file, expected_data = scenarios.single_segment_with_two_channels().values
+    data_arrays = defaultdict(list)
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for chunk in tdms_file.data_chunks():
+                for (group, channel) in expected_data.keys():
+                    key = (group, channel)
+                    channel_chunk = chunk[group][channel]
+                    data_arrays[key].extend(channel_chunk[:])
+
+    for ((group, channel), expected_data) in expected_data.items():
+        actual_data = data_arrays[(group, channel)]
+        compare_arrays(actual_data, expected_data)
+
+
 def test_invalid_offset_throws():
     """ Exception is thrown when reading a subset of data with an invalid offset
     """
