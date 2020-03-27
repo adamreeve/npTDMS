@@ -1,6 +1,7 @@
 """Test reading of TDMS files with DAQmx data
 """
 
+from collections import defaultdict
 import numpy as np
 
 from nptdms import TdmsFile
@@ -523,6 +524,52 @@ def test_lazily_reading_a_subset_of_raw_channel_data():
             assert len(data_2) == 1
             assert data_2[0].dtype == np.int16
             np.testing.assert_array_equal(data_2[0], [18, 19])
+
+
+def test_stream_data_chunks():
+    """Test streaming chunks of DAQmx data from a TDMS file
+    """
+    properties = {
+        "NI_Number_Of_Scales": (3, "01 00 00 00"),
+    }
+    scaler_1 = daqmx_scaler_metadata(0, 3, 0)
+    scaler_2 = daqmx_scaler_metadata(0, 3, 2)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 4, [4], [scaler_1], properties),
+        daqmx_channel_metadata("Channel2", 4, [4], [scaler_2], properties))
+    data = (
+        # Data for segment
+        "01 00" "11 00"
+        "02 00" "12 00"
+        "03 00" "13 00"
+        "04 00" "14 00"
+        "05 00" "15 00"
+        "06 00" "16 00"
+        "07 00" "17 00"
+        "08 00" "18 00"
+    )
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc(), metadata, data)
+    data_arrays = defaultdict(list)
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for chunk in tdms_file.data_chunks():
+                for group in chunk.groups():
+                    for channel in group.channels():
+                        key = (group.name, channel.name)
+                        assert channel.offset == len(data_arrays[key])
+                        data_arrays[key].extend(channel[:])
+
+    expected_channel_data = {
+        ("Group", "Channel1"): [1, 2, 3, 4, 5, 6, 7, 8],
+        ("Group", "Channel2"): [17, 18, 19, 20, 21, 22, 23, 24],
+    }
+    for ((group, channel), expected_data) in expected_channel_data.items():
+        actual_data = data_arrays[(group, channel)]
+        np.testing.assert_equal(actual_data, expected_data)
 
 
 def segment_toc():

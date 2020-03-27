@@ -3,16 +3,18 @@
     This module contains the public facing API for reading TDMS files
 """
 
+from collections import defaultdict
 import warnings
 import numpy as np
 
-from nptdms import scaling
+from nptdms import scaling, types
 from nptdms.utils import Timer, OrderedDict
 from nptdms.log import log_manager
 from nptdms.common import ObjectPath
 from nptdms.reader import TdmsReader
 from nptdms.channel_data import get_data_receiver
 from nptdms.export import hdf_export, pandas_export
+from nptdms.base_segment import RawChannelDataChunk
 
 
 log = log_manager.get_logger(__name__)
@@ -91,6 +93,7 @@ class TdmsFile(object):
         self._properties = {}
         self._channel_data = {}
         self._reader = None
+        self.data_read = False
 
         reader = TdmsReader(file)
         try:
@@ -143,6 +146,21 @@ class TdmsFile(object):
         :param group: A group in the HDF5 file that will contain the TDMS data.
         """
         return hdf_export.from_tdms_file(self, filepath, mode, group)
+
+    def data_chunks(self):
+        """ A generator that streams chunks of data from disk.
+        This method may only be used when the TDMS file was opened without reading all data immediately.
+
+        :rtype: Generator that yields :class:`DataChunk` objects
+        """
+        if self._reader is None:
+            raise RuntimeError(
+                "Cannot read data chunks after the underlying TDMS reader is closed")
+        channel_offsets = defaultdict(int)
+        for chunk in self._reader.read_raw_data():
+            yield DataChunk(self, chunk, channel_offsets)
+            for path, data in chunk.channel_data.items():
+                channel_offsets[path] += len(data)
 
     def close(self):
         """ Close the underlying file if it was opened by this TdmsFile
@@ -219,20 +237,21 @@ class TdmsFile(object):
         with Timer(log, "Read data"):
             # Now actually read all the data
             for chunk in tdms_reader.read_raw_data():
-                for (path, data) in chunk.raw_data.items():
+                for (path, data) in chunk.channel_data.items():
                     channel_data = self._channel_data[path]
-                    channel_data.append_data(data)
-                for (path, data) in chunk.daqmx_raw_data.items():
-                    channel_data = self._channel_data[path]
-                    for scaler_id, scaler_data in data.items():
-                        channel_data.append_scaler_data(
-                            scaler_id, scaler_data)
+                    if data.data is not None:
+                        channel_data.append_data(data.data)
+                    elif data.scaler_data is not None:
+                        for scaler_id, scaler_data in data.scaler_data.items():
+                            channel_data.append_scaler_data(scaler_id, scaler_data)
 
             for group in self.groups():
                 for channel in group.channels():
                     channel_data = self._channel_data[channel.path]
                     if channel_data is not None:
                         channel._set_raw_data(channel_data)
+
+        self.data_read = True
 
     def _read_channel_data(self, channel, offset=0, length=None):
         if offset < 0:
@@ -255,10 +274,10 @@ class TdmsFile(object):
         with Timer(log, "Read data"):
             # Now actually read all the data
             for chunk in self._reader.read_raw_data_for_channel(channel.path, offset, length):
-                if chunk.raw_data is not None:
-                    channel_data.append_data(chunk.raw_data)
-                if chunk.daqmx_raw_data is not None:
-                    for scaler_id, scaler_data in chunk.daqmx_raw_data.items():
+                if chunk.data is not None:
+                    channel_data.append_data(chunk.data)
+                if chunk.scaler_data is not None:
+                    for scaler_id, scaler_data in chunk.scaler_data.items():
                         channel_data.append_scaler_data(scaler_id, scaler_data)
 
         return channel_data
@@ -490,6 +509,24 @@ class TdmsChannel(object):
         return self._path.channel
 
     @_property_builtin
+    def dtype(self):
+        """ NumPy data type of the channel data
+
+        For data with a scaling this is the data type of the scaled data
+
+        :rtype: numpy.dtype
+        """
+        if self.data_type is types.String:
+            return np.dtype('O')
+        elif self.data_type is types.TimeStamp:
+            return np.dtype('<M8[us]')
+
+        channel_scaling = self._get_scaling()
+        if channel_scaling is not None:
+            return channel_scaling.get_dtype(self.data_type, self.scaler_data_types)
+        return self.data_type.nptype
+
+    @_property_builtin
     def data(self):
         """
         NumPy array containing the data for this channel
@@ -498,7 +535,7 @@ class TdmsChannel(object):
             raise RuntimeError("Channel data has not been read")
 
         if self._raw_data is None:
-            return np.empty((0, 1))
+            return np.empty((0, ))
         if self._data_scaled is None:
             self._data_scaled = self._scale_data(self._raw_data)
         return self._data_scaled
@@ -513,7 +550,7 @@ class TdmsChannel(object):
             raise RuntimeError("Channel data has not been read")
 
         if self._raw_data is None:
-            return np.empty((0, 1))
+            return np.empty((0, ))
         if self._raw_data.scaler_data:
             if len(self._raw_data.scaler_data) == 1:
                 return next(v for v in self._raw_data.scaler_data.values())
@@ -691,6 +728,114 @@ class TdmsChannel(object):
         """(Deprecated)"""
         _deprecated("TdmsChannel.number_values", "Use len(channel)")
         return self._length
+
+
+class DataChunk(object):
+    """ A chunk of data in a TDMS file
+
+    Can be indexed by group name to get the data for a group in this channel,
+    which can then be indexed by channel name to get the data for a channel in this chunk.
+    For example::
+
+        group_chunk = data_chunk[group_name]
+        channel_chunk = group_chunk[channel_name]
+    """
+    def __init__(self, tdms_file, raw_data_chunk, channel_offsets):
+        self._groups = OrderedDict(
+            (group.name, GroupDataChunk(tdms_file, group, raw_data_chunk, channel_offsets))
+            for group in tdms_file.groups())
+
+    def __getitem__(self, group_name):
+        return self._groups[group_name]
+
+    def groups(self):
+        """ Returns chunks of data for a group
+
+        :rtype: List of :class:`GroupDataChunk`
+        """
+        return list(self._groups.values())
+
+
+class GroupDataChunk(object):
+    """ A chunk of data for a group in a TDMS file
+
+    Can be indexed by channel name to get the data for a channel in this chunk.
+    For example::
+
+        channel_chunk = group_chunk[channel_name]
+
+    :ivar ~.name: Name of the group
+    """
+    def __init__(self, tdms_file, group, raw_data_chunk, channel_offsets):
+        self.name = group.name
+        self._channels = OrderedDict(
+            (channel.name, ChannelDataChunk(tdms_file, channel, raw_data_chunk, channel_offsets[channel.path]))
+            for channel in group.channels())
+
+    def __getitem__(self, channel_name):
+        return self._channels[channel_name]
+
+    def channels(self):
+        """ Returns chunks of channel data
+
+        :rtype: List of :class:`ChannelDataChunk`
+        """
+        return list(self._channels.values())
+
+
+class ChannelDataChunk(object):
+    """ A chunk of data for a channel in a TDMS file
+
+    Is an array-like object that supports indexing to access data, for example::
+
+        chunk_length = len(channel_data_chunk)
+        chunk_data = channel_data_chunk[:]
+
+    :ivar ~.name: Name of the channel
+    :ivar ~.offset: Starting index of this chunk of data in the entire channel
+    """
+    def __init__(self, tdms_file, channel, raw_data_chunk, offset):
+        self._path = channel._path
+        self._tdms_file = tdms_file
+        self._channel = channel
+        self.name = channel.name
+        self.offset = offset
+        try:
+            self._raw_data = raw_data_chunk.channel_data[channel.path]
+        except KeyError:
+            self._raw_data = RawChannelDataChunk.empty()
+        self._scaled_data = None
+
+    def __len__(self):
+        return len(self._raw_data)
+
+    def __getitem__(self, index):
+        return self._data()[index]
+
+    def __iter__(self):
+        return iter(self._data())
+
+    def _data(self):
+        if self._scaled_data is not None:
+            return self._scaled_data
+        if self._raw_data.data is None and self._raw_data.scaler_data is None:
+            return np.empty((0, ))
+
+        scale = self._get_scaling()
+        if scale is not None:
+            self._scaled_data = scale.scale(self._raw_data)
+        elif self._raw_data.scaler_data:
+            raise ValueError("Missing scaling information for DAQmx data")
+        else:
+            self._scaled_data = self._raw_data.data
+        return self._scaled_data
+
+    def _get_scaling(self):
+        file_properties = self._tdms_file.properties
+        group_properties = self._tdms_file[self._path.group].properties
+        channel_properties = self._channel.properties
+        return scaling.get_scaling(
+            channel_properties, group_properties, file_properties)
 
 
 class RootObject(object):

@@ -1,5 +1,6 @@
 """Test reading of example TDMS files"""
 
+from collections import defaultdict
 import os
 import tempfile
 from hypothesis import (assume, given, example, strategies)
@@ -27,8 +28,10 @@ def test_read_channel_data(test_file, expected_data):
         tdms_data = TdmsFile.read(temp_file.file)
 
     for ((group, channel), expected_data) in expected_data.items():
-        actual_data = tdms_data[group][channel].data
+        channel_obj = tdms_data[group][channel]
+        actual_data = channel_obj.data
         assert actual_data.dtype == expected_data.dtype
+        assert channel_obj.dtype == expected_data.dtype
         compare_arrays(actual_data, expected_data)
 
 
@@ -133,6 +136,43 @@ def test_reading_subset_of_data_for_scenario(test_file, expected_data, offset, l
             for ((group, channel), expected_data) in expected_data.items():
                 actual_data = tdms_file[group][channel].read_data(offset, length)
                 compare_arrays(actual_data, expected_data[offset:offset + length])
+
+
+@pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
+def test_stream_data_chunks(test_file, expected_data):
+    """Test streaming chunks of data from a TDMS file
+    """
+    data_arrays = defaultdict(list)
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for chunk in tdms_file.data_chunks():
+                for group in chunk.groups():
+                    for channel in group.channels():
+                        key = (group.name, channel.name)
+                        assert channel.offset == len(data_arrays[key])
+                        data_arrays[key].extend(channel[:])
+
+    for ((group, channel), expected_data) in expected_data.items():
+        actual_data = data_arrays[(group, channel)]
+        compare_arrays(actual_data, expected_data)
+
+
+def test_indexing_and_iterating_data_chunks():
+    """Test streaming chunks of data from a TDMS file and indexing into chunks
+    """
+    test_file, expected_data = scenarios.single_segment_with_two_channels().values
+    data_arrays = defaultdict(list)
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for chunk in tdms_file.data_chunks():
+                for (group, channel) in expected_data.keys():
+                    key = (group, channel)
+                    channel_chunk = chunk[group][channel]
+                    data_arrays[key].extend(list(channel_chunk))
+
+    for ((group, channel), expected_data) in expected_data.items():
+        actual_data = data_arrays[(group, channel)]
+        compare_arrays(actual_data, expected_data)
 
 
 def test_invalid_offset_throws():
@@ -301,9 +341,10 @@ def test_string_data():
     test_file.add_segment(toc, metadata, data)
     tdms_data = test_file.load()
 
-    data = tdms_data["Group"]["StringChannel"].data
-    assert len(data) == len(strings)
-    for expected, read in zip(strings, data):
+    channel = tdms_data["Group"]["StringChannel"]
+    assert len(channel.data) == len(strings)
+    assert channel.data.dtype == channel.dtype
+    for expected, read in zip(strings, channel.data):
         assert expected == read
 
 

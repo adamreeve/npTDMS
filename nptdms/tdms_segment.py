@@ -7,8 +7,8 @@ from nptdms.common import toc_properties
 from nptdms.base_segment import (
     BaseSegment,
     BaseSegmentObject,
-    ChannelDataChunk,
-    DataChunk,
+    RawChannelDataChunk,
+    RawDataChunk,
     read_interleaved_segment_bytes,
     fromfile)
 from nptdms.daqmx import DaqmxSegment
@@ -152,7 +152,7 @@ class InterleavedDataSegment(BaseSegment):
             channel_data[obj.path] = object_data
             data_pos += obj.data_type.size
 
-        return DataChunk.channel_data(channel_data)
+        return RawDataChunk.channel_data(channel_data)
 
     def _read_interleaved(self, file, data_objects):
         """Read interleaved data that doesn't have a numpy type"""
@@ -171,7 +171,7 @@ class InterleavedDataSegment(BaseSegment):
                         obj.read_value(file))
                     points_added[obj.path] += 1
 
-        return DataChunk.channel_data(object_data)
+        return RawDataChunk.channel_data(object_data)
 
 
 class ContiguousDataSegment(BaseSegment):
@@ -189,16 +189,16 @@ class ContiguousDataSegment(BaseSegment):
         for obj in data_objects:
             number_values = self._get_channel_number_values(obj, chunk_index)
             object_data[obj.path] = obj.read_values(file, number_values)
-        return DataChunk.channel_data(object_data)
+        return RawDataChunk.channel_data(object_data)
 
     def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
         """ Read data from a chunk for a single channel
         """
-        channel_data = ChannelDataChunk.empty()
+        channel_data = RawChannelDataChunk.empty()
         for obj in data_objects:
             number_values = self._get_channel_number_values(obj, chunk_index)
             if obj.path == channel_path:
-                channel_data = ChannelDataChunk.channel_data(obj.read_values(file, number_values))
+                channel_data = RawChannelDataChunk.channel_data(obj.read_values(file, number_values))
             elif number_values == obj.number_values:
                 # Seek over data for other channel data
                 file.seek(obj.data_size, os.SEEK_CUR)

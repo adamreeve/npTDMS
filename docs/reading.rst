@@ -79,6 +79,23 @@ For example, to read 200 data points, beginning at offset 1,000::
         length = 200
         channel_data = channel.read_data(offset, length)
 
+Alternatively, you may have an application where you wish to stream all data chunk by chunk.
+:py:meth:`~nptdms.TdmsFile.data_chunks` is a generator that produces instances of
+:py:class:`~nptdms.DataChunk`, which can be used after opening a TDMS file with
+:py:meth:`~nptdms.TdmsFile.open`.
+For example, to compute the mean of a channel::
+
+    channel_sum = 0.0
+    channel_length = 0
+    with TdmsFile.open(tdms_file_path) as tdms_file:
+        for chunk in tdms_file.data_chunks():
+            channel_chunk = chunk[group_name][channel_name]
+            channel_length += len(channel_chunk)
+            channel_sum += channel_chunk[:].sum()
+    channel_mean = channel_sum / channel_length
+
+This approach can also be useful to stream TDMS data to another format on disk or into a data store.
+
 In cases where you don't need to read the file data and only need to read metadata, you can
 also use the static :py:meth:`~nptdms.TdmsFile.read_metadata` method::
 

@@ -61,6 +61,8 @@ class PolynomialScaling(object):
         return PolynomialScaling(coefficients, input_source)
 
     def scale(self, data):
+        # Ensure data is double type before scaling
+        data = data.astype(np.dtype('float64'), copy=False)
         return np.polynomial.polynomial.polyval(data, self.coefficients)
 
 
@@ -229,7 +231,7 @@ class ThermistorScaling(object):
         """ Convert voltage data to temperature in Kelvin
         """
         # Ensure data is double precision
-        data = data.astype(np.float64, copy=False)
+        data = data.astype(np.dtype('float64'), copy=False)
         if self.excitation_type == CURRENT_EXCITATION:
             r_t = data / self.excitation_value
         elif self.excitation_type == VOLTAGE_EXCITATION:
@@ -375,6 +377,26 @@ class MultiScaling(object):
     def scale(self, raw_channel_data):
         final_scale = len(self.scalings) - 1
         return self._compute_scaled_data(final_scale, raw_channel_data)
+
+    def get_dtype(self, raw_data_type, scaler_data_types):
+        """ Get the numpy dtype for scaled data
+        """
+        final_scale = len(self.scalings) - 1
+        return self._compute_scale_dtype(final_scale, raw_data_type, scaler_data_types)
+
+    def _compute_scale_dtype(self, scale_index, raw_data_type, scaler_data_types):
+        if scale_index == RAW_DATA_INPUT_SOURCE:
+            return raw_data_type.nptype
+        scaling = self.scalings[scale_index]
+        if isinstance(scaling, DaqMxScalerScaling):
+            return scaler_data_types[scaling.scale_id].nptype
+        elif isinstance(scaling, AddScaling) or isinstance(scaling, SubtractScaling):
+            return np.result_type(
+                self._compute_scale_dtype(scaling.left_input_source, raw_data_type, scaler_data_types),
+                self._compute_scale_dtype(scaling.right_input_source, raw_data_type, scaler_data_types))
+        else:
+            # Any other scaling type should produce double data
+            return np.dtype('float64')
 
     def _compute_scaled_data(self, scale_index, raw_channel_data):
         """ Compute output data from a single scale in the set of all scalings,

@@ -3,7 +3,7 @@ import numpy as np
 
 from nptdms import types
 from nptdms.base_segment import (
-    BaseSegment, BaseSegmentObject, DataChunk, read_interleaved_segment_bytes)
+    BaseSegment, BaseSegmentObject, RawDataChunk, read_interleaved_segment_bytes)
 from nptdms.log import log_manager
 
 
@@ -78,7 +78,7 @@ class DaqmxSegment(BaseSegment):
                         scaler.data_type.nptype.newbyteorder(self.endianness))
                     scaler_data[obj.path][scaler.scale_id] = this_scaler_data
 
-        return DataChunk.scaler_data(scaler_data)
+        return RawDataChunk.scaler_data(scaler_data)
 
 
 class DaqmxSegmentObject(BaseSegmentObject):

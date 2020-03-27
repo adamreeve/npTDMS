@@ -45,8 +45,7 @@ def tdmsinfo(file, show_properties=False):
             if show_properties:
                 level = 3
                 if channel.data_type is not None:
-                    display("data type: %s" % channel.data_type.__name__,
-                            level)
+                    display("data type: %s" % channel.data_type.__name__, level)
                 display_properties(channel, level)
 
 

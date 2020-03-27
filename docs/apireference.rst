@@ -18,6 +18,15 @@ Reading TDMS Files
   :members:
   :exclude-members: group, channel, has_data, property, number_values
 
+.. autoclass:: DataChunk()
+  :members:
+
+.. autoclass:: GroupDataChunk()
+  :members:
+
+.. autoclass:: ChannelDataChunk()
+  :members:
+
 Writing TDMS Files
 ------------------
 
