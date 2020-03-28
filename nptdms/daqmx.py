@@ -10,6 +10,10 @@ from nptdms.log import log_manager
 log = log_manager.get_logger(__name__)
 
 
+FORMAT_CHANGING_SCALER = 0x00001269
+DIGITAL_LINE_SCALER = 0x0000126A
+
+
 class DaqmxSegment(BaseSegment):
     """ A TDMS segment with DAQmx data
     """
@@ -92,16 +96,15 @@ class DaqmxSegmentObject(BaseSegmentObject):
         self.daqmx_metadata = None
 
     def read_raw_data_index(self, f, raw_data_index_header):
-        if raw_data_index_header not in (0x00001269, 0x00001369):
+        if raw_data_index_header not in (FORMAT_CHANGING_SCALER, DIGITAL_LINE_SCALER):
             raise ValueError(
                 "Unexpected raw data index for DAQmx data: 0x%08X" %
                 raw_data_index_header)
         # This is a DAQmx raw data segment.
         #    0x00001269 for segment containing Format Changing scaler.
-        #    0x00001369 for segment containing Digital Line scaler.
-        if raw_data_index_header == 0x00001369:
-            # special scaling for DAQ's digital input lines?
-            log.warning("DAQmx with Digital Line scaler has not tested")
+        #    0x0000126A for segment containing Digital Line scaler.
+        # Note that the NI docs on the TDMS format state that digital line scaler data
+        # has 0x00001369, which appears to be incorrect
 
         # Read the data type
         data_type_val = types.Uint32.read(f, self.endianness)
@@ -112,7 +115,7 @@ class DaqmxSegmentObject(BaseSegmentObject):
 
         log.debug("DAQmx object data type: %r", self.data_type)
 
-        daqmx_metadata = DaqMxMetadata(f, self.endianness)
+        daqmx_metadata = DaqMxMetadata(f, self.endianness, raw_data_index_header)
         log.debug("DAQmx metadata: %r", daqmx_metadata)
 
         self.data_type = daqmx_metadata.data_type
@@ -146,7 +149,7 @@ class DaqMxMetadata(object):
         'scalers',
         ]
 
-    def __init__(self, f, endianness):
+    def __init__(self, f, endianness, daqmx_segment_type):
         """
         Read the metadata for a DAQmx raw segment.  This is the raw
         DAQmx-specific portion of the raw data index.
@@ -162,7 +165,7 @@ class DaqMxMetadata(object):
         scaler_vector_length = types.Uint32.read(f, endianness)
         log.debug("mxDAQ format scaler vector size '%d'", scaler_vector_length)
         self.scalers = [
-            DaqMxScaler(f, endianness)
+            DaqMxScaler(f, endianness, daqmx_segment_type)
             for _ in range(scaler_vector_length)]
 
         # Read raw data widths.
@@ -198,15 +201,17 @@ class DaqMxScaler(object):
         'sample_format_bitmap',
         ]
 
-    def __init__(self, open_file, endianness):
+    def __init__(self, open_file, endianness, daqmx_segment_type):
         data_type_code = types.Uint32.read(open_file, endianness)
         self.data_type = DAQMX_TYPES[data_type_code]
 
         # more info for format changing scaler
         self.raw_buffer_index = types.Uint32.read(open_file, endianness)
         self.raw_byte_offset = types.Uint32.read(open_file, endianness)
-        self.sample_format_bitmap = types.Uint32.read(
-            open_file, endianness)
+        if daqmx_segment_type == DIGITAL_LINE_SCALER:
+            self.sample_format_bitmap = types.Uint8.read(open_file, endianness)
+        else:
+            self.sample_format_bitmap = types.Uint32.read(open_file, endianness)
         self.scale_id = types.Uint32.read(open_file, endianness)
 
     def __repr__(self):
