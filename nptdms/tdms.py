@@ -503,6 +503,12 @@ class TdmsChannel(object):
     def __len__(self):
         return self._length
 
+    def __iter__(self):
+        if self._raw_data is not None:
+            return iter(self.data)
+        else:
+            return self._read_data_values()
+
     @_property_builtin
     def path(self):
         """ Path to the TDMS object for this channel
@@ -685,6 +691,11 @@ class TdmsChannel(object):
         """
 
         return pandas_export.from_channel(self, time_index, absolute_time, scaled_data)
+
+    def _read_data_values(self):
+        for chunk in self.data_chunks():
+            for value in chunk:
+                yield value
 
     def _scale_data(self, raw_data):
         scale = self._get_scaling()

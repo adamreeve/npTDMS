@@ -190,6 +190,34 @@ def test_stream_channel_data_chunks():
                 compare_arrays(actual_data, expected_channel_data)
 
 
+def test_iterate_channel_data_in_open_mode():
+    """Test iterating over channel data after opening a file without reading data
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                actual_data = []
+                for value in tdms_file[group][channel]:
+                    actual_data.append(value)
+                compare_arrays(actual_data, expected_channel_data)
+
+
+def test_iterate_channel_data_in_read_mode():
+    """Test iterating over channel data after reading all data
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+
+    with test_file.get_tempfile() as temp_file:
+        tdms_file = TdmsFile.read(temp_file.file)
+        for ((group, channel), expected_channel_data) in expected_data.items():
+            actual_data = []
+            for value in tdms_file[group][channel]:
+                actual_data.append(value)
+            compare_arrays(actual_data, expected_channel_data)
+
+
 def test_invalid_offset_throws():
     """ Exception is thrown when reading a subset of data with an invalid offset
     """
