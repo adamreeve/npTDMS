@@ -401,6 +401,32 @@ def test_multiple_raw_data_buffers_with_scalers_split_across_buffers():
     np.testing.assert_array_equal(scaler_data_4, [10, 12, 14, 16])
 
 
+def test_digital_line_scaler_data():
+    """ Test loading a DAQmx file with a single channel of U8 digital line scaler data
+    """
+
+    scaler_metadata = daqmx_scaler_metadata(0, 0, 2, digital_line_scaler=True)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 4, [4], [scaler_metadata], digital_line_scaler=True))
+    data = (
+        "00 00 00 00"
+        "00 00 01 00"
+        "00 00 00 00"
+        "00 00 01 00"
+    )
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc(), metadata, data)
+    tdms_data = test_file.load()
+
+    data = tdms_data["Group"]["Channel1"].raw_data
+
+    assert data.dtype == np.uint8
+    np.testing.assert_array_equal(data, [0, 1, 0, 1])
+
+
 def test_lazily_reading_channel():
     """ Test loading channels individually from a DAQmx file
     """
@@ -602,7 +628,7 @@ def group_metadata():
         "00 00 00 00")
 
 
-def daqmx_scaler_metadata(scale_id, type_id, byte_offset, raw_buffer_index=0):
+def daqmx_scaler_metadata(scale_id, type_id, byte_offset, raw_buffer_index=0, digital_line_scaler=False):
     return (
         # DAQmx data type (type ids don't match TDMS types)
         hexlify_value("<I", type_id) +
@@ -611,14 +637,14 @@ def daqmx_scaler_metadata(scale_id, type_id, byte_offset, raw_buffer_index=0):
         # Raw byte offset
         hexlify_value("<I", byte_offset) +
         # Sample format bitmap (don't know what this is for...)
-        "00 00 00 00" +
+        ("00" if digital_line_scaler else "00 00 00 00") +
         # Scale ID
         hexlify_value("<I", scale_id))
 
 
 def daqmx_channel_metadata(
         channel_name, num_values,
-        raw_data_widths, scaler_metadata, properties=None):
+        raw_data_widths, scaler_metadata, properties=None, digital_line_scaler=False):
     path = "/'Group'/'" + channel_name + "'"
     return (
         # Length of the object path
@@ -626,7 +652,7 @@ def daqmx_channel_metadata(
         # Object path
         string_hexlify(path) +
         # Raw data index (DAQmx)
-        "69 12 00 00"
+        ("6A 12 00 00" if digital_line_scaler else "69 12 00 00") +
         # Data type (DAQmx)
         "FF FF FF FF"
         # Array  dimension
