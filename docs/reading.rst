@@ -95,6 +95,12 @@ For example, to compute the mean of a channel::
     channel_mean = channel_sum / channel_length
 
 This approach can also be useful to stream TDMS data to another format on disk or into a data store.
+It's also possible to stream data chunks for a single channel using :py:meth:`~nptdms.TdmsChannel.data_chunks`::
+
+    with TdmsFile.open(tdms_file_path) as tdms_file:
+        channel = tdms_file[group_name][channel_name]
+        for chunk in channel.data_chunks():
+            channel_chunk_data = chunk[:]
 
 In cases where you don't need to read the file data and only need to read metadata, you can
 also use the static :py:meth:`~nptdms.TdmsFile.read_metadata` method::
