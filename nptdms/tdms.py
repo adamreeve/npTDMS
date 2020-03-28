@@ -253,6 +253,13 @@ class TdmsFile(object):
 
         self.data_read = True
 
+    def _read_channel_data_chunks(self, channel):
+        if self._reader is None:
+            raise RuntimeError(
+                "Cannot read channel data after the underlying TDMS reader is closed")
+        for chunk in self._reader.read_raw_data_for_channel(channel.path):
+            yield chunk
+
     def _read_channel_data(self, channel, offset=0, length=None):
         if offset < 0:
             raise ValueError("offset must be non-negative")
@@ -496,6 +503,12 @@ class TdmsChannel(object):
     def __len__(self):
         return self._length
 
+    def __iter__(self):
+        if self._raw_data is not None:
+            return iter(self.data)
+        else:
+            return self._read_data_values()
+
     @_property_builtin
     def path(self):
         """ Path to the TDMS object for this channel
@@ -569,6 +582,17 @@ class TdmsChannel(object):
             raise RuntimeError("Channel data has not been read")
 
         return self._raw_data.scaler_data
+
+    def data_chunks(self):
+        """ A generator that streams chunks data for this channel from disk.
+        This method may only be used when the TDMS file was opened without reading all data immediately.
+
+        :rtype: Generator that yields :class:`ChannelDataChunk` objects
+        """
+        channel_offset = 0
+        for raw_data_chunk in self._tdms_file._read_channel_data_chunks(self):
+            yield ChannelDataChunk(self._tdms_file, self, raw_data_chunk, channel_offset)
+            channel_offset += len(raw_data_chunk)
 
     def read_data(self, offset=0, length=None, scaled=True):
         """ Reads data for this channel from the TDMS file and returns it
@@ -667,6 +691,11 @@ class TdmsChannel(object):
         """
 
         return pandas_export.from_channel(self, time_index, absolute_time, scaled_data)
+
+    def _read_data_values(self):
+        for chunk in self.data_chunks():
+            for value in chunk:
+                yield value
 
     def _scale_data(self, raw_data):
         scale = self._get_scaling()
@@ -769,7 +798,11 @@ class GroupDataChunk(object):
     def __init__(self, tdms_file, group, raw_data_chunk, channel_offsets):
         self.name = group.name
         self._channels = OrderedDict(
-            (channel.name, ChannelDataChunk(tdms_file, channel, raw_data_chunk, channel_offsets[channel.path]))
+            (channel.name, ChannelDataChunk(
+                tdms_file,
+                channel,
+                raw_data_chunk.channel_data.get(channel.path, RawChannelDataChunk.empty()),
+                channel_offsets[channel.path]))
             for channel in group.channels())
 
     def __getitem__(self, channel_name):
@@ -800,10 +833,7 @@ class ChannelDataChunk(object):
         self._channel = channel
         self.name = channel.name
         self.offset = offset
-        try:
-            self._raw_data = raw_data_chunk.channel_data[channel.path]
-        except KeyError:
-            self._raw_data = RawChannelDataChunk.empty()
+        self._raw_data = raw_data_chunk
         self._scaled_data = None
 
     def __len__(self):
