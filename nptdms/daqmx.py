@@ -80,6 +80,8 @@ class DaqmxSegment(BaseSegment):
                     # should be correct
                     this_scaler_data.dtype = (
                         scaler.data_type.nptype.newbyteorder(self.endianness))
+                    if obj.daqmx_metadata.scaler_type == DIGITAL_LINE_SCALER:
+                        this_scaler_data = np.bitwise_and(this_scaler_data, 1)
                     scaler_data[obj.path][scaler.scale_id] = this_scaler_data
 
         return RawDataChunk.scaler_data(scaler_data)
@@ -143,17 +145,19 @@ class DaqMxMetadata(object):
 
     __slots__ = [
         'data_type',
+        'scaler_type',
         'dimension',
         'chunk_size',
         'raw_data_widths',
         'scalers',
         ]
 
-    def __init__(self, f, endianness, daqmx_segment_type):
+    def __init__(self, f, endianness, scaler_type):
         """
         Read the metadata for a DAQmx raw segment.  This is the raw
         DAQmx-specific portion of the raw data index.
         """
+        self.scaler_type = scaler_type
         self.data_type = types.tds_data_types[0xFFFFFFFF]
         self.dimension = types.Uint32.read(f, endianness)
         # In TDMS format version 2.0, 1 is the only valid value for dimension
@@ -165,7 +169,7 @@ class DaqMxMetadata(object):
         scaler_vector_length = types.Uint32.read(f, endianness)
         log.debug("mxDAQ format scaler vector size '%d'", scaler_vector_length)
         self.scalers = [
-            DaqMxScaler(f, endianness, daqmx_segment_type)
+            DaqMxScaler(f, endianness, scaler_type)
             for _ in range(scaler_vector_length)]
 
         # Read raw data widths.
@@ -201,14 +205,14 @@ class DaqMxScaler(object):
         'sample_format_bitmap',
         ]
 
-    def __init__(self, open_file, endianness, daqmx_segment_type):
+    def __init__(self, open_file, endianness, scaler_type):
         data_type_code = types.Uint32.read(open_file, endianness)
         self.data_type = DAQMX_TYPES[data_type_code]
 
         # more info for format changing scaler
         self.raw_buffer_index = types.Uint32.read(open_file, endianness)
         self.raw_byte_offset = types.Uint32.read(open_file, endianness)
-        if daqmx_segment_type == DIGITAL_LINE_SCALER:
+        if scaler_type == DIGITAL_LINE_SCALER:
             self.sample_format_bitmap = types.Uint8.read(open_file, endianness)
         else:
             self.sample_format_bitmap = types.Uint32.read(open_file, endianness)

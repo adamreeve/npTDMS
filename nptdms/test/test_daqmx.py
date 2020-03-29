@@ -427,6 +427,32 @@ def test_digital_line_scaler_data():
     np.testing.assert_array_equal(data, [0, 1, 0, 1])
 
 
+def test_digital_line_scaler_data_uses_first_bit_of_bytes():
+    """ Test DAQmx digital line scaler data only uses the first bit in each byte to represent a 1 or 0 value
+    """
+
+    scaler_metadata = daqmx_scaler_metadata(0, 0, 2, digital_line_scaler=True)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 4, [4], [scaler_metadata], digital_line_scaler=True))
+    data = (
+        "00 00 00 00"
+        "00 00 01 00"
+        "00 00 02 00"
+        "00 00 03 00"
+    )
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc(), metadata, data)
+    tdms_data = test_file.load()
+
+    data = tdms_data["Group"]["Channel1"].raw_data
+
+    assert data.dtype == np.uint8
+    np.testing.assert_array_equal(data, [0, 1, 0, 1])
+
+
 def test_lazily_reading_channel():
     """ Test loading channels individually from a DAQmx file
     """
