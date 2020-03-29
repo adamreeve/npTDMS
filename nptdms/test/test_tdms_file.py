@@ -233,6 +233,95 @@ def test_iterate_file_and_groups():
                 compare_arrays(channel.data, expected_channel_data)
 
 
+def test_indexing_channel_after_read_data():
+    """ Test indexing into a channel after reading all data
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        tdms_file = TdmsFile.read(temp_file.file)
+    for ((group, channel), expected_channel_data) in expected_data.items():
+        channel_object = tdms_file[group][channel]
+        assert channel_object[0] == expected_channel_data[0]
+        compare_arrays(channel_object[:], expected_channel_data)
+
+
+@given(index=strategies.integers(0, 7))
+def test_indexing_channel_with_integer(index):
+    """ Test indexing into a channel with an integer index
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                assert channel_object[index] == expected_channel_data[index]
+
+
+def test_indexing_channel_with_ellipsis():
+    """ Test indexing into a channel with ellipsis returns all data
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                compare_arrays(channel_object[...], expected_channel_data)
+
+
+@given(
+    start=strategies.integers(-10, 10) | strategies.none(),
+    stop=strategies.integers(-10, 10) | strategies.none(),
+    step=strategies.integers(-5, 5).filter(lambda i: i != 0) | strategies.none(),
+)
+def test_indexing_channel_with_slice(start, stop, step):
+    """ Test indexing into a channel with a slice
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                compare_arrays(channel_object[start:stop:step], expected_channel_data[start:stop:step])
+
+
+@pytest.mark.parametrize('index', [-9, 8])
+def test_indexing_channel_with_invalid_integer_raises_error(index):
+    """ Test indexing into a channel with an invalid integer index
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                with pytest.raises(IndexError):
+                    _ = channel_object[index]
+
+
+def test_indexing_channel_with_zero_step_raises_error():
+    """ Test indexing into a channel with a slice with zero step size raises an error
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                with pytest.raises(ValueError):
+                    _ = channel_object[::0]
+
+
+@pytest.mark.parametrize('index', ["test", None])
+def test_indexing_channel_with_invalid_type_raises_error(index):
+    """ Test indexing into a channel with an invalid index type
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                with pytest.raises(TypeError):
+                    _ = channel_object[index]
+
+
 def test_invalid_offset_in_read_data_throws():
     """ Exception is thrown when reading a subset of data with an invalid offset
     """
