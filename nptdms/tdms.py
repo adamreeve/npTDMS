@@ -172,6 +172,9 @@ class TdmsFile(object):
             self._reader.close()
             self._reader = None
 
+    def __iter__(self):
+        return iter(self._groups)
+
     def __getitem__(self, group_name):
         """ Retrieve a TDMS group from the file by name
         """
@@ -425,6 +428,9 @@ class TdmsGroup(object):
         """
 
         return pandas_export.from_group(self, time_index, absolute_time, scaled_data)
+
+    def __iter__(self):
+        return iter(self._channels)
 
     def __getitem__(self, channel_name):
         """ Retrieve a TDMS channel from this group by name

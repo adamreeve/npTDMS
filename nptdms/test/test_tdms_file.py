@@ -218,7 +218,22 @@ def test_iterate_channel_data_in_read_mode():
             compare_arrays(actual_data, expected_channel_data)
 
 
-def test_invalid_offset_throws():
+def test_iterate_file_and_groups():
+    """ Test iterating over TdmsFile and TdmsGroup uses key values
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+
+    with test_file.get_tempfile() as temp_file:
+        tdms_file = TdmsFile.read(temp_file.file)
+        for group_name in tdms_file:
+            group = tdms_file[group_name]
+            for channel_name in group:
+                channel = group[channel_name]
+                expected_channel_data = expected_data[(group_name, channel_name)]
+                compare_arrays(channel.data, expected_channel_data)
+
+
+def test_invalid_offset_in_read_data_throws():
     """ Exception is thrown when reading a subset of data with an invalid offset
     """
     test_file, expected_data = scenarios.single_segment_with_one_channel().values
@@ -230,7 +245,7 @@ def test_invalid_offset_throws():
             assert "offset must be non-negative" in str(exc_info.value)
 
 
-def test_invalid_length_throws():
+def test_invalid_length_in_read_data_throws():
     """ Exception is thrown when reading a subset of data with an invalid length
     """
     test_file, expected_data = scenarios.single_segment_with_one_channel().values
