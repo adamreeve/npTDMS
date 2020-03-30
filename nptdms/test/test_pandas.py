@@ -267,7 +267,7 @@ def test_channel_as_dataframe_with_raw_data():
     """Convert channel to Pandas dataframe with absolute time index"""
 
     test_file, _ = scenarios.scaled_data().values
-    expected_raw_data = np.array([1, 2], dtype=np.int32)
+    expected_raw_data = np.array([1, 2, 3, 4], dtype=np.int32)
     tdms_data = test_file.load()
 
     df = tdms_data["group"]["channel1"].as_dataframe(scaled_data=False)

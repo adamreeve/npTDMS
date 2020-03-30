@@ -3,7 +3,7 @@
 from collections import defaultdict
 import os
 import tempfile
-from hypothesis import (assume, given, example, strategies)
+from hypothesis import (assume, given, example, settings, strategies)
 import numpy as np
 import pytest
 from nptdms import TdmsFile
@@ -231,6 +231,134 @@ def test_iterate_file_and_groups():
                 channel = group[channel_name]
                 expected_channel_data = expected_data[(group_name, channel_name)]
                 compare_arrays(channel.data, expected_channel_data)
+
+
+def test_indexing_channel_after_read_data():
+    """ Test indexing into a channel after reading all data
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        tdms_file = TdmsFile.read(temp_file.file)
+    for ((group, channel), expected_channel_data) in expected_data.items():
+        channel_object = tdms_file[group][channel]
+        assert channel_object[0] == expected_channel_data[0]
+        compare_arrays(channel_object[:], expected_channel_data)
+
+
+@given(index=strategies.integers(0, 7))
+def test_indexing_channel_with_integer(index):
+    """ Test indexing into a channel with an integer index
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                assert channel_object[index] == expected_channel_data[index]
+
+
+def test_indexing_channel_with_integer_and_caching():
+    """ Test indexing into a channel with an integer index, reusing the same file to test caching
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                values = []
+                for i in range(len(channel_object)):
+                    values.append(channel_object[i])
+                compare_arrays(values, expected_channel_data)
+
+
+def test_indexing_scaled_channel_with_integer():
+    """ Test indexing into a channel with an integer index when the channel is scaled
+    """
+    test_file, expected_data = scenarios.scaled_data().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                values = []
+                for i in range(len(channel_object)):
+                    values.append(channel_object[i])
+                compare_arrays(values, expected_channel_data)
+
+
+def test_indexing_channel_with_ellipsis():
+    """ Test indexing into a channel with ellipsis returns all data
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                compare_arrays(channel_object[...], expected_channel_data)
+
+
+@pytest.fixture(scope="module")
+def opened_tdms_file():
+    """ Allow re-use of an opened TDMS file
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            yield tdms_file, expected_data
+
+
+@given(
+    start=strategies.integers(-10, 10) | strategies.none(),
+    stop=strategies.integers(-10, 10) | strategies.none(),
+    step=strategies.integers(-5, 5).filter(lambda i: i != 0) | strategies.none(),
+)
+@settings(max_examples=1000)
+def test_indexing_channel_with_slice(opened_tdms_file, start, stop, step):
+    """ Test indexing into a channel with a slice
+    """
+    tdms_file, expected_data = opened_tdms_file
+    for ((group, channel), expected_channel_data) in expected_data.items():
+        channel_object = tdms_file[group][channel]
+        compare_arrays(channel_object[start:stop:step], expected_channel_data[start:stop:step])
+
+
+@pytest.mark.parametrize('index', [-9, 8])
+def test_indexing_channel_with_invalid_integer_raises_error(index):
+    """ Test indexing into a channel with an invalid integer index
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                with pytest.raises(IndexError):
+                    _ = channel_object[index]
+
+
+def test_indexing_channel_with_zero_step_raises_error():
+    """ Test indexing into a channel with a slice with zero step size raises an error
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                with pytest.raises(ValueError) as exc_info:
+                    _ = channel_object[::0]
+                assert str(exc_info.value) == "Step size cannot be zero"
+
+
+@pytest.mark.parametrize('index', ["test", None])
+def test_indexing_channel_with_invalid_type_raises_error(index):
+    """ Test indexing into a channel with an invalid index type
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                with pytest.raises(TypeError) as exc_info:
+                    _ = channel_object[index]
+                assert "Invalid index type" in str(exc_info.value)
 
 
 def test_invalid_offset_in_read_data_throws():

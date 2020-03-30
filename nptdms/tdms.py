@@ -263,6 +263,12 @@ class TdmsFile(object):
         for chunk in self._reader.read_raw_data_for_channel(channel.path):
             yield chunk
 
+    def _read_channel_data_chunk_for_index(self, channel, index):
+        if self._reader is None:
+            raise RuntimeError(
+                "Cannot read channel data after the underlying TDMS reader is closed")
+        return self._reader.read_channel_chunk_for_index(channel.path, index)
+
     def _read_channel_data(self, channel, offset=0, length=None):
         if offset < 0:
             raise ValueError("offset must be non-negative")
@@ -503,6 +509,9 @@ class TdmsChannel(object):
         self._raw_data = None
         self._data_scaled = None
 
+        self._cached_chunk = None
+        self._cached_chunk_bounds = None
+
     def __repr__(self):
         return "<TdmsChannel with path %s>" % self.path
 
@@ -514,6 +523,18 @@ class TdmsChannel(object):
             return iter(self.data)
         else:
             return self._read_data_values()
+
+    def __getitem__(self, index):
+        if self._raw_data is not None:
+            return self.data[index]
+        elif index is Ellipsis:
+            return self.read_data()
+        elif isinstance(index, slice):
+            return self._read_slice(index.start, index.stop, index.step)
+        elif isinstance(index, int):
+            return self._read_at_index(index)
+        else:
+            raise TypeError("Invalid index type '%s', expected int, slice or Ellipsis" % type(index).__name__)
 
     @_property_builtin
     def path(self):
@@ -702,6 +723,66 @@ class TdmsChannel(object):
         for chunk in self.data_chunks():
             for value in chunk:
                 yield value
+
+    def _read_slice(self, start, stop, step):
+        if step == 0:
+            raise ValueError("Step size cannot be zero")
+
+        # Replace None values with defaults
+        step = 1 if step is None else step
+        if start is None:
+            start = 0 if step > 0 else -1
+        if stop is None:
+            stop = self._length if step > 0 else -1 - self._length
+
+        # Handle negative indices
+        if start < 0:
+            start = self._length + start
+        if stop < 0:
+            stop = self._length + stop
+
+        # Check for empty ranges
+        if stop == start:
+            return np.empty((0, ), dtype=self.dtype)
+        if step > 0 and (stop < start or start >= self._length or stop < 0):
+            return np.empty((0,), dtype=self.dtype)
+        if step < 0 and (stop > start or stop >= self._length or start < 0):
+            return np.empty((0,), dtype=self.dtype)
+
+        # Trim values outside bounds
+        if start < 0:
+            start = 0
+        if start >= self._length:
+            start = self._length - 1
+        if stop > self._length:
+            stop = self._length
+        if stop < -1:
+            stop = -1
+
+        # Read data and handle step size
+        if step > 0:
+            read_data = self.read_data(start, stop - start)
+            return read_data[::step] if step > 1 else read_data
+        else:
+            read_data = self.read_data(stop + 1, start - stop)
+            return read_data[::step]
+
+    def _read_at_index(self, index):
+        if index < 0 or index >= self._length:
+            raise IndexError("Index {0} is outside of the channel bounds [0, {1}]".format(index, self._length - 1))
+
+        if self._cached_chunk is not None:
+            # Check if we've already read and cached the chunk containing this index
+            bounds = self._cached_chunk_bounds
+            if bounds[0] <= index < bounds[1]:
+                return self._cached_chunk[index - bounds[0]]
+
+        chunk, chunk_offset = self._tdms_file._read_channel_data_chunk_for_index(self, index)
+        scaled_chunk = self._scale_data(chunk)
+        self._cached_chunk = scaled_chunk
+        self._cached_chunk_bounds = (chunk_offset, chunk_offset + len(scaled_chunk))
+
+        return scaled_chunk[index - chunk_offset]
 
     def _scale_data(self, raw_data):
         scale = self._get_scaling()
