@@ -372,22 +372,22 @@ def chunked_segment():
             channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
             channel_metadata("/'group'/'channel2'", TDS_TYPE_INT32, 2),
         ),
-        "01 00 00 00" "02 00 00 00"
-        "03 00 00 00" "04 00 00 00"
-        "05 00 00 00" "06 00 00 00"
-        "07 00 00 00" "08 00 00 00"
+        "00 00 00 00" "01 00 00 00"
+        "0A 00 00 00" "0B 00 00 00"
+        "02 00 00 00" "03 00 00 00"
+        "0C 00 00 00" "0D 00 00 00"
     )
     test_file.add_segment(
         ("kTocRawData", ),
         "",
-        "07 00 00 00" "08 00 00 00"
-        "05 00 00 00" "06 00 00 00"
-        "03 00 00 00" "04 00 00 00"
-        "01 00 00 00" "02 00 00 00"
+        "04 00 00 00" "05 00 00 00"
+        "0E 00 00 00" "0F 00 00 00"
+        "06 00 00 00" "07 00 00 00"
+        "10 00 00 00" "11 00 00 00"
     )
     expected_data = {
-        ('group', 'channel1'): np.array([1, 2, 5, 6, 7, 8, 3, 4], dtype=np.int32),
-        ('group', 'channel2'): np.array([3, 4, 7, 8, 5, 6, 1, 2], dtype=np.int32),
+        ('group', 'channel1'): np.array([0, 1, 2, 3, 4, 5, 6, 7], dtype=np.int32),
+        ('group', 'channel2'): np.array([10, 11, 12, 13, 14, 15, 16, 17], dtype=np.int32),
     }
     return test_file, expected_data
 
