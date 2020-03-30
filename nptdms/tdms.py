@@ -263,6 +263,12 @@ class TdmsFile(object):
         for chunk in self._reader.read_raw_data_for_channel(channel.path):
             yield chunk
 
+    def _read_channel_data_chunk_for_index(self, channel, index):
+        if self._reader is None:
+            raise RuntimeError(
+                "Cannot read channel data after the underlying TDMS reader is closed")
+        return self._reader.read_channel_chunk_for_index(channel.path, index)
+
     def _read_channel_data(self, channel, offset=0, length=None):
         if offset < 0:
             raise ValueError("offset must be non-negative")
@@ -502,6 +508,9 @@ class TdmsChannel(object):
 
         self._raw_data = None
         self._data_scaled = None
+
+        self._cached_chunk = None
+        self._cached_chunk_bounds = None
 
     def __repr__(self):
         return "<TdmsChannel with path %s>" % self.path
@@ -761,8 +770,19 @@ class TdmsChannel(object):
     def _read_at_index(self, index):
         if index < 0 or index >= self._length:
             raise IndexError("Index {0} is outside of the channel bounds [0, {1}]".format(index, self._length - 1))
-        # TODO: Cache chunk containing the read index
-        return self.read_data(index, 1)[0]
+
+        if self._cached_chunk is not None:
+            # Check if we've already read and cached the chunk containing this index
+            bounds = self._cached_chunk_bounds
+            if bounds[0] <= index < bounds[1]:
+                return self._cached_chunk[index - bounds[0]]
+
+        chunk, chunk_offset = self._tdms_file._read_channel_data_chunk_for_index(self, index)
+        scaled_chunk = self._scale_data(chunk)
+        self._cached_chunk = scaled_chunk
+        self._cached_chunk_bounds = (chunk_offset, chunk_offset + len(scaled_chunk))
+
+        return scaled_chunk[index - chunk_offset]
 
     def _scale_data(self, raw_data):
         scale = self._get_scaling()

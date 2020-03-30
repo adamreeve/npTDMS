@@ -152,6 +152,33 @@ class TdmsReader(object):
 
             segment_index += 1
 
+    def read_channel_chunk_for_index(self, channel_path, index):
+        """ Read the chunk containing the given index
+
+        :returns: Tuple of raw channel data chunk and the integer offset to the beginning of the chunk
+        :rtype: (RawChannelDataChunk, int)
+        """
+        if self._segments is None:
+            raise RuntimeError("Cannot read data unless metadata has first been read")
+
+        if self._segment_channel_offsets is None:
+            with Timer(log, "Build data index"):
+                self._build_index()
+        segment_offsets = self._segment_channel_offsets[channel_path]
+
+        # Binary search to find the segment to read
+        segment_index = np.searchsorted(segment_offsets, index, side='right')
+        segment = self._segments[segment_index]
+        chunk_size = self._segment_chunk_sizes[channel_path][segment_index]
+        segment_start_index = segment_offsets[segment_index - 1] if segment_index > 0 else 0
+
+        index_in_segment = index - segment_start_index
+        chunk_index = index_in_segment // chunk_size
+
+        chunk_data = next(segment.read_raw_data_for_channel(self._file, channel_path, chunk_index, 1))
+        chunk_offset = segment_start_index + chunk_index * chunk_size
+        return chunk_data, chunk_offset
+
     def _update_object_metadata(self, segment):
         """ Update object metadata using the metadata read from a single segment
         """

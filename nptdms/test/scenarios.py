@@ -639,10 +639,10 @@ def scaled_data():
         segment_objects_metadata(
             channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2, properties),
         ),
-        "01 00 00 00" "02 00 00 00"
+        "01 00 00 00" "02 00 00 00" "03 00 00 00" "04 00 00 00"
     )
     expected_data = {
-        ('group', 'channel1'): np.array([12, 14], dtype=np.float64),
+        ('group', 'channel1'): np.array([12, 14, 16, 18], dtype=np.float64),
     }
     return test_file, expected_data
 
