@@ -132,20 +132,20 @@ class ExtendedFloat(TdmsType):
     pass
 
 
-@tds_data_type(12, None)
-class DoubleFloatWithUnit(TdmsType):
-    size = 8
-    pass
-
-
-@tds_data_type(13, None)
-class ExtendedFloatWithUnit(TdmsType):
-    pass
-
-
-@tds_data_type(0x19, None)
-class SingleFloatWithUnit(TdmsType):
+@tds_data_type(0x19, np.single)
+class SingleFloatWithUnit(StructType):
     size = 4
+    struct_declaration = "f"
+
+
+@tds_data_type(0x1A, np.double)
+class DoubleFloatWithUnit(StructType):
+    size = 8
+    struct_declaration = "d"
+
+
+@tds_data_type(0x1B, None)
+class ExtendedFloatWithUnit(TdmsType):
     pass
 
 
