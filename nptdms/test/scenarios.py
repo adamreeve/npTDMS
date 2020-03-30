@@ -14,10 +14,13 @@ from nptdms.test.util import (
 
 
 TDS_TYPE_INT32 = 3
+TDS_TYPE_BOOL = 0x21
 TDS_TYPE_COMPLEX64 = 0x08000c
 TDS_TYPE_COMPLEX128 = 0x10000d
 TDS_TYPE_FLOAT32 = 9
 TDS_TYPE_FLOAT64 = 10
+TDS_TYPE_FLOAT32_WITH_UNIT = 0x19
+TDS_TYPE_FLOAT64_WITH_UNIT = 0x1A
 
 
 _scenarios = []
@@ -560,6 +563,26 @@ def incomplete_last_row_of_interleaved_data():
 
 
 @scenario
+def bool_data():
+    """ Test reading a file with boolean valued data
+    """
+    expected_channel_data = np.array([False, True, False, True], dtype=np.dtype('bool8'))
+
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'bool_channel'", TDS_TYPE_BOOL, 2),
+        ),
+        "00 01 00 01"
+    )
+    expected_data = {
+        ('group', 'bool_channel'): expected_channel_data,
+    }
+    return test_file, expected_data
+
+
+@scenario
 def float_data():
     """ Test reading a file with float valued data
     """
@@ -581,6 +604,40 @@ def float_data():
         segment_objects_metadata(
             channel_metadata("/'group'/'single_channel'", TDS_TYPE_FLOAT32, 2),
             channel_metadata("/'group'/'double_channel'", TDS_TYPE_FLOAT64, 2),
+        ),
+        data
+    )
+    expected_data = {
+        ('group', 'single_channel'): single_arr,
+        ('group', 'double_channel'): double_arr,
+    }
+    return test_file, expected_data
+
+
+@scenario
+def float_data_with_unit():
+    """ Test reading a file with float valued data with units
+
+        These are the same as normal floating point data but have a 'unit_string' property
+    """
+    single_arr = np.array([0.123, 0.234, 0.345, 0.456], dtype=np.float32)
+    double_arr = np.array([0.987, 0.876, 0.765, 0.654], dtype=np.double)
+    data = ""
+    for num in single_arr[0:2]:
+        data += hexlify_value("<f", num)
+    for num in double_arr[0:2]:
+        data += hexlify_value("<d", num)
+    for num in single_arr[2:4]:
+        data += hexlify_value("<f", num)
+    for num in double_arr[2:4]:
+        data += hexlify_value("<d", num)
+
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'single_channel'", TDS_TYPE_FLOAT32_WITH_UNIT, 2),
+            channel_metadata("/'group'/'double_channel'", TDS_TYPE_FLOAT64_WITH_UNIT, 2),
         ),
         data
     )
