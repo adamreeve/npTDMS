@@ -961,7 +961,7 @@ class GroupDataChunk(object):
         return self._channels[channel_name]
 
     def channels(self):
-        """ Returns chunks of channel data for all channels
+        """ Returns chunks of channel data for all channels in this group
 
         :rtype: List of :class:`ChannelDataChunk`
         """
