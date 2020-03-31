@@ -37,3 +37,16 @@ def test_tdmsinfo_with_properties(capsys):
             assert "length: 2" in captured.out
     finally:
         os.remove(temp_file.name)
+
+
+def test_tdmsinfo_with_debug_output(caplog):
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    temp_file = test_file.get_tempfile(delete=False)
+    try:
+        temp_file.file.close()
+        with patch.object(sys, 'argv', ['tdmsinfo.py', temp_file.name, '--debug']):
+            tdmsinfo.main()
+            assert "Reading metadata for object /'Group'/'Channel1'" in caplog.text
+    finally:
+        os.remove(temp_file.name)
