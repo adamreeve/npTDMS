@@ -43,7 +43,7 @@ you can instead use ``TdmsFile.open``. This is more memory efficient but
 accessing data can be slower::
 
     with TdmsFile.open("path_to_file.tdms"):
-        channel = tdms_file['group name']['channel name']
+        channel = tdms_file[group_name][channel_name]
         channel_data = channel[:]
 
 npTDMS also has rudimentary support for writing TDMS files.

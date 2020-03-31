@@ -539,7 +539,7 @@ class TdmsChannel(object):
 
         all_data = channel[:]
 
-    Or to retrieve a subset of data:
+    Or to retrieve a subset of data::
 
         data_subset = channel[start:stop]
 
@@ -665,8 +665,6 @@ class TdmsChannel(object):
         """ If the TdmsFile was created by reading all data, this property
         provides direct access to the numpy array of raw DAQmx scaler data
         as a dictionary mapping from scale id to raw data arrays.
-
-        For unscaled objects this is the same as the data property.
         """
         if len(self) > 0 and self._raw_data is None:
             raise RuntimeError("Channel data has not been read")
@@ -930,7 +928,7 @@ class DataChunk(object):
         return self._groups[group_name]
 
     def groups(self):
-        """ Returns chunks of data for a group
+        """ Returns chunks of data for all groups
 
         :rtype: List of :class:`GroupDataChunk`
         """
@@ -963,7 +961,7 @@ class GroupDataChunk(object):
         return self._channels[channel_name]
 
     def channels(self):
-        """ Returns chunks of channel data
+        """ Returns chunks of channel data for all channels
 
         :rtype: List of :class:`ChannelDataChunk`
         """

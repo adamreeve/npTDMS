@@ -31,7 +31,7 @@ instance of one of:
 - :py:class:`nptdms.TdmsGroup` or :py:class:`nptdms.TdmsChannel`.
   A TDMS object that was read from a TDMS file using :py:class:`nptdms.TdmsFile`.
 
-Each of ``RootObject``, ``GroupObject`` and ``ChannelObject``
+Each of :py:class:`~nptdms.RootObject`, :py:class:`~nptdms.GroupObject` and :py:class:`~nptdms.ChannelObject`
 may optionally have properties associated with them, which
 are passed into the ``__init__`` method as a dictionary.
 The data types supported as property values are:
@@ -63,10 +63,15 @@ is given below::
     channel_object = ChannelObject("group_1", "channel_1", data, properties={})
 
     with TdmsWriter("my_file.tdms") as tdms_writer:
+        # Write first segment
         tdms_writer.write_segment([
             root_object,
             group_object,
             channel_object])
+        # Write another segment with more data for the same channel
+        more_data = np.array([6.0, 7.0, 8.0, 9.0, 10.0])
+        channel_object = ChannelObject("group_1", "channel_1", more_data, properties={})
+        tdms_writer.write_segment([channel_object])
 
 You could also read a TDMS file and then re-write it by passing
 :py:class:`~nptdms.TdmsGroup` and :py:class:`~nptdms.TdmsChannel`

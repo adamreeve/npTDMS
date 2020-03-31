@@ -2,15 +2,15 @@ Reading TDMS files
 ==================
 
 To read a TDMS file, create an instance of the :py:class:`~nptdms.TdmsFile`
-class using one of the static :py:meth:`~nptdms.TdmsFile.read` or :py:meth:`~nptdms.TdmsFile.open` methods,
+class using one of the static :py:meth:`nptdms.TdmsFile.read` or :py:meth:`nptdms.TdmsFile.open` methods,
 passing the path to the file, or an already opened file.
-The :py:meth:`~nptdms.TdmsFile.read` method will read all channel data immediately,
-whereas the :py:meth:`~nptdms.TdmsFile.open` method will only read the file metadata,
-keeping the file open to allow channel data to be read on demand::
+The :py:meth:`~nptdms.TdmsFile.read` method will read all channel data immediately::
 
     tdms_file = TdmsFile.read("my_file.tdms")
 
-or::
+If using the :py:meth:`~nptdms.TdmsFile.open` method, only the file metadata will be read initially,
+and the returned :py:class:`~nptdms.TdmsFile` object should be used as a context manager to keep
+the file open and allow channel data to be read on demand::
 
     with TdmsFile.open("my_file.tdms") as tdms_file:
         # Use tdms_file
@@ -83,7 +83,7 @@ TDMS files are written in multiple segments, where each segment can in turn have
 multiple chunks of data.
 When accessing a value or a slice of data in a channel, npTDMS will read whole chunks at a time.
 npTDMS also allows streaming data from a file chunk by chunk using
-:py:meth:`~nptdms.TdmsFile.data_chunks`. This is a generator that produces instances of
+:py:meth:`nptdms.TdmsFile.data_chunks`. This is a generator that produces instances of
 :py:class:`~nptdms.DataChunk`.
 For example, to compute the mean of a channel::
 
@@ -97,7 +97,7 @@ For example, to compute the mean of a channel::
     channel_mean = channel_sum / channel_length
 
 This approach can be useful to stream TDMS data to another format on disk or into a data store.
-It's also possible to stream data chunks for a single channel using :py:meth:`~nptdms.TdmsChannel.data_chunks`::
+It's also possible to stream data chunks for a single channel using :py:meth:`nptdms.TdmsChannel.data_chunks`::
 
     with TdmsFile.open(tdms_file_path) as tdms_file:
         channel = tdms_file[group_name][channel_name]
