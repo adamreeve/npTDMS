@@ -14,31 +14,47 @@ npTDMS
 
 npTDMS is a cross-platform Python package for reading and writing TDMS files as produced by LabVIEW,
 and is built on top of the `numpy <http://www.numpy.org/>`__ package.
-Data read from a TDMS file is stored in numpy arrays,
-and numpy arrays are also used when writing TDMS file.
+Data is read from TDMS files as numpy arrays,
+and npTDMS also allows writing numpy arrays to TDMS files.
 
-TDMS files can contain multiple data channels organised intro groups.
+TDMS files are structured in a hierarchy of groups and channels.
+A TDMS file can contain multiple groups, which may each contain multiple channels.
+A file, group and channel may all have properties associated with them,
+but only channels have array data.
+
 Typical usage when reading a TDMS file might look like::
 
     from nptdms import TdmsFile
 
     tdms_file = TdmsFile.read("path_to_file.tdms")
-    channel = tdms_file['Group']['Channel1']
-    data = channel.data
-    time = channel.time_track()
-    # do stuff with data
+    group = tdms_file['group name']
+    channel = group['channel name']
+    channel_data = channel[:]
+    channel_properties = channel.properties
 
-And to write a file::
+The ``TdmsFile.read`` method reads all data into memory immediately.
+When you are working with large TDMS files or don't need to read all channel data,
+you can instead use ``TdmsFile.open``. This is more memory efficient but
+accessing data can be slower::
+
+    with TdmsFile.open("path_to_file.tdms"):
+        group = tdms_file['group name']
+        channel = group['channel name']
+        channel_data = channel[:]
+
+npTDMS also has rudimentary support for writing TDMS files.
+Using npTDMS to write a TDMS file looks like::
 
     from nptdms import TdmsWriter, ChannelObject
     import numpy
 
     with TdmsWriter("path_to_file.tdms") as tdms_writer:
         data_array = numpy.linspace(0, 1, 10)
-        channel = ChannelObject('Group', 'Channel1', data_array)
+        channel = ChannelObject('group name', 'channel name', data_array)
         tdms_writer.write_segment([channel])
 
-For more information, see the `npTDMS documentation <http://nptdms.readthedocs.io>`__.
+For more detailed documentation on reading and writing TDMS files,
+see the `npTDMS documentation <http://nptdms.readthedocs.io>`__.
 
 Installation
 ------------
@@ -72,7 +88,7 @@ Limitations
 -----------
 
 This module doesn't support TDMS files with XML headers or with
-extended floating point data.
+extended precision floating point data.
 
 TDMS files support timestamps with a resolution of 2^-64 seconds but these
 are read as numpy datetime64 values with microsecond resolution.

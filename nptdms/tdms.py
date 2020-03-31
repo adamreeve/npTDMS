@@ -28,10 +28,32 @@ _property_builtin = property
 class TdmsFile(object):
     """ Reads and stores data from a TDMS file.
 
-    Can be indexed by group name to access a group within the TDMS file, for example::
+    There are two main ways to create a new TdmsFile object.
+    TdmsFile.read will read all data into memory::
+
+        tdms_file = TdmsFile.read(tdms_file_path)
+
+    or you can use TdmsFile.open to read file metadata but not immediately read all data,
+    for cases where a file is too large to easily fit in memory or you don't need to
+    read data for all channels::
+
+        with TdmsFile.open(tdms_file_path) as tdms_file:
+            # Use tdms_file
+            ...
+
+    This class acts like a dictionary, where the keys are names of groups in the TDMS
+    files and the values are TdmsGroup objects.
+    A TdmsFile can be indexed by group name to access a group within the TDMS file, for example::
 
         tdms_file = TdmsFile.read(tdms_file_path)
         group = tdms_file[group_name]
+
+    Iterating over a TdmsFile produces the names of groups in this file,
+    or you can use the groups method to directly access all groups::
+
+        for group in tdms_file.groups():
+            # Use group
+            ...
     """
 
     @staticmethod
@@ -173,6 +195,8 @@ class TdmsFile(object):
             self._reader = None
 
     def __iter__(self):
+        """ Returns an iterator over the names of groups in this file
+        """
         return iter(self._groups)
 
     def __getitem__(self, group_name):
@@ -385,9 +409,18 @@ class TdmsFile(object):
 class TdmsGroup(object):
     """ Represents a group of channels in a TDMS file.
 
-    Can be indexed by channel name to access a channel in this group, for example::
+    This class acts like a dictionary, where the keys are names of channels in the group
+    and the values are TdmsChannel objects.
+    A TdmsGroup can be indexed by channel name to access a channel in this group, for example::
 
         channel = group[channel_name]
+
+    Iterating over a TdmsGroup produces the names of channels in this group,
+    or you can use the channels method to directly access all channels::
+
+        for channel in group.channels():
+            # Use channel
+            ...
 
     :ivar ~.properties: Dictionary of TDMS properties defined for this group.
     """
@@ -436,6 +469,8 @@ class TdmsGroup(object):
         return pandas_export.from_group(self, time_index, absolute_time, scaled_data)
 
     def __iter__(self):
+        """ Returns an iterator over the names of channels in this group
+        """
         return iter(self._channels)
 
     def __getitem__(self, channel_name):
@@ -490,7 +525,23 @@ class TdmsGroup(object):
 class TdmsChannel(object):
     """ Represents a data channel in a TDMS file.
 
-    To find the number of data points in this channel use :code:`len(channel)`.
+    This class acts like an array, you can get the length of a channel using :code:`len(channel)`,
+    and can iterate over values in the channel using a for loop,
+    or index into a channel using an integer index to get a single value::
+
+        for value in channel:
+            # Use value
+            ...
+        first_value = channel[0]
+
+    Or you can index using a slice to retrieve a range of data as a numpy array.
+    To get all data in this channel as a numpy array::
+
+        all_data = channel[:]
+
+    Or to retrieve a subset of data::
+
+        data_subset = channel[start:stop]
 
     :ivar ~.properties: Dictionary of TDMS properties defined for this channel,
                       for example the start time and time increment for waveforms.
@@ -516,9 +567,13 @@ class TdmsChannel(object):
         return "<TdmsChannel with path %s>" % self.path
 
     def __len__(self):
+        """ Returns the number of values in this channel
+        """
         return self._length
 
     def __iter__(self):
+        """ Returns an iterator over the values in this channel
+        """
         if self._raw_data is not None:
             return iter(self.data)
         else:
@@ -568,8 +623,12 @@ class TdmsChannel(object):
 
     @_property_builtin
     def data(self):
-        """
-        NumPy array containing the data for this channel
+        """ If the TdmsFile was created by reading all data, this property
+        provides direct access to the numpy array containing the data for this channel.
+
+        Indexing into the channel with a slice should be preferred to using this property, for example::
+
+            channel_data = channel[:]
         """
         if len(self) > 0 and self._raw_data is None:
             raise RuntimeError("Channel data has not been read")
@@ -582,8 +641,8 @@ class TdmsChannel(object):
 
     @_property_builtin
     def raw_data(self):
-        """
-        The raw, unscaled data array.
+        """ If the TdmsFile was created by reading all data, this property
+        provides direct access to the numpy array of raw, unscaled data.
         For unscaled objects this is the same as the data property.
         """
         if len(self) > 0 and self._raw_data is None:
@@ -603,7 +662,9 @@ class TdmsChannel(object):
 
     @_property_builtin
     def raw_scaler_data(self):
-        """ Raw DAQmx scaler data as a dictionary mapping from scale id to raw data arrays
+        """ If the TdmsFile was created by reading all data, this property
+        provides direct access to the numpy array of raw DAQmx scaler data
+        as a dictionary mapping from scale id to raw data arrays.
         """
         if len(self) > 0 and self._raw_data is None:
             raise RuntimeError("Channel data has not been read")
@@ -622,17 +683,17 @@ class TdmsChannel(object):
             channel_offset += len(raw_data_chunk)
 
     def read_data(self, offset=0, length=None, scaled=True):
-        """ Reads data for this channel from the TDMS file and returns it
+        """ Reads data for this channel from the TDMS file and returns it as a numpy array
 
-            This is for use when the TDMS file was opened without immediately reading all data,
-            otherwise the data attribute should be used.
+        Indexing into the channel with a slice should be preferred over using
+        this method, but this method is needed if you want to read raw, unscaled data.
 
-            :param offset: Initial position to read data from.
-            :param length: Number of values to attempt to read.
-                Fewer values will be returned if attempting to read beyond the end of the available data.
-            :param scaled: By default scaling will be applied to the returned data.
-                Set this parameter to False to return raw unscaled data.
-                For DAQmx data a dictionary of scaler id to raw scaler data will be returned.
+        :param offset: Initial position to read data from.
+        :param length: Number of values to attempt to read.
+            Fewer values will be returned if attempting to read beyond the end of the available data.
+        :param scaled: By default scaling will be applied to the returned data.
+            Set this parameter to False to return raw unscaled data.
+            For DAQmx data a dictionary of scaler id to raw scaler data will be returned.
         """
         raw_data = self._tdms_file._read_channel_data(self, offset, length)
         if scaled:
@@ -835,7 +896,7 @@ class TdmsChannel(object):
 
     @_property_builtin
     def has_data(self):
-        """Deprecated"""
+        """(Deprecated)"""
         _deprecated("TdmsChannel.has_data", "This always returns True")
         return True
 
@@ -862,10 +923,12 @@ class DataChunk(object):
             for group in tdms_file.groups())
 
     def __getitem__(self, group_name):
+        """ Get a chunk of data for a group
+        """
         return self._groups[group_name]
 
     def groups(self):
-        """ Returns chunks of data for a group
+        """ Returns chunks of data for all groups
 
         :rtype: List of :class:`GroupDataChunk`
         """
@@ -893,10 +956,12 @@ class GroupDataChunk(object):
             for channel in group.channels())
 
     def __getitem__(self, channel_name):
+        """ Get a chunk of data for a channel in this group
+        """
         return self._channels[channel_name]
 
     def channels(self):
-        """ Returns chunks of channel data
+        """ Returns chunks of channel data for all channels in this group
 
         :rtype: List of :class:`ChannelDataChunk`
         """
@@ -924,12 +989,18 @@ class ChannelDataChunk(object):
         self._scaled_data = None
 
     def __len__(self):
+        """ Returns the number of values in this chunk
+        """
         return len(self._raw_data)
 
     def __getitem__(self, index):
+        """ Get a value or slice of values from this chunk
+        """
         return self._data()[index]
 
     def __iter__(self):
+        """ Iterate over values in this chunk
+        """
         return iter(self._data())
 
     def _data(self):
