@@ -39,7 +39,7 @@ The data types supported as property values are:
 - Integers
 - Floating point values
 - Strings
-- datetime objects
+- datetime or numpy datetime64 objects
 - Boolean values
 
 For more control over the data type used to represent a property value, for example

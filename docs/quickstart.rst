@@ -28,14 +28,26 @@ Typical usage when reading a TDMS file might look like::
             # Access dictionary of properties:
             properties = channel.properties
             # Access numpy array of data for channel:
-            data = channel.data
-            # do stuff with data and properties...
+            data = channel[:]
+            # Access a subset of data
+            data_subset = channel[100:200]
 
 Or to access a channel by group name and channel name directly::
 
-    channel = tdms_file[group_name][channel_name]
+    group = tdms_file[group_name]
+    channel = group[channel_name]
 
-And to write a TDMS file::
+The ``TdmsFile.read`` method reads all data into memory immediately.
+When you are working with large TDMS files or don't need to read all channel data,
+you can instead use ``TdmsFile.open``. This is more memory efficient but
+accessing data can be slower::
+
+    with TdmsFile.open("path_to_file.tdms"):
+        channel = tdms_file['group name']['channel name']
+        channel_data = channel[:]
+
+npTDMS also has rudimentary support for writing TDMS files.
+Using npTDMS to write a TDMS file looks like::
 
     from nptdms import TdmsWriter, ChannelObject
     import numpy
