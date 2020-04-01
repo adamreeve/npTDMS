@@ -36,6 +36,7 @@ def test_linear_scaling():
     expected_scaled_data = np.array([12.0, 14.0, 16.0])
 
     properties = {
+        "NI_Scaling_Status": "unscaled",
         "NI_Number_Of_Scales": 1,
         "NI_Scale[0]_Scale_Type": "Linear",
         "NI_Scale[0]_Linear_Slope": 2.0,
@@ -452,6 +453,20 @@ def test_scaling_from_root():
     scaled_data = scaling.scale(data)
 
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+
+
+def test_scaling_status_scaled():
+    """ When the scaling status is scaled, data is already scaled so scaling should not be applied
+    """
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Linear",
+        "NI_Scale[0]_Linear_Slope": 2.0,
+        "NI_Scale[0]_Linear_Y_Intercept": 10.0,
+        "NI_Scaling_Status": "scaled",
+    }
+    scaling = get_scaling(properties, {}, {})
+    assert scaling is None
 
 
 class StubTdmsData(object):

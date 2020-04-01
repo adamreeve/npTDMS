@@ -446,6 +446,10 @@ def _get_channel_scaling(properties):
     num_scalings = _get_number_of_scalings(properties)
     if num_scalings is None or num_scalings == 0:
         return None
+    scaling_status = properties.get("NI_Scaling_Status", "unscaled")
+    if scaling_status == "scaled":
+        # Data is written with scaling already applied
+        return None
 
     scalings = [None] * num_scalings
     for scale_index in range(num_scalings):
