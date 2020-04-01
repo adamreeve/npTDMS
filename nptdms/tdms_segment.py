@@ -184,7 +184,7 @@ class ContiguousDataSegment(BaseSegment):
         return TdmsSegmentObject(object_path, self.endianness)
 
     def _read_data_chunk(self, file, data_objects, chunk_index):
-        log.debug("Data is contiguous")
+        log.debug("Reading contiguous data chunk")
         object_data = {}
         for obj in data_objects:
             number_values = self._get_channel_number_values(obj, chunk_index)
@@ -235,7 +235,7 @@ class TdmsSegmentObject(BaseSegmentObject):
                 types.Uint32.read(f, self.endianness)]
         except KeyError:
             raise KeyError("Unrecognised data type")
-        log.debug("Object data type: %r", self.data_type)
+        log.debug("Object data type: %s", self.data_type.__name__)
 
         if (self.data_type.size is None and
                 self.data_type != types.String):
@@ -246,7 +246,7 @@ class TdmsSegmentObject(BaseSegmentObject):
         dimension = types.Uint32.read(f, self.endianness)
         # In TDMS version 2.0, 1 is the only valid value for dimension
         if dimension != 1:
-            log.warning("Data dimension is not 1")
+            raise ValueError("Data dimension is not 1")
 
         # Read number of values
         self.number_values = types.Uint64.read(f, self.endianness)

@@ -389,7 +389,7 @@ def read_property(f, endianness="<"):
     prop_name = types.String.read(f, endianness)
     prop_data_type = types.tds_data_types[types.Uint32.read(f, endianness)]
     value = prop_data_type.read(f, endianness)
-    log.debug("Property %s: %r", prop_name, value)
+    log.debug("Property '%s' = %r", prop_name, value)
     return prop_name, value
 
 

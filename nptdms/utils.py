@@ -1,3 +1,4 @@
+import logging
 import time
 
 try:
@@ -16,18 +17,24 @@ class Timer(object):
     """
 
     def __init__(self, log, description):
+        self._enabled = log.isEnabledFor(logging.INFO)
         self._log = log
         self._description = description
         self._start_time = None
 
     def __enter__(self):
+        if not self._enabled:
+            return self
         try:
             self._start_time = time.perf_counter()
         except AttributeError:
             # Python < 3.3
             self._start_time = time.clock()
+        return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
+        if not self._enabled:
+            return
         try:
             end_time = time.perf_counter()
         except AttributeError:
@@ -35,5 +42,4 @@ class Timer(object):
             end_time = time.clock()
 
         elapsed_time = (end_time - self._start_time) * 1.0e3
-        self._log.info("{0}: Took {1} ms".format(
-            self._description, elapsed_time))
+        self._log.info("{0}: Took {1} ms".format(self._description, elapsed_time))

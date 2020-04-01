@@ -1,12 +1,14 @@
 """Test reading of example TDMS files"""
 
 from collections import defaultdict
+import logging
 import os
 import tempfile
 from hypothesis import (assume, given, example, settings, strategies)
 import numpy as np
 import pytest
 from nptdms import TdmsFile
+from nptdms.log import log_manager
 from nptdms.test.util import (
     BytesIoTestFile,
     GeneratedFile,
@@ -652,3 +654,15 @@ def test_file_properties():
 
     file_props = tdms_file.properties
     assert file_props['num'] == 15
+
+
+def test_debug_logging(caplog):
+    """ Test loading a file with debug logging enabled
+    """
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+
+    log_manager.set_level(logging.DEBUG)
+    _ = test_file.load()
+
+    assert "Reading metadata for object /'group'/'channel1' with index header 0x00000014" in caplog.text
+    assert "Object data type: Int32" in caplog.text

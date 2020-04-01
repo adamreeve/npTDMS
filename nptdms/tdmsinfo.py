@@ -28,13 +28,13 @@ def main():
 
 
 def tdmsinfo(file, show_properties=False):
-    tdmsfile = TdmsFile.read_metadata(file)
+    tdms_file = TdmsFile.read_metadata(file)
 
     level = 0
     display('/', level)
     if show_properties:
-        display_properties(tdmsfile, level + 1)
-    for group in tdmsfile.groups():
+        display_properties(tdms_file, level + 1)
+    for group in tdms_file.groups():
         level = 1
         display("%s" % group.path, level)
         if show_properties:
