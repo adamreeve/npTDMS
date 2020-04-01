@@ -312,10 +312,6 @@ class BaseSegmentObject(object):
         raise NotImplementedError("Segment metadata reading must be implemented in base classes")
 
     @property
-    def total_raw_data_width(self):
-        raise NotImplementedError("Raw data width must be implemented in base classes")
-
-    @property
     def scaler_data_types(self):
         return None
 

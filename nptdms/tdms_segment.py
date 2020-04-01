@@ -260,10 +260,6 @@ class TdmsSegmentObject(BaseSegmentObject):
         log.debug(
             "Object number of values in segment: %d", self.number_values)
 
-    @property
-    def total_raw_data_width(self):
-        return self.data_type.size
-
     def read_value(self, file):
         """Read a single value from the given file"""
 

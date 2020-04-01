@@ -56,12 +56,6 @@ class ObjectPath(object):
         """
         return self._path
 
-    def __hash__(self):
-        return hash(self._path)
-
-    def __eq__(self, other):
-        return self._path == str(other)
-
 
 def _path_components(path):
     """ Generator that yields components within an object path
