@@ -298,3 +298,24 @@ def test_unicode_string_data(tmp_path):
     for expected, read in zip(strings, h5_strings[...]):
         assert expected == read
     h5.close()
+
+
+def test_add_to_file_under_group(tmp_path):
+    """ Test adding TDMS data to an HDF file under a group
+    """
+    test_file, expected_data = scenarios.single_segment_with_two_channels().values
+    preexisting_data = np.array([1.0, 2.0, 3.0])
+
+    tdms_data = test_file.load()
+    h5_path = tmp_path / 'h5_data_test.h5'
+    h5 = h5py.File(h5_path, 'w')
+    h5['preexisting_data'] = preexisting_data
+    h5.close()
+
+    h5 = tdms_data.as_hdf(h5_path, mode='a', group='tdms_data')
+
+    for ((group, channel), expected_data) in expected_data.items():
+        h5_channel = h5['tdms_data'][group][channel]
+        np.testing.assert_almost_equal(h5_channel[...], expected_data)
+    np.testing.assert_almost_equal(h5['preexisting_data'], preexisting_data)
+    h5.close()
