@@ -175,11 +175,9 @@ class TdmsFile(object):
 
         :rtype: Generator that yields :class:`DataChunk` objects
         """
-        if self._reader is None:
-            raise RuntimeError(
-                "Cannot read data chunks after the underlying TDMS reader is closed")
+        reader = self._get_reader()
         channel_offsets = defaultdict(int)
-        for chunk in self._reader.read_raw_data():
+        for chunk in reader.read_raw_data():
             yield DataChunk(self, chunk, channel_offsets)
             for path, data in chunk.channel_data.items():
                 channel_offsets[path] += len(data)
@@ -217,6 +215,12 @@ class TdmsFile(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
+
+    def _get_reader(self):
+        if self._reader is None:
+            raise RuntimeError(
+                "Cannot read data after the underlying TDMS reader is closed")
+        return self._reader
 
     def _read_file(self, tdms_reader, read_metadata_only):
         tdms_reader.read_metadata()
@@ -286,26 +290,19 @@ class TdmsFile(object):
         self.data_read = True
 
     def _read_channel_data_chunks(self, channel):
-        if self._reader is None:
-            raise RuntimeError(
-                "Cannot read channel data after the underlying TDMS reader is closed")
-        for chunk in self._reader.read_raw_data_for_channel(channel.path):
+        reader = self._get_reader()
+        for chunk in reader.read_raw_data_for_channel(channel.path):
             yield chunk
 
     def _read_channel_data_chunk_for_index(self, channel, index):
-        if self._reader is None:
-            raise RuntimeError(
-                "Cannot read channel data after the underlying TDMS reader is closed")
-        return self._reader.read_channel_chunk_for_index(channel.path, index)
+        return self._get_reader().read_channel_chunk_for_index(channel.path, index)
 
     def _read_channel_data(self, channel, offset=0, length=None):
         if offset < 0:
             raise ValueError("offset must be non-negative")
         if length is not None and length < 0:
             raise ValueError("length must be non-negative")
-        if self._reader is None:
-            raise RuntimeError(
-                "Cannot read channel data after the underlying TDMS reader is closed")
+        reader = self._get_reader()
 
         with Timer(log, "Allocate space"):
             # Allocate space for data
@@ -318,7 +315,7 @@ class TdmsFile(object):
 
         with Timer(log, "Read data"):
             # Now actually read all the data
-            for chunk in self._reader.read_raw_data_for_channel(channel.path, offset, length):
+            for chunk in reader.read_raw_data_for_channel(channel.path, offset, length):
                 if chunk.data is not None:
                     channel_data.append_data(chunk.data)
                 if chunk.scaler_data is not None:

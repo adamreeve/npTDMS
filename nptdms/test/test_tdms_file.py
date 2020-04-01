@@ -394,7 +394,7 @@ def test_read_data_after_close_throws():
             pass
         with pytest.raises(RuntimeError) as exc_info:
             tdms_file[group][channel].read_data()
-        assert "Cannot read channel data after the underlying TDMS reader is closed" in str(exc_info.value)
+        assert "Cannot read data after the underlying TDMS reader is closed" in str(exc_info.value)
 
 
 def test_read_data_after_open_in_read_mode_throws():
@@ -406,7 +406,7 @@ def test_read_data_after_open_in_read_mode_throws():
         tdms_file = TdmsFile.read(temp_file.file)
         with pytest.raises(RuntimeError) as exc_info:
             tdms_file[group][channel].read_data()
-        assert "Cannot read channel data after the underlying TDMS reader is closed" in str(exc_info.value)
+        assert "Cannot read data after the underlying TDMS reader is closed" in str(exc_info.value)
 
 
 def test_access_data_property_after_opening_throws():
