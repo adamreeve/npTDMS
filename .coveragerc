@@ -5,3 +5,5 @@ exclude_lines =
     def __repr__
     # Ignore handling failing imports
     except ImportError
+    # Ignore not-implemented methods in base classes
+    raise NotImplementedError
