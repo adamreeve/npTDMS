@@ -131,7 +131,7 @@ def _new_numpy_array(dtype, num_values, memmap_dir=None):
 
     :param dtype: Numpy data type for array
     :param num_values: Capacity required
-    :param mmemap_dir: Optional directory to store memory mmap files
+    :param memmap_dir: Optional directory to store memory mmap files
     """
     if memmap_dir:
         memmap_file = tempfile.NamedTemporaryFile(

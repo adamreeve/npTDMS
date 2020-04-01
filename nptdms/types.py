@@ -1,8 +1,36 @@
 """Conversions to and from bytes representation of values in TDMS files"""
 
-from datetime import datetime, timedelta
 import numpy as np
 import struct
+
+
+__all__ = [
+    'numpy_data_types',
+    'tds_data_types',
+    'TdmsType',
+    'Bytes',
+    'Void',
+    'Int8',
+    'Int16',
+    'Int32',
+    'Int64',
+    'Uint8',
+    'Uint16',
+    'Uint32',
+    'Uint64',
+    'SingleFloat',
+    'DoubleFloat',
+    'ExtendedFloat',
+    'SingleFloatWithUnit',
+    'DoubleFloatWithUnit',
+    'ExtendedFloatWithUnit',
+    'String',
+    'Boolean',
+    'TimeStamp',
+    'ComplexSingleFloat',
+    'ComplexDoubleFloat',
+    'DaqMxRawData',
+]
 
 
 _struct_pack = struct.pack
@@ -52,14 +80,16 @@ class Bytes(TdmsType):
 
 
 class StructType(TdmsType):
+    struct_declaration = None
+
     def __init__(self, value):
         self.value = value
         self.bytes = _struct_pack('<' + self.struct_declaration, value)
 
     @classmethod
     def read(cls, file, endianness="<"):
-        bytes = file.read(cls.size)
-        return _struct_unpack(endianness + cls.struct_declaration, bytes)[0]
+        read_bytes = file.read(cls.size)
+        return _struct_unpack(endianness + cls.struct_declaration, read_bytes)[0]
 
 
 @tds_data_type(0, None)

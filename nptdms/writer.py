@@ -6,13 +6,9 @@ except ImportError:
     OrderedDict = dict
 from datetime import datetime
 from io import UnsupportedOperation
-import logging
 import numpy as np
 from nptdms.common import toc_properties, ObjectPath
 from nptdms.types import *
-
-log = logging.getLogger(__name__)
-log.setLevel(logging.WARNING)
 
 
 try:
@@ -71,7 +67,7 @@ class TdmsWriter(object):
         self.open()
         return self
 
-    def __exit__(self, type, value, traceback):
+    def __exit__(self, exc_type, exc_value, exc_traceback):
         self.close()
 
 

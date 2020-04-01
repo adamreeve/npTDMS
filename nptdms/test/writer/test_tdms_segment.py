@@ -1,10 +1,12 @@
 """Test TdmsSegment"""
 
+from datetime import datetime
 import pytest
 try:
     from collections import OrderedDict
 except ImportError:
     OrderedDict = dict
+import numpy as np
 
 from nptdms.writer import TdmsSegment, read_properties_dict
 from nptdms.types import *

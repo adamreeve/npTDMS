@@ -46,7 +46,7 @@ class PolynomialScaling(object):
     def from_properties(properties, scale_index):
         try:
             number_of_coefficients = properties[
-                'NI_Scale[%d]_Polynomial_Coefficients_Size' % (scale_index)]
+                'NI_Scale[%d]_Polynomial_Coefficients_Size' % scale_index]
         except KeyError:
             number_of_coefficients = 4
         try:
