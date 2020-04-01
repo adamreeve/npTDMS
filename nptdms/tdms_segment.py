@@ -269,7 +269,7 @@ class TdmsSegmentObject(BaseSegmentObject):
 
         if self.data_type.nptype is not None:
             dtype = self.data_type.nptype.newbyteorder(self.endianness)
-            return fromfile(file, dtype=dtype, count=1)
+            return fromfile(file, dtype=dtype, count=1)[0]
         return self.data_type.read(file, self.endianness)
 
     def read_values(self, file, number_values):
