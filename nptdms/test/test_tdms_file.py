@@ -465,6 +465,32 @@ def test_get_len_of_group():
     assert len(tdms_data['Group']) == 2
 
 
+def test_key_error_getting_invalid_group():
+    """Test getting a group that doesn't exist raises a KeyError
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    with pytest.raises(KeyError) as exc_info:
+        _ = tdms_data['non-existent group']
+    assert 'non-existent group' in str(exc_info.value)
+
+
+def test_key_error_getting_invalid_channel():
+    """Test getting a channel that doesn't exist raises a KeyError
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    group = tdms_data['Group']
+    with pytest.raises(KeyError) as exc_info:
+        _ = group['non-existent channel']
+    assert 'non-existent channel' in str(exc_info.value)
+    assert 'Group' in str(exc_info.value)
+
+
 def test_group_property_read():
     """Test reading property of a group"""
 
