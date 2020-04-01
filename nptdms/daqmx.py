@@ -69,8 +69,6 @@ class DaqmxSegment(BaseSegment):
                     scaler_size = scaler.data_type.size
                     byte_columns = tuple(
                         range(offset, offset + scaler_size))
-                    log.debug("Byte columns for channel %d scaler %d: %s",
-                              i, scaler.scale_id, byte_columns)
                     # Select columns for this scaler, so that number of values
                     # will be number of bytes per point * number of data
                     # points. Then use ravel to flatten the results into a
@@ -114,8 +112,6 @@ class DaqmxSegmentObject(BaseSegmentObject):
             self.data_type = types.tds_data_types[data_type_val]
         except KeyError:
             raise KeyError("Unrecognised data type: %s" % data_type_val)
-
-        log.debug("DAQmx object data type: %r", self.data_type)
 
         daqmx_metadata = DaqMxMetadata(f, self.endianness, raw_data_index_header)
         log.debug("DAQmx metadata: %r", daqmx_metadata)
@@ -162,12 +158,11 @@ class DaqMxMetadata(object):
         self.dimension = types.Uint32.read(f, endianness)
         # In TDMS format version 2.0, 1 is the only valid value for dimension
         if self.dimension != 1:
-            log.warning("Data dimension is not 1")
+            raise ValueError("Data dimension is not 1")
         self.chunk_size = types.Uint64.read(f, endianness)
 
         # size of vector of format changing scalers
         scaler_vector_length = types.Uint32.read(f, endianness)
-        log.debug("mxDAQ format scaler vector size '%d'", scaler_vector_length)
         self.scalers = [
             DaqMxScaler(f, endianness, scaler_type)
             for _ in range(scaler_vector_length)]
@@ -186,7 +181,7 @@ class DaqMxMetadata(object):
         """ Return string representation of DAQmx metadata
         """
         properties = (
-            "%s=%s" % (name, getattr(self, name))
+            "%s=%s" % (name, _get_attr_repr(self, name))
             for name in self.__slots__)
 
         properties_list = ", ".join(properties)
@@ -220,11 +215,18 @@ class DaqMxScaler(object):
 
     def __repr__(self):
         properties = (
-            "%s=%s" % (name, getattr(self, name))
+            "%s=%s" % (name, _get_attr_repr(self, name))
             for name in self.__slots__)
 
         properties_list = ", ".join(properties)
         return "%s(%s)" % (self.__class__.__name__, properties_list)
+
+
+def _get_attr_repr(obj, attr_name):
+    val = getattr(obj, attr_name)
+    if isinstance(val, type):
+        return val.__name__
+    return repr(val)
 
 
 # Type codes for DAQmx scalers don't match the normal TDMS type codes:

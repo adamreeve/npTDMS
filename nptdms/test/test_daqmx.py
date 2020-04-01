@@ -2,9 +2,11 @@
 """
 
 from collections import defaultdict
+import logging
 import numpy as np
 
 from nptdms import TdmsFile
+from nptdms.log import log_manager
 from nptdms.test.util import (
     GeneratedFile, hexlify_value, string_hexlify, segment_objects_metadata, hex_properties)
 
@@ -622,6 +624,33 @@ def test_stream_data_chunks():
     for ((group, channel), expected_data) in expected_channel_data.items():
         actual_data = data_arrays[(group, channel)]
         np.testing.assert_equal(actual_data, expected_data)
+
+
+def test_daqmx_debug_logging(caplog):
+    """ Test loading a DAQmx file with debug logging enabled
+    """
+    scaler_metadata = daqmx_scaler_metadata(0, 3, 0)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 4, [2], [scaler_metadata]))
+    data = (
+        "01 00"
+        "02 00"
+        "FF FF"
+        "FE FF"
+    )
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc(), metadata, data)
+
+    log_manager.set_level(logging.DEBUG)
+    _ = test_file.load()
+
+    assert "Reading metadata for object /'Group'/'Channel1' with index header 0x00001269" in caplog.text
+    assert "scaler_type=4713" in caplog.text
+    assert "scale_id=0" in caplog.text
+    assert "data_type=Int16" in caplog.text
 
 
 def segment_toc():

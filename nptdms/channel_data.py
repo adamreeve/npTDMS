@@ -76,14 +76,12 @@ class NumpyDataReceiver(object):
             obj.data_type.nptype, num_values, memmap_dir)
         self.scaler_data = {}
         self._data_insert_position = 0
-        log.debug(
-            "Allocated %d sample slots for %s", len(self.data), obj.path)
+        log.debug("Allocated %d sample slots for %s", len(self.data), obj.path)
 
     def append_data(self, new_data):
         """Update the object data with a new array of data"""
 
-        log.debug(
-            "Adding %d data points to data for %s", len(new_data), self.path)
+        log.debug("Adding %d data points to data for %s", len(new_data), self.path)
         start_pos = self._data_insert_position
         end_pos = self._data_insert_position + len(new_data)
         self.data[start_pos:end_pos] = new_data

@@ -302,7 +302,7 @@ class TdmsFile(object):
             raise RuntimeError(
                 "Cannot read channel data after the underlying TDMS reader is closed")
 
-        with Timer(log, "Allocate space"):
+        with Timer(log, "Allocate space for channel"):
             # Allocate space for data
             if length is None:
                 num_values = len(channel) - offset
@@ -311,7 +311,7 @@ class TdmsFile(object):
             num_values = max(0, num_values)
             channel_data = get_data_receiver(channel, num_values, self._memmap_dir)
 
-        with Timer(log, "Read data"):
+        with Timer(log, "Read data for channel"):
             # Now actually read all the data
             for chunk in self._reader.read_raw_data_for_channel(channel.path, offset, length):
                 if chunk.data is not None:
