@@ -820,6 +820,43 @@ def interleaved_timestamp_data():
     return test_file, expected_data
 
 
+@scenario
+def segment_without_data():
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
+        ),
+        ""
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList", "kTocRawData"),
+        segment_objects_metadata(
+            channel_metadata_with_repeated_structure("/'group'/'channel1'"),
+        ),
+        "01 00 00 00" "02 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata_with_repeated_structure("/'group'/'channel1'"),
+        ),
+        ""
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList", "kTocRawData"),
+        segment_objects_metadata(
+            channel_metadata_with_repeated_structure("/'group'/'channel1'"),
+        ),
+        "03 00 00 00" "04 00 00 00"
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([1, 2, 3, 4], dtype=np.int32),
+    }
+    return test_file, expected_data
+
+
 def _timestamp_data(times):
     epoch = np.datetime64('1904-01-01T00:00:00')
 

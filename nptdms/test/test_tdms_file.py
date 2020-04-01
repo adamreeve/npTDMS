@@ -175,11 +175,10 @@ def test_indexing_and_iterating_data_chunks():
         compare_arrays(actual_data, expected_data)
 
 
-def test_stream_channel_data_chunks():
+@pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
+def test_stream_channel_data_chunks(test_file, expected_data):
     """Test streaming chunks of data for a single channel from a TDMS file
     """
-    test_file, expected_data = scenarios.chunked_segment().values
-
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             for ((group, channel), expected_channel_data) in expected_data.items():
