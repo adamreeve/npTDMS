@@ -445,6 +445,26 @@ def test_get_objects():
     assert "/'Group'/'Channel2'" in objects.keys()
 
 
+def test_get_len_of_file():
+    """Test getting the length of a TdmsFile
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    assert len(tdms_data) == 1
+
+
+def test_get_len_of_group():
+    """Test getting the length of a TdmsGroup
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    assert len(tdms_data['Group']) == 2
+
+
 def test_group_property_read():
     """Test reading property of a group"""
 

@@ -194,6 +194,11 @@ class TdmsFile(object):
             self._reader.close()
             self._reader = None
 
+    def __len__(self):
+        """ Returns the number of groups in this file
+        """
+        return len(self._groups)
+
     def __iter__(self):
         """ Returns an iterator over the names of groups in this file
         """
@@ -467,6 +472,11 @@ class TdmsGroup(object):
         """
 
         return pandas_export.from_group(self, time_index, absolute_time, scaled_data)
+
+    def __len__(self):
+        """ Returns the number of channels in this group
+        """
+        return len(self._channels)
 
     def __iter__(self):
         """ Returns an iterator over the names of channels in this group
