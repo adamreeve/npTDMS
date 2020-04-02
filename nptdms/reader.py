@@ -2,6 +2,7 @@
 """
 
 import numpy as np
+from nptdms.common import ObjectPath
 from nptdms.utils import Timer, OrderedDict
 from nptdms.tdms_segment import read_segment_metadata
 from nptdms.base_segment import RawChannelDataChunk
@@ -216,7 +217,7 @@ class TdmsReader(object):
         data_objects = [
             path
             for (path, obj) in self.object_metadata.items()
-            if obj.num_values > 0]
+            if ObjectPath.from_string(path).is_channel]
         num_segments = len(self._segments)
 
         segment_num_values = {

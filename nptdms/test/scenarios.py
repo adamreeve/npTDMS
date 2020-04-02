@@ -942,6 +942,38 @@ def segment_without_data():
     return test_file, expected_data
 
 
+@scenario
+def channel_without_data():
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
+        ),
+        ""
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([], dtype=np.dtype('int32')),
+    }
+    return test_file, expected_data
+
+
+@scenario
+def channel_without_data_or_data_type():
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata_with_no_data("/'group'/'channel1'"),
+        ),
+        ""
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([], dtype=np.dtype('void')),
+    }
+    return test_file, expected_data
+
+
 def _timestamp_data(times):
     epoch = np.datetime64('1904-01-01T00:00:00')
 

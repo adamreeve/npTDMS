@@ -618,15 +618,19 @@ class TdmsChannel(object):
 
         :rtype: numpy.dtype
         """
+        channel_scaling = self._get_scaling()
+        if channel_scaling is not None:
+            return channel_scaling.get_dtype(self.data_type, self.scaler_data_types)
+        return self._raw_data_dtype()
+
+    def _raw_data_dtype(self):
         if self.data_type is types.String:
             return np.dtype('O')
         elif self.data_type is types.TimeStamp:
             return np.dtype('<M8[us]')
-
-        channel_scaling = self._get_scaling()
-        if channel_scaling is not None:
-            return channel_scaling.get_dtype(self.data_type, self.scaler_data_types)
-        return self.data_type.nptype
+        if self.data_type is not None and self.data_type.nptype is not None:
+            return self.data_type.nptype
+        return np.dtype('V8')
 
     @_property_builtin
     def data(self):
@@ -641,7 +645,7 @@ class TdmsChannel(object):
             raise RuntimeError("Channel data has not been read")
 
         if self._raw_data is None:
-            return np.empty((0, ))
+            return np.empty((0, ), dtype=self.dtype)
         if self._data_scaled is None:
             self._data_scaled = self._scale_data(self._raw_data)
         return self._data_scaled
@@ -656,7 +660,7 @@ class TdmsChannel(object):
             raise RuntimeError("Channel data has not been read")
 
         if self._raw_data is None:
-            return np.empty((0, ))
+            return np.empty((0, ), dtype=self._raw_data_dtype())
         if self._raw_data.scaler_data:
             if len(self._raw_data.scaler_data) == 1:
                 return next(v for v in self._raw_data.scaler_data.values())
@@ -703,6 +707,9 @@ class TdmsChannel(object):
             For DAQmx data a dictionary of scaler id to raw scaler data will be returned.
         """
         raw_data = self._tdms_file._read_channel_data(self, offset, length)
+        if raw_data is None:
+            dtype = self.dtype if scaled else self._raw_data_dtype()
+            return np.empty((0,), dtype=dtype)
         if scaled:
             return self._scale_data(raw_data)
         else:
@@ -1014,7 +1021,7 @@ class ChannelDataChunk(object):
         if self._scaled_data is not None:
             return self._scaled_data
         if self._raw_data.data is None and self._raw_data.scaler_data is None:
-            return np.empty((0, ))
+            return np.empty((0, ), dtype=self._channel.dtype)
 
         scale = self._get_scaling()
         if scale is not None:

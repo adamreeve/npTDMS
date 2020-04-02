@@ -46,6 +46,10 @@ class ObjectPath(object):
     def is_group(self):
         return self.group is not None and self.channel is None
 
+    @property
+    def is_channel(self):
+        return self.channel is not None
+
     @staticmethod
     def from_string(path_string):
         components = list(_path_components(path_string))
