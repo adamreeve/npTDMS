@@ -177,11 +177,10 @@ def test_indexing_and_iterating_data_chunks():
         compare_arrays(actual_data, expected_data)
 
 
-def test_stream_channel_data_chunks():
+@pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
+def test_stream_channel_data_chunks(test_file, expected_data):
     """Test streaming chunks of data for a single channel from a TDMS file
     """
-    test_file, expected_data = scenarios.chunked_segment().values
-
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             for ((group, channel), expected_channel_data) in expected_data.items():
@@ -397,7 +396,7 @@ def test_read_data_after_close_throws():
             pass
         with pytest.raises(RuntimeError) as exc_info:
             tdms_file[group][channel].read_data()
-        assert "Cannot read channel data after the underlying TDMS reader is closed" in str(exc_info.value)
+        assert "Cannot read data after the underlying TDMS reader is closed" in str(exc_info.value)
 
 
 def test_read_data_after_open_in_read_mode_throws():
@@ -409,7 +408,7 @@ def test_read_data_after_open_in_read_mode_throws():
         tdms_file = TdmsFile.read(temp_file.file)
         with pytest.raises(RuntimeError) as exc_info:
             tdms_file[group][channel].read_data()
-        assert "Cannot read channel data after the underlying TDMS reader is closed" in str(exc_info.value)
+        assert "Cannot read data after the underlying TDMS reader is closed" in str(exc_info.value)
 
 
 def test_access_data_property_after_opening_throws():
@@ -446,6 +445,52 @@ def test_get_objects():
     assert "/'Group'" in objects.keys()
     assert "/'Group'/'Channel1'" in objects.keys()
     assert "/'Group'/'Channel2'" in objects.keys()
+
+
+def test_get_len_of_file():
+    """Test getting the length of a TdmsFile
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    assert len(tdms_data) == 1
+
+
+def test_get_len_of_group():
+    """Test getting the length of a TdmsGroup
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    assert len(tdms_data['Group']) == 2
+
+
+def test_key_error_getting_invalid_group():
+    """Test getting a group that doesn't exist raises a KeyError
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    with pytest.raises(KeyError) as exc_info:
+        _ = tdms_data['non-existent group']
+    assert 'non-existent group' in str(exc_info.value)
+
+
+def test_key_error_getting_invalid_channel():
+    """Test getting a channel that doesn't exist raises a KeyError
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    group = tdms_data['Group']
+    with pytest.raises(KeyError) as exc_info:
+        _ = group['non-existent channel']
+    assert 'non-existent channel' in str(exc_info.value)
+    assert 'Group' in str(exc_info.value)
 
 
 def test_group_property_read():

@@ -13,6 +13,8 @@ from nptdms.test.util import (
     channel_metadata_with_repeated_structure)
 
 
+TDS_TYPE_INT8 = 1
+TDS_TYPE_INT16 = 2
 TDS_TYPE_INT32 = 3
 TDS_TYPE_BOOL = 0x21
 TDS_TYPE_COMPLEX64 = 0x08000c
@@ -88,6 +90,28 @@ def single_segment_with_two_channels_interleaved():
     expected_data = {
         ('group', 'channel1'): np.array([1, 3], dtype=np.int32),
         ('group', 'channel2'): np.array([2, 4], dtype=np.int32),
+    }
+    return test_file, expected_data
+
+
+@scenario
+def single_segment_with_interleaved_data_of_different_width():
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT8, 2),
+            channel_metadata("/'group'/'channel2'", TDS_TYPE_INT16, 2),
+            channel_metadata("/'group'/'channel3'", TDS_TYPE_INT32, 2),
+        ),
+        "01" "01 00" "01 00 00 00"
+        "02" "02 00" "02 00 00 00"
+        "03" "03 00" "03 00 00 00"
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([1, 2, 3], dtype=np.int8),
+        ('group', 'channel2'): np.array([1, 2, 3], dtype=np.int16),
+        ('group', 'channel3'): np.array([1, 2, 3], dtype=np.int32),
     }
     return test_file, expected_data
 
@@ -817,6 +841,136 @@ def interleaved_timestamp_data():
         ('Group', 'TimeChannel2'): np.array([times[1], times[3]]),
     }
 
+    return test_file, expected_data
+
+
+@scenario
+def interleaved_timestamp_and_numpy_data():
+    """Test reading timestamp data interleaved with a standard numpy data type
+    """
+
+    times = [
+        np.datetime64('2012-08-23T00:00:00.123', 'us'),
+        np.datetime64('2012-08-23T01:02:03.456', 'us'),
+    ]
+
+    metadata = (
+        # Number of objects
+        "02 00 00 00"
+        # Length of the object path
+        "16 00 00 00")
+    metadata += string_hexlify("/'Group'/'TimeChannel'")
+    metadata += (
+        # Length of index information
+        "14 00 00 00"
+        # Raw data data type
+        "44 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+    metadata += (
+        "15 00 00 00")
+    metadata += string_hexlify("/'Group'/'IntChannel'")
+    metadata += (
+        # Length of index information
+        "14 00 00 00"
+        # Raw data data type
+        "03 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+
+    data = (_timestamp_data([times[0]]) +
+            "01 00 00 00" +
+            _timestamp_data([times[1]]) +
+            "02 00 00 00")
+
+    test_file = GeneratedFile()
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData")
+    test_file.add_segment(toc, metadata, data)
+
+    expected_data = {
+        ('Group', 'TimeChannel'): np.array([times[0], times[1]]),
+        ('Group', 'IntChannel'): np.array([1, 2], dtype=np.dtype('int32')),
+    }
+
+    return test_file, expected_data
+
+
+@scenario
+def segment_without_data():
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
+        ),
+        ""
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList", "kTocRawData"),
+        segment_objects_metadata(
+            channel_metadata_with_repeated_structure("/'group'/'channel1'"),
+        ),
+        "01 00 00 00" "02 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata_with_repeated_structure("/'group'/'channel1'"),
+        ),
+        ""
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList", "kTocRawData"),
+        segment_objects_metadata(
+            channel_metadata_with_repeated_structure("/'group'/'channel1'"),
+        ),
+        "03 00 00 00" "04 00 00 00"
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([1, 2, 3, 4], dtype=np.int32),
+    }
+    return test_file, expected_data
+
+
+@scenario
+def channel_without_data():
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
+        ),
+        ""
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([], dtype=np.dtype('int32')),
+    }
+    return test_file, expected_data
+
+
+@scenario
+def channel_without_data_or_data_type():
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata_with_no_data("/'group'/'channel1'"),
+        ),
+        ""
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([], dtype=np.dtype('void')),
+    }
     return test_file, expected_data
 
 

@@ -175,11 +175,9 @@ class TdmsFile(object):
 
         :rtype: Generator that yields :class:`DataChunk` objects
         """
-        if self._reader is None:
-            raise RuntimeError(
-                "Cannot read data chunks after the underlying TDMS reader is closed")
+        reader = self._get_reader()
         channel_offsets = defaultdict(int)
-        for chunk in self._reader.read_raw_data():
+        for chunk in reader.read_raw_data():
             yield DataChunk(self, chunk, channel_offsets)
             for path, data in chunk.channel_data.items():
                 channel_offsets[path] += len(data)
@@ -193,6 +191,11 @@ class TdmsFile(object):
         if self._reader is not None:
             self._reader.close()
             self._reader = None
+
+    def __len__(self):
+        """ Returns the number of groups in this file
+        """
+        return len(self._groups)
 
     def __iter__(self):
         """ Returns an iterator over the names of groups in this file
@@ -212,6 +215,12 @@ class TdmsFile(object):
 
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
+
+    def _get_reader(self):
+        if self._reader is None:
+            raise RuntimeError(
+                "Cannot read data after the underlying TDMS reader is closed")
+        return self._reader
 
     def _read_file(self, tdms_reader, read_metadata_only):
         tdms_reader.read_metadata()
@@ -281,26 +290,19 @@ class TdmsFile(object):
         self.data_read = True
 
     def _read_channel_data_chunks(self, channel):
-        if self._reader is None:
-            raise RuntimeError(
-                "Cannot read channel data after the underlying TDMS reader is closed")
-        for chunk in self._reader.read_raw_data_for_channel(channel.path):
+        reader = self._get_reader()
+        for chunk in reader.read_raw_data_for_channel(channel.path):
             yield chunk
 
     def _read_channel_data_chunk_for_index(self, channel, index):
-        if self._reader is None:
-            raise RuntimeError(
-                "Cannot read channel data after the underlying TDMS reader is closed")
-        return self._reader.read_channel_chunk_for_index(channel.path, index)
+        return self._get_reader().read_channel_chunk_for_index(channel.path, index)
 
     def _read_channel_data(self, channel, offset=0, length=None):
         if offset < 0:
             raise ValueError("offset must be non-negative")
         if length is not None and length < 0:
             raise ValueError("length must be non-negative")
-        if self._reader is None:
-            raise RuntimeError(
-                "Cannot read channel data after the underlying TDMS reader is closed")
+        reader = self._get_reader()
 
         with Timer(log, "Allocate space for channel"):
             # Allocate space for data
@@ -313,7 +315,7 @@ class TdmsFile(object):
 
         with Timer(log, "Read data for channel"):
             # Now actually read all the data
-            for chunk in self._reader.read_raw_data_for_channel(channel.path, offset, length):
+            for chunk in reader.read_raw_data_for_channel(channel.path, offset, length):
                 if chunk.data is not None:
                     channel_data.append_data(chunk.data)
                 if chunk.scaler_data is not None:
@@ -468,6 +470,11 @@ class TdmsGroup(object):
 
         return pandas_export.from_group(self, time_index, absolute_time, scaled_data)
 
+    def __len__(self):
+        """ Returns the number of channels in this group
+        """
+        return len(self._channels)
+
     def __iter__(self):
         """ Returns an iterator over the names of channels in this group
         """
@@ -611,15 +618,19 @@ class TdmsChannel(object):
 
         :rtype: numpy.dtype
         """
+        channel_scaling = self._get_scaling()
+        if channel_scaling is not None:
+            return channel_scaling.get_dtype(self.data_type, self.scaler_data_types)
+        return self._raw_data_dtype()
+
+    def _raw_data_dtype(self):
         if self.data_type is types.String:
             return np.dtype('O')
         elif self.data_type is types.TimeStamp:
             return np.dtype('<M8[us]')
-
-        channel_scaling = self._get_scaling()
-        if channel_scaling is not None:
-            return channel_scaling.get_dtype(self.data_type, self.scaler_data_types)
-        return self.data_type.nptype
+        if self.data_type is not None and self.data_type.nptype is not None:
+            return self.data_type.nptype
+        return np.dtype('V8')
 
     @_property_builtin
     def data(self):
@@ -634,7 +645,7 @@ class TdmsChannel(object):
             raise RuntimeError("Channel data has not been read")
 
         if self._raw_data is None:
-            return np.empty((0, ))
+            return np.empty((0, ), dtype=self.dtype)
         if self._data_scaled is None:
             self._data_scaled = self._scale_data(self._raw_data)
         return self._data_scaled
@@ -649,7 +660,7 @@ class TdmsChannel(object):
             raise RuntimeError("Channel data has not been read")
 
         if self._raw_data is None:
-            return np.empty((0, ))
+            return np.empty((0, ), dtype=self._raw_data_dtype())
         if self._raw_data.scaler_data:
             if len(self._raw_data.scaler_data) == 1:
                 return next(v for v in self._raw_data.scaler_data.values())
@@ -696,6 +707,9 @@ class TdmsChannel(object):
             For DAQmx data a dictionary of scaler id to raw scaler data will be returned.
         """
         raw_data = self._tdms_file._read_channel_data(self, offset, length)
+        if raw_data is None:
+            dtype = self.dtype if scaled else self._raw_data_dtype()
+            return np.empty((0,), dtype=dtype)
         if scaled:
             return self._scale_data(raw_data)
         else:
@@ -1007,7 +1021,7 @@ class ChannelDataChunk(object):
         if self._scaled_data is not None:
             return self._scaled_data
         if self._raw_data.data is None and self._raw_data.scaler_data is None:
-            return np.empty((0, ))
+            return np.empty((0, ), dtype=self._channel.dtype)
 
         scale = self._get_scaling()
         if scale is not None:

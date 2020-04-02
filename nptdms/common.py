@@ -46,6 +46,10 @@ class ObjectPath(object):
     def is_group(self):
         return self.group is not None and self.channel is None
 
+    @property
+    def is_channel(self):
+        return self.channel is not None
+
     @staticmethod
     def from_string(path_string):
         components = list(_path_components(path_string))
@@ -55,12 +59,6 @@ class ObjectPath(object):
         """ String representation of the object path
         """
         return self._path
-
-    def __hash__(self):
-        return hash(self._path)
-
-    def __eq__(self, other):
-        return self._path == str(other)
 
 
 def _path_components(path):

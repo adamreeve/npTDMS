@@ -2,6 +2,7 @@
 """
 
 import numpy as np
+from nptdms.common import ObjectPath
 from nptdms.utils import Timer, OrderedDict
 from nptdms.tdms_segment import read_segment_metadata
 from nptdms.base_segment import RawChannelDataChunk
@@ -67,10 +68,7 @@ class TdmsReader(object):
                 self._segments.append(segment)
                 previous_segment = segment
 
-                if segment.next_segment_pos is None:
-                    break
-                else:
-                    self._file.seek(segment.next_segment_pos)
+                self._file.seek(segment.next_segment_pos)
 
     def read_raw_data(self):
         """ Read raw data from all segments, chunk by chunk
@@ -219,7 +217,7 @@ class TdmsReader(object):
         data_objects = [
             path
             for (path, obj) in self.object_metadata.items()
-            if obj.num_values > 0]
+            if ObjectPath.from_string(path).is_channel]
         num_segments = len(self._segments)
 
         segment_num_values = {
