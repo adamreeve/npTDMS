@@ -1,12 +1,18 @@
 """ Lower level TDMS reader API that allows finer grained reading of data
 """
 
+import logging
+import os
 import numpy as np
-from nptdms.common import ObjectPath
+
+from nptdms import types
+from nptdms.common import ObjectPath, toc_properties
 from nptdms.utils import Timer, OrderedDict
-from nptdms.tdms_segment import read_segment_metadata
 from nptdms.base_segment import RawChannelDataChunk
+from nptdms.tdms_segment import ContiguousDataSegment, InterleavedDataSegment
+from nptdms.daqmx import DaqmxSegment
 from nptdms.log import log_manager
+
 
 log = log_manager.get_logger(__name__)
 
@@ -27,6 +33,7 @@ class TdmsReader(object):
         self._prev_segment_objects = {}
         self.object_metadata = OrderedDict()
         self._file_path = None
+        self._index_file_path = None
 
         self._segment_channel_offsets = None
         self._segment_chunk_sizes = None
@@ -38,6 +45,9 @@ class TdmsReader(object):
             # Is path to a file
             self._file = open(tdms_file, 'rb')
             self._file_path = tdms_file
+            index_file_path = tdms_file + '_index'
+            if os.path.isfile(index_file_path):
+                self._index_file_path = index_file_path
 
     def close(self):
         if self._file_path is not None:
@@ -51,24 +61,38 @@ class TdmsReader(object):
         """ Read all metadata and structure information from a TdmsFile
         """
 
+        if self._index_file_path is not None:
+            reading_index_file = True
+            file = open(self._index_file_path, 'rb')
+        else:
+            reading_index_file = False
+            file = self._file
+
         self._segments = []
-        with Timer(log, "Read metadata"):
-            # Read metadata first to work out how much space we need
-            previous_segment = None
-            while True:
-                try:
-                    segment = read_segment_metadata(
-                        self._file, self._prev_segment_objects, previous_segment)
-                except EOFError:
-                    # We've finished reading the file
-                    break
+        segment_position = 0
+        try:
+            with Timer(log, "Read metadata"):
+                # Read metadata first to work out how much space we need
+                previous_segment = None
+                while True:
+                    try:
+                        segment = self._read_segment_metadata(
+                            file, self._prev_segment_objects, segment_position, previous_segment, reading_index_file)
+                    except EOFError:
+                        # We've finished reading the file
+                        break
 
-                self._update_object_metadata(segment)
-                self._update_object_properties(segment)
-                self._segments.append(segment)
-                previous_segment = segment
+                    self._update_object_metadata(segment)
+                    self._update_object_properties(segment)
+                    self._segments.append(segment)
+                    previous_segment = segment
 
-                self._file.seek(segment.next_segment_pos)
+                    segment_position = segment.next_segment_pos
+                    if not reading_index_file:
+                        file.seek(segment.next_segment_pos)
+        finally:
+            if reading_index_file:
+                file.close()
 
     def read_raw_data(self):
         """ Read raw data from all segments, chunk by chunk
@@ -176,6 +200,84 @@ class TdmsReader(object):
         chunk_data = next(segment.read_raw_data_for_channel(self._file, channel_path, chunk_index, 1))
         chunk_offset = segment_start_index + chunk_index * chunk_size
         return chunk_data, chunk_offset
+
+    def _read_segment_metadata(
+            self, file, previous_segment_objects, segment_position, previous_segment=None, is_index_file=False):
+        (position, toc_mask, endianness, data_position, raw_data_offset,
+         next_segment_offset, next_segment_pos) = self._read_lead_in(file, segment_position, is_index_file)
+
+        segment_args = (
+            position, toc_mask, endianness, next_segment_offset,
+            next_segment_pos, raw_data_offset, data_position)
+        if toc_mask & toc_properties['kTocDAQmxRawData']:
+            segment = DaqmxSegment(*segment_args)
+        elif toc_mask & toc_properties['kTocInterleavedData']:
+            segment = InterleavedDataSegment(*segment_args)
+        else:
+            segment = ContiguousDataSegment(*segment_args)
+
+        segment.read_segment_objects(
+            file, previous_segment_objects, previous_segment)
+        return segment
+
+    def _read_lead_in(self, file, segment_position, is_index_file=False):
+        expected_tag = b'TDSh' if is_index_file else b'TDSm'
+        tag = file.read(4)
+        if tag == b'':
+            raise EOFError
+        if tag != expected_tag:
+            raise ValueError(
+                "Segment does not start with %r, but with %r" % (expected_tag, tag))
+
+        log.debug("Reading segment at %d", segment_position)
+
+        # Next four bytes are table of contents mask
+        toc_mask = types.Int32.read(file)
+
+        if log.isEnabledFor(logging.DEBUG):
+            for prop_name, prop_mask in toc_properties.items():
+                prop_is_set = (toc_mask & prop_mask) != 0
+                log.debug("Property %s is %s", prop_name, prop_is_set)
+
+        endianness = '>' if (toc_mask & toc_properties['kTocBigEndian']) else '<'
+
+        # Next four bytes are version number
+        version = types.Int32.read(file, endianness)
+        if version not in (4712, 4713):
+            log.warning("Unrecognised version number.")
+
+        # Now 8 bytes each for the offset values
+        next_segment_offset = types.Uint64.read(file, endianness)
+        raw_data_offset = types.Uint64.read(file, endianness)
+
+        # Calculate data and next segment position
+        lead_size = 7 * 4
+        data_position = segment_position + lead_size + raw_data_offset
+        if next_segment_offset == 0xFFFFFFFFFFFFFFFF:
+            # Segment size is unknown. This can happen if LabVIEW crashes.
+            # Try to read until the end of the file.
+            log.warning(
+                "Last segment of file has unknown size, "
+                "will attempt to read to the end of the file")
+            next_segment_pos = self._get_data_file_size()
+            next_segment_offset = next_segment_pos - segment_position - lead_size
+        else:
+            log.debug("Next segment offset = %d, raw data offset = %d",
+                      next_segment_offset, raw_data_offset)
+            log.debug("Data size = %d b",
+                      next_segment_offset - raw_data_offset)
+            next_segment_pos = (
+                    segment_position + next_segment_offset + lead_size)
+
+        return (segment_position, toc_mask, endianness, data_position, raw_data_offset,
+                next_segment_offset, next_segment_pos)
+
+    def _get_data_file_size(self):
+        current_pos = self._file.tell()
+        self._file.seek(0, os.SEEK_END)
+        end_pos = self._file.tell()
+        self._file.seek(current_pos, os.SEEK_SET)
+        return end_pos
 
     def _update_object_metadata(self, segment):
         """ Update object metadata using the metadata read from a single segment

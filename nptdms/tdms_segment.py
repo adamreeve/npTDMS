@@ -1,9 +1,7 @@
-import logging
 import os
 import numpy as np
 
 from nptdms import types
-from nptdms.common import toc_properties
 from nptdms.base_segment import (
     BaseSegment,
     BaseSegmentObject,
@@ -11,92 +9,10 @@ from nptdms.base_segment import (
     RawDataChunk,
     read_interleaved_segment_bytes,
     fromfile)
-from nptdms.daqmx import DaqmxSegment
 from nptdms.log import log_manager
 
 
 log = log_manager.get_logger(__name__)
-
-
-def read_segment_metadata(file, previous_segment_objects, previous_segment=None):
-    (position, toc_mask, endianness, data_position, raw_data_offset,
-     next_segment_offset, next_segment_pos) = read_lead_in(file)
-
-    segment_args = (
-        position, toc_mask, endianness, next_segment_offset,
-        next_segment_pos, raw_data_offset, data_position)
-    if toc_mask & toc_properties['kTocDAQmxRawData']:
-        segment = DaqmxSegment(*segment_args)
-    elif toc_mask & toc_properties['kTocInterleavedData']:
-        segment = InterleavedDataSegment(*segment_args)
-    else:
-        segment = ContiguousDataSegment(*segment_args)
-
-    segment.read_segment_objects(
-        file, previous_segment_objects, previous_segment)
-    return segment
-
-
-def read_lead_in(file):
-    position = file.tell()
-    # First four bytes should be TDSm
-    try:
-        tag = file.read(4).decode('utf-8')
-    except UnicodeDecodeError:
-        raise ValueError("Segment does not start with TDSm")
-    if tag == '':
-        raise EOFError
-    if tag != 'TDSm':
-        raise ValueError(
-            "Segment does not start with TDSm, but with %s" % tag)
-
-    log.debug("Reading segment at %d", position)
-
-    # Next four bytes are table of contents mask
-    toc_mask = types.Int32.read(file)
-
-    if log.isEnabledFor(logging.DEBUG):
-        for prop_name, prop_mask in toc_properties.items():
-            prop_is_set = (toc_mask & prop_mask) != 0
-            log.debug("Property %s is %s", prop_name, prop_is_set)
-
-    endianness = '>' if (toc_mask & toc_properties['kTocBigEndian']) else '<'
-
-    # Next four bytes are version number
-    version = types.Int32.read(file, endianness)
-    if version not in (4712, 4713):
-        log.warning("Unrecognised version number.")
-
-    # Now 8 bytes each for the offset values
-    next_segment_offset = types.Uint64.read(file, endianness)
-    raw_data_offset = types.Uint64.read(file, endianness)
-
-    # Calculate data and next segment position
-    lead_size = 7 * 4
-    data_position = position + lead_size + raw_data_offset
-    if next_segment_offset == 0xFFFFFFFFFFFFFFFF:
-        # Segment size is unknown. This can happen if Labview crashes.
-        # Try to read until the end of the file.
-        log.warning(
-            "Last segment of file has unknown size, "
-            "will attempt to read to the end of the file")
-        current_pos = file.tell()
-        file.seek(0, os.SEEK_END)
-        end_pos = file.tell()
-        file.seek(current_pos, os.SEEK_SET)
-
-        next_segment_pos = end_pos
-        next_segment_offset = end_pos - position - lead_size
-    else:
-        log.debug("Next segment offset = %d, raw data offset = %d",
-                  next_segment_offset, raw_data_offset)
-        log.debug("Data size = %d b",
-                  next_segment_offset - raw_data_offset)
-        next_segment_pos = (
-                position + next_segment_offset + lead_size)
-
-    return (position, toc_mask, endianness, data_position, raw_data_offset,
-            next_segment_offset, next_segment_pos)
 
 
 class InterleavedDataSegment(BaseSegment):
