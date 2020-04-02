@@ -77,7 +77,7 @@ class TdmsReader(object):
                 while True:
                     try:
                         segment = self._read_segment_metadata(
-                            file, self._prev_segment_objects, segment_position, previous_segment, reading_index_file)
+                            file, segment_position, previous_segment, reading_index_file)
                     except EOFError:
                         # We've finished reading the file
                         break
@@ -202,7 +202,7 @@ class TdmsReader(object):
         return chunk_data, chunk_offset
 
     def _read_segment_metadata(
-            self, file, previous_segment_objects, segment_position, previous_segment=None, is_index_file=False):
+            self, file, segment_position, previous_segment=None, is_index_file=False):
         (position, toc_mask, endianness, data_position, raw_data_offset,
          next_segment_offset, next_segment_pos) = self._read_lead_in(file, segment_position, is_index_file)
 
@@ -217,7 +217,7 @@ class TdmsReader(object):
             segment = ContiguousDataSegment(*segment_args)
 
         segment.read_segment_objects(
-            file, previous_segment_objects, previous_segment)
+            file, self._prev_segment_objects, previous_segment)
         return segment
 
     def _read_lead_in(self, file, segment_position, is_index_file=False):
