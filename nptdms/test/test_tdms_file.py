@@ -431,6 +431,18 @@ def test_access_data_property_after_opening_throws():
             assert "Channel data has not been read" in str(exc_info.value)
 
 
+@pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
+def test_read_with_index_file(test_file, expected_data):
+    """ Test reading a file with an associated tdms_index file
+    """
+    with test_file.get_tempfile_with_index() as tdms_file_path:
+        tdms_file = TdmsFile.read(tdms_file_path)
+
+    for ((group, channel), expected_channel_data) in expected_data.items():
+        channel_obj = tdms_file[group][channel]
+        compare_arrays(channel_obj.data, expected_channel_data)
+
+
 @pytest.mark.filterwarnings('ignore:.* is deprecated')
 def test_get_objects():
     """Test reading data"""

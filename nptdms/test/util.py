@@ -2,6 +2,8 @@
 """
 
 import binascii
+from contextlib import contextmanager
+import os
 from io import BytesIO
 import struct
 import tempfile
@@ -201,7 +203,7 @@ class GeneratedFile(object):
     """Generate a TDMS file for testing"""
 
     def __init__(self):
-        self._content = b''
+        self._content = []
 
     def add_segment(self, toc, metadata, data, incomplete=False):
         metadata_bytes = _hex_to_bytes(metadata)
@@ -232,27 +234,61 @@ class GeneratedFile(object):
             lead_in += struct.pack('<Q', raw_data_offset)
         else:
             lead_in = b''
-        self._content += lead_in + metadata_bytes + data_bytes
+        self._content.append((lead_in, metadata_bytes, data_bytes))
 
     def get_tempfile(self, **kwargs):
         named_file = tempfile.NamedTemporaryFile(suffix=".tdms", **kwargs)
         file = named_file.file
-        file.write(self._content)
+        file.write(self._get_contents())
         file.seek(0)
         return named_file
+
+    @contextmanager
+    def get_tempfile_with_index(self):
+        directory = tempfile.mkdtemp()
+        tdms_path = os.path.join(directory, 'test_file.tdms')
+        tdms_index_path = os.path.join(directory, 'test_file.tdms_index')
+        with open(tdms_path, 'wb') as file:
+            file.write(self._get_contents())
+        with open(tdms_index_path, 'wb') as file:
+            file.write(self._get_index_contents())
+        try:
+            yield tdms_path
+        finally:
+            os.unlink(tdms_path)
+            os.unlink(tdms_index_path)
+            os.rmdir(directory)
 
     def load(self, *args, **kwargs):
         with tempfile.NamedTemporaryFile(suffix=".tdms") as named_file:
             file = named_file.file
-            file.write(self._content)
+            file.write(self._get_contents())
             file.seek(0)
             return tdms.TdmsFile(file, *args, **kwargs)
+
+    def _get_contents(self):
+        contents = b''
+        for segment in self._content:
+            contents += segment[0]
+            contents += segment[1]
+            contents += segment[2]
+        return contents
+
+    def _get_index_contents(self):
+        contents = b''
+        for segment in self._content:
+            lead_in = segment[0]
+            if len(lead_in) >= 4:
+                lead_in = b'TDSh' + lead_in[4:]
+            contents += lead_in
+            contents += segment[1]
+        return contents
 
 
 class BytesIoTestFile(GeneratedFile):
     def load(self, *args, **kwargs):
         file = BytesIO()
-        file.write(self._content)
+        file.write(self._get_contents())
         file.seek(0)
         return tdms.TdmsFile(file, *args, **kwargs)
 
