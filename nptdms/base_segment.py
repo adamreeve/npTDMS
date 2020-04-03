@@ -219,13 +219,11 @@ class BaseSegment(object):
         data_objects = [o for o in self.ordered_objects if o.has_data]
         chunk_size = self._get_chunk_size()
 
-        for chunk_index in range(self.num_chunks):
-            if chunk_index < chunk_offset:
-                f.seek(chunk_size, os.SEEK_CUR)
-            elif num_chunks is None or chunk_index < num_chunks + chunk_offset:
-                yield self._read_channel_data_chunk(f, data_objects, chunk_index, channel_path)
-            else:
-                break
+        if chunk_offset > 0:
+            f.seek(chunk_size * chunk_offset, os.SEEK_CUR)
+        stop_chunk = self.num_chunks if num_chunks is None else num_chunks + chunk_offset
+        for chunk_index in range(chunk_offset, stop_chunk):
+            yield self._read_channel_data_chunk(f, data_objects, chunk_index, channel_path)
 
     def _calculate_chunks(self):
         """
