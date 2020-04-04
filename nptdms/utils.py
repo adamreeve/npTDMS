@@ -1,3 +1,4 @@
+from functools import wraps
 import logging
 import time
 
@@ -10,6 +11,24 @@ except ImportError:
     except ImportError:
         # Otherwise fall back on normal dict
         OrderedDict = dict
+
+
+def cached_property(func):
+    """ Wraps a method on a class to make it a property and caches the result the first time it is evaluated
+    """
+    attr_name = '_cached_prop_' + func.__name__
+
+    @property
+    @wraps(func)
+    def get(self):
+        try:
+            return getattr(self, attr_name)
+        except AttributeError:
+            value = func(self)
+            setattr(self, attr_name, value)
+            return value
+
+    return get
 
 
 class Timer(object):

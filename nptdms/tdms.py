@@ -8,7 +8,7 @@ import warnings
 import numpy as np
 
 from nptdms import scaling, types
-from nptdms.utils import Timer, OrderedDict
+from nptdms.utils import Timer, OrderedDict, cached_property
 from nptdms.log import log_manager
 from nptdms.common import ObjectPath
 from nptdms.reader import TdmsReader
@@ -565,8 +565,6 @@ class TdmsChannel(object):
         self.scaler_data_types = scaler_data_types
 
         self._raw_data = None
-        self._data_scaled = None
-
         self._cached_chunk = None
         self._cached_chunk_bounds = None
 
@@ -610,7 +608,7 @@ class TdmsChannel(object):
         """
         return self._path.channel
 
-    @_property_builtin
+    @cached_property
     def dtype(self):
         """ NumPy data type of the channel data
 
@@ -618,7 +616,7 @@ class TdmsChannel(object):
 
         :rtype: numpy.dtype
         """
-        channel_scaling = self._get_scaling()
+        channel_scaling = self._scaling
         if channel_scaling is not None:
             return channel_scaling.get_dtype(self.data_type, self.scaler_data_types)
         return self._raw_data_dtype()
@@ -632,7 +630,7 @@ class TdmsChannel(object):
             return self.data_type.nptype
         return np.dtype('V8')
 
-    @_property_builtin
+    @cached_property
     def data(self):
         """ If the TdmsFile was created by reading all data, this property
         provides direct access to the numpy array containing the data for this channel.
@@ -646,9 +644,7 @@ class TdmsChannel(object):
 
         if self._raw_data is None:
             return np.empty((0, ), dtype=self.dtype)
-        if self._data_scaled is None:
-            self._data_scaled = self._scale_data(self._raw_data)
-        return self._data_scaled
+        return self._scale_data(self._raw_data)
 
     @_property_builtin
     def raw_data(self):
@@ -860,7 +856,7 @@ class TdmsChannel(object):
         return scaled_chunk[index - chunk_offset]
 
     def _scale_data(self, raw_data):
-        scale = self._get_scaling()
+        scale = self._scaling
         if scale is not None:
             return scale.scale(raw_data)
         elif raw_data.scaler_data:
@@ -868,7 +864,8 @@ class TdmsChannel(object):
         else:
             return raw_data.data
 
-    def _get_scaling(self):
+    @cached_property
+    def _scaling(self):
         group_properties = self._tdms_file[self._path.group].properties
         file_properties = self._tdms_file.properties
         return scaling.get_scaling(
@@ -1000,7 +997,6 @@ class ChannelDataChunk(object):
         self.name = channel.name
         self.offset = offset
         self._raw_data = raw_data_chunk
-        self._scaled_data = None
 
     def __len__(self):
         """ Returns the number of values in this chunk
@@ -1010,34 +1006,25 @@ class ChannelDataChunk(object):
     def __getitem__(self, index):
         """ Get a value or slice of values from this chunk
         """
-        return self._data()[index]
+        return self._data[index]
 
     def __iter__(self):
         """ Iterate over values in this chunk
         """
-        return iter(self._data())
+        return iter(self._data)
 
+    @cached_property
     def _data(self):
-        if self._scaled_data is not None:
-            return self._scaled_data
         if self._raw_data.data is None and self._raw_data.scaler_data is None:
             return np.empty((0, ), dtype=self._channel.dtype)
 
-        scale = self._get_scaling()
+        scale = self._channel._scaling
         if scale is not None:
-            self._scaled_data = scale.scale(self._raw_data)
+            return scale.scale(self._raw_data)
         elif self._raw_data.scaler_data:
             raise ValueError("Missing scaling information for DAQmx data")
         else:
-            self._scaled_data = self._raw_data.data
-        return self._scaled_data
-
-    def _get_scaling(self):
-        file_properties = self._tdms_file.properties
-        group_properties = self._tdms_file[self._path.group].properties
-        channel_properties = self._channel.properties
-        return scaling.get_scaling(
-            channel_properties, group_properties, file_properties)
+            return self._raw_data.data
 
 
 class RootObject(object):
