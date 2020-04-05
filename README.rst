@@ -1,6 +1,9 @@
 npTDMS
 ======
 
+.. image:: https://img.shields.io/pypi/v/npTDMS.svg
+    :alt: PyPI Version
+    :target: https://pypi.org/project/npTDMS/
 .. image:: https://travis-ci.com/adamreeve/npTDMS.svg?branch=master
     :alt: Build status
     :target: https://travis-ci.com/adamreeve/npTDMS
