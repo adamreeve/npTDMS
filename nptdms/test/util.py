@@ -205,9 +205,9 @@ class GeneratedFile(object):
     def __init__(self):
         self._content = []
 
-    def add_segment(self, toc, metadata, data, incomplete=False):
+    def add_segment(self, toc, metadata, data, incomplete=False, binary_data=False):
         metadata_bytes = _hex_to_bytes(metadata)
-        data_bytes = _hex_to_bytes(data)
+        data_bytes = data if binary_data else _hex_to_bytes(data)
         if toc is not None:
             lead_in = b'TDSm'
             toc_mask = long(0)
@@ -266,6 +266,12 @@ class GeneratedFile(object):
             file.seek(0)
             return tdms.TdmsFile(file, *args, **kwargs)
 
+    def get_bytes_io_file(self):
+        file = BytesIO()
+        file.write(self._get_contents())
+        file.seek(0)
+        return file
+
     def _get_contents(self):
         contents = b''
         for segment in self._content:
@@ -287,9 +293,7 @@ class GeneratedFile(object):
 
 class BytesIoTestFile(GeneratedFile):
     def load(self, *args, **kwargs):
-        file = BytesIO()
-        file.write(self._get_contents())
-        file.seek(0)
+        file = self.get_bytes_io_file()
         return tdms.TdmsFile(file, *args, **kwargs)
 
 
