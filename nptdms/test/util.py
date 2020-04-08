@@ -211,18 +211,21 @@ class GeneratedFile(object):
         if toc is not None:
             lead_in = b'TDSm'
             toc_mask = long(0)
-            if "kTocMetaData" in toc:
-                toc_mask = toc_mask | long(1) << 1
-            if "kTocRawData" in toc:
-                toc_mask = toc_mask | long(1) << 3
-            if "kTocDAQmxRawData" in toc:
-                toc_mask = toc_mask | long(1) << 7
-            if "kTocInterleavedData" in toc:
-                toc_mask = toc_mask | long(1) << 5
-            if "kTocBigEndian" in toc:
-                toc_mask = toc_mask | long(1) << 6
-            if "kTocNewObjList" in toc:
-                toc_mask = toc_mask | long(1) << 2
+            for toc_item in toc:
+                if toc_item == "kTocMetaData":
+                    toc_mask = toc_mask | long(1) << 1
+                elif toc_item == "kTocRawData":
+                    toc_mask = toc_mask | long(1) << 3
+                elif toc_item == "kTocDAQmxRawData":
+                    toc_mask = toc_mask | long(1) << 7
+                elif toc_item == "kTocInterleavedData":
+                    toc_mask = toc_mask | long(1) << 5
+                elif toc_item == "kTocBigEndian":
+                    toc_mask = toc_mask | long(1) << 6
+                elif toc_item == "kTocNewObjList":
+                    toc_mask = toc_mask | long(1) << 2
+                else:
+                    raise ValueError("Unrecognised TOC value: %s" % toc_item)
             lead_in += struct.pack('<i', toc_mask)
             lead_in += _hex_to_bytes("69 12 00 00")
             next_segment_offset = len(metadata_bytes) + len(data_bytes)
