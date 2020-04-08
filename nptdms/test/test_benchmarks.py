@@ -7,7 +7,9 @@ from nptdms.test.util import (
     hexlify_value,
     string_hexlify,
     segment_objects_metadata,
-    channel_metadata)
+    channel_metadata,
+    channel_metadata_with_no_data,
+    channel_metadata_with_repeated_structure)
 from nptdms.test.scenarios import TDS_TYPE_INT32
 
 
@@ -137,6 +139,75 @@ def test_stream_scaled_data_chunks(benchmark):
         channel_data = np.concatenate(channel_data)
         expected_data = np.tile(10.0 + 2.0 * data_array, 10)
         np.testing.assert_equal(channel_data, expected_data)
+
+
+def test_complex_metadata_reading(benchmark):
+    """ Benchmark reading metadata for a file with many channels and segments with alternating sets of objects
+    """
+    test_file = GeneratedFile()
+    data = np.array([0] * 5, dtype=np.dtype('int32')).tobytes()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel0'", TDS_TYPE_INT32, 1),
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 1),
+            channel_metadata("/'group'/'channel2'", TDS_TYPE_INT32, 1),
+            channel_metadata("/'group'/'channel3'", TDS_TYPE_INT32, 1),
+            channel_metadata("/'group'/'channel4'", TDS_TYPE_INT32, 1),
+        ),
+        data, binary_data=True
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel5'", TDS_TYPE_INT32, 1),
+            channel_metadata("/'group'/'channel6'", TDS_TYPE_INT32, 1),
+            channel_metadata("/'group'/'channel7'", TDS_TYPE_INT32, 1),
+            channel_metadata("/'group'/'channel8'", TDS_TYPE_INT32, 1),
+            channel_metadata("/'group'/'channel9'", TDS_TYPE_INT32, 1),
+        ),
+        data, binary_data=True
+    )
+    for _ in range(9):
+        test_file.add_segment(
+            ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+            segment_objects_metadata(
+                channel_metadata_with_no_data("/'group'/'channel0'"),
+                channel_metadata_with_no_data("/'group'/'channel1'"),
+                channel_metadata_with_no_data("/'group'/'channel2'"),
+                channel_metadata_with_no_data("/'group'/'channel3'"),
+                channel_metadata_with_no_data("/'group'/'channel4'"),
+                channel_metadata_with_repeated_structure("/'group'/'channel5'"),
+                channel_metadata_with_repeated_structure("/'group'/'channel6'"),
+                channel_metadata_with_repeated_structure("/'group'/'channel7'"),
+                channel_metadata_with_repeated_structure("/'group'/'channel8'"),
+                channel_metadata_with_repeated_structure("/'group'/'channel9'"),
+            ),
+            data, binary_data=True
+        )
+        test_file.add_segment(
+            ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+            segment_objects_metadata(
+                channel_metadata_with_repeated_structure("/'group'/'channel0'"),
+                channel_metadata_with_repeated_structure("/'group'/'channel1'"),
+                channel_metadata_with_repeated_structure("/'group'/'channel2'"),
+                channel_metadata_with_repeated_structure("/'group'/'channel3'"),
+                channel_metadata_with_repeated_structure("/'group'/'channel4'"),
+                channel_metadata_with_no_data("/'group'/'channel5'"),
+                channel_metadata_with_no_data("/'group'/'channel6'"),
+                channel_metadata_with_no_data("/'group'/'channel7'"),
+                channel_metadata_with_no_data("/'group'/'channel8'"),
+                channel_metadata_with_no_data("/'group'/'channel9'"),
+            ),
+            data, binary_data=True
+        )
+
+    tdms_file = benchmark(read_metadata_from_start, test_file.get_bytes_io_file())
+
+    assert len(tdms_file) == 1
+    assert len(tdms_file['group']) == 10
+    for channel_num in range(10):
+        assert len(tdms_file['group']['channel{0}'.format(channel_num)]) == 10
 
 
 def get_contiguous_file():
