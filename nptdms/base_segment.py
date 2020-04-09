@@ -64,6 +64,9 @@ class BaseSegment(object):
             # metadata changed will need to be copied before being modified.
             self.ordered_objects = [
                 o for o in previous_segment.ordered_objects]
+            existing_objects = {o.path: (i, o) for (i, o) in enumerate(self.ordered_objects)}
+        else:
+            existing_objects = None
 
         log.debug("Reading segment object metadata at %d", file.tell())
 
@@ -79,7 +82,10 @@ class BaseSegment(object):
 
             # Check whether we already have this object in our list from
             # the last segment
-            (existing_object_index, existing_object) = self._get_existing_object(object_path)
+            (existing_object_index, existing_object) = (
+                self._get_existing_object(existing_objects, object_path)
+                if existing_objects is not None
+                else (None, None))
             if existing_object_index is not None:
                 self._update_existing_object(
                     object_path, existing_object_index, existing_object, raw_data_index_header, file)
@@ -157,14 +163,12 @@ class BaseSegment(object):
                 "kTocMetaData is not set for segment but "
                 "there is no previous segment")
 
-    def _get_existing_object(self, object_path):
-        """ Find an object already in the list of objects in this segment
+    def _get_existing_object(self, existing_objects, object_path):
+        """ Find an object already in the list of objects that are reused from the previous segment
         """
         try:
-            return next(
-                (i, o) for (i, o) in enumerate(self.ordered_objects)
-                if o.path == object_path)
-        except StopIteration:
+            return existing_objects[object_path]
+        except KeyError:
             return None, None
 
     def _read_object_properties(self, file, object_path):
