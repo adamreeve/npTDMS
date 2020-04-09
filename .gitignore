@@ -8,6 +8,7 @@
 *.swp
 .tox
 .hypothesis
+.benchmark
 
 # Wercker directories
 _builds
