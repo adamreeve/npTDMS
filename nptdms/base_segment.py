@@ -1,6 +1,7 @@
 from copy import copy
 from io import UnsupportedOperation
 import os
+import struct
 import numpy as np
 
 from nptdms import types
@@ -9,6 +10,7 @@ from nptdms.log import log_manager
 
 
 log = log_manager.get_logger(__name__)
+_struct_unpack = struct.unpack
 
 RAW_DATA_INDEX_NO_DATA = 0xFFFFFFFF
 RAW_DATA_INDEX_MATCHES_PREVIOUS = 0x00000000
@@ -55,6 +57,8 @@ class BaseSegment(object):
             self._reuse_previous_segment_metadata(previous_segment)
             return
 
+        endianness = self.endianness
+
         new_obj_list = self.toc_mask & toc_properties['kTocNewObjList']
         if not new_obj_list:
             # In this case, there can be a list of new objects that
@@ -64,22 +68,29 @@ class BaseSegment(object):
             # metadata changed will need to be copied before being modified.
             self.ordered_objects = [
                 o for o in previous_segment.ordered_objects]
+            existing_objects = {o.path: (i, o) for (i, o) in enumerate(self.ordered_objects)}
+        else:
+            existing_objects = None
 
         log.debug("Reading segment object metadata at %d", file.tell())
 
         # First four bytes have number of objects in metadata
-        num_objects = types.Int32.read(file, self.endianness)
+        num_objects_bytes = file.read(4)
+        num_objects = _struct_unpack(endianness + 'L', num_objects_bytes)[0]
 
         for _ in range(num_objects):
             # Read the object path
-            object_path = types.String.read(file, self.endianness)
-            raw_data_index_header = types.Uint32.read(file, self.endianness)
-            log.debug("Reading metadata for object %s with index header 0x%08x",
-                      object_path, raw_data_index_header)
+            object_path = types.String.read(file, endianness)
+            raw_data_index_header_bytes = file.read(4)
+            raw_data_index_header = _struct_unpack(endianness + 'L', raw_data_index_header_bytes)[0]
+            log.debug("Reading metadata for object %s with index header 0x%08x", object_path, raw_data_index_header)
 
             # Check whether we already have this object in our list from
             # the last segment
-            (existing_object_index, existing_object) = self._get_existing_object(object_path)
+            (existing_object_index, existing_object) = (
+                self._get_existing_object(existing_objects, object_path)
+                if existing_objects is not None
+                else (None, None))
             if existing_object_index is not None:
                 self._update_existing_object(
                     object_path, existing_object_index, existing_object, raw_data_index_header, file)
@@ -157,20 +168,19 @@ class BaseSegment(object):
                 "kTocMetaData is not set for segment but "
                 "there is no previous segment")
 
-    def _get_existing_object(self, object_path):
-        """ Find an object already in the list of objects in this segment
+    def _get_existing_object(self, existing_objects, object_path):
+        """ Find an object already in the list of objects that are reused from the previous segment
         """
         try:
-            return next(
-                (i, o) for (i, o) in enumerate(self.ordered_objects)
-                if o.path == object_path)
-        except StopIteration:
+            return existing_objects[object_path]
+        except KeyError:
             return None, None
 
     def _read_object_properties(self, file, object_path):
         """Read properties for an object in the segment
         """
-        num_properties = types.Uint32.read(file, self.endianness)
+        num_properties_bytes = file.read(4)
+        num_properties = _struct_unpack(self.endianness + 'L', num_properties_bytes)[0]
         if num_properties > 0:
             log.debug("Reading %d properties", num_properties)
             if self.object_properties is None:
