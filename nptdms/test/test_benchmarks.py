@@ -1,5 +1,6 @@
 import os
 import numpy as np
+import pytest
 
 from nptdms import TdmsFile
 from nptdms.test.util import (
@@ -13,6 +14,7 @@ from nptdms.test.util import (
 from nptdms.test.scenarios import TDS_TYPE_INT32
 
 
+@pytest.mark.benchmark(group='read-all-data')
 def test_read_contiguous_data(benchmark):
     """ Benchmark reading a file with multiple channels of contiguous data
     """
@@ -24,6 +26,7 @@ def test_read_contiguous_data(benchmark):
     np.testing.assert_equal(tdms_file['group']['channel4'][:], np.repeat([4], 10000))
 
 
+@pytest.mark.benchmark(group='read-all-data')
 def test_read_interleaved_data(benchmark):
     """ Benchmark reading a file with interleaved data
     """
@@ -35,6 +38,7 @@ def test_read_interleaved_data(benchmark):
     np.testing.assert_equal(tdms_file['group']['channel4'][:], np.repeat([4], 10000))
 
 
+@pytest.mark.benchmark(group='read-all-channel')
 def test_read_contiguous_data_channel(benchmark):
     """ Benchmark reading a single channel's data from a contiguous data file
     """
@@ -46,6 +50,7 @@ def test_read_contiguous_data_channel(benchmark):
         np.testing.assert_equal(channel_data, expected_data)
 
 
+@pytest.mark.benchmark(group='read-all-channel')
 def test_read_interleaved_data_channel(benchmark):
     """ Benchmark reading a single channel's data from an interleaved data file
     """
@@ -57,6 +62,7 @@ def test_read_interleaved_data_channel(benchmark):
         np.testing.assert_equal(channel_data, expected_data)
 
 
+@pytest.mark.benchmark(group='read-all-channel')
 def test_stream_contiguous_data_channel(benchmark):
     """ Benchmark streaming channel data from a contiguous data file
     """
@@ -69,6 +75,7 @@ def test_stream_contiguous_data_channel(benchmark):
         np.testing.assert_equal(channel_data, expected_data)
 
 
+@pytest.mark.benchmark(group='read-all-channel')
 def test_stream_interleaved_data_channel(benchmark):
     """ Benchmark streaming channel data from an interleaved data file
     """
@@ -81,6 +88,7 @@ def test_stream_interleaved_data_channel(benchmark):
         np.testing.assert_equal(channel_data, expected_data)
 
 
+@pytest.mark.benchmark(group='slice-channel')
 def test_slice_contiguous_data_channel(benchmark):
     """ Benchmark reading a slice of data from a contiguous data file
     """
@@ -92,6 +100,7 @@ def test_slice_contiguous_data_channel(benchmark):
         np.testing.assert_equal(channel_data, expected_data)
 
 
+@pytest.mark.benchmark(group='slice-channel')
 def test_slice_interleaved_data_channel(benchmark):
     """ Benchmark reading a slice of data from an interleaved data file
     """
@@ -103,6 +112,7 @@ def test_slice_interleaved_data_channel(benchmark):
         np.testing.assert_equal(channel_data, expected_data)
 
 
+@pytest.mark.benchmark(group='read-all-channel')
 def test_index_contiguous_data_channel(benchmark):
     """ Benchmark reading a data from a contiguous data file using integer indices
     """
@@ -115,6 +125,7 @@ def test_index_contiguous_data_channel(benchmark):
         np.testing.assert_equal(channel_data, expected_data)
 
 
+@pytest.mark.benchmark(group='read-all-channel')
 def test_index_interleaved_data_channel(benchmark):
     """ Benchmark reading a data from a interleaved data file using integer indices
     """
@@ -127,6 +138,7 @@ def test_index_interleaved_data_channel(benchmark):
         np.testing.assert_equal(channel_data, expected_data)
 
 
+@pytest.mark.benchmark(group='read-scaled-channel')
 def test_stream_scaled_data_chunks(benchmark):
     """ Benchmark streaming channel data when the data is scaled
     """
@@ -163,6 +175,7 @@ def test_stream_scaled_data_chunks(benchmark):
         np.testing.assert_equal(channel_data, expected_data)
 
 
+@pytest.mark.benchmark(group='read-metadata')
 def test_complex_metadata_reading(benchmark):
     """ Benchmark reading metadata for a file with many channels and segments with alternating sets of objects
     """
