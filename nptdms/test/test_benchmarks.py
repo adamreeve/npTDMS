@@ -35,6 +35,28 @@ def test_read_interleaved_data(benchmark):
     np.testing.assert_equal(tdms_file['group']['channel4'][:], np.repeat([4], 10000))
 
 
+def test_read_contiguous_data_channel(benchmark):
+    """ Benchmark reading a single channel's data from a contiguous data file
+    """
+    with TdmsFile.open(get_contiguous_file().get_bytes_io_file()) as tdms_file:
+        channel = tdms_file['group']['channel3']
+        channel_data = benchmark(read_channel_data, channel)
+
+        expected_data = np.repeat([3], 10000)
+        np.testing.assert_equal(channel_data, expected_data)
+
+
+def test_read_interleaved_data_channel(benchmark):
+    """ Benchmark reading a single channel's data from an interleaved data file
+    """
+    with TdmsFile.open(get_interleaved_file().get_bytes_io_file()) as tdms_file:
+        channel = tdms_file['group']['channel3']
+        channel_data = benchmark(read_channel_data, channel)
+
+        expected_data = np.repeat([3], 10000)
+        np.testing.assert_equal(channel_data, expected_data)
+
+
 def test_stream_contiguous_data_channel(benchmark):
     """ Benchmark streaming channel data from a contiguous data file
     """
@@ -259,6 +281,10 @@ def read_from_start(file):
 def read_metadata_from_start(file):
     file.seek(0, os.SEEK_SET)
     return TdmsFile.read_metadata(file)
+
+
+def read_channel_data(chan):
+    return chan[:]
 
 
 def stream_chunks(chan):
