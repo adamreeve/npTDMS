@@ -1,6 +1,7 @@
 from copy import copy
 from io import UnsupportedOperation
 import os
+import struct
 import numpy as np
 
 from nptdms import types
@@ -9,6 +10,7 @@ from nptdms.log import log_manager
 
 
 log = log_manager.get_logger(__name__)
+_struct_unpack = struct.unpack
 
 RAW_DATA_INDEX_NO_DATA = 0xFFFFFFFF
 RAW_DATA_INDEX_MATCHES_PREVIOUS = 0x00000000
@@ -55,6 +57,8 @@ class BaseSegment(object):
             self._reuse_previous_segment_metadata(previous_segment)
             return
 
+        endianness = self.endianness
+
         new_obj_list = self.toc_mask & toc_properties['kTocNewObjList']
         if not new_obj_list:
             # In this case, there can be a list of new objects that
@@ -71,14 +75,15 @@ class BaseSegment(object):
         log.debug("Reading segment object metadata at %d", file.tell())
 
         # First four bytes have number of objects in metadata
-        num_objects = types.Int32.read(file, self.endianness)
+        num_objects_bytes = file.read(4)
+        num_objects = _struct_unpack(endianness + 'L', num_objects_bytes)[0]
 
         for _ in range(num_objects):
             # Read the object path
-            object_path = types.String.read(file, self.endianness)
-            raw_data_index_header = types.Uint32.read(file, self.endianness)
-            log.debug("Reading metadata for object %s with index header 0x%08x",
-                      object_path, raw_data_index_header)
+            object_path = types.String.read(file, endianness)
+            raw_data_index_header_bytes = file.read(4)
+            raw_data_index_header = _struct_unpack(endianness + 'L', raw_data_index_header_bytes)[0]
+            log.debug("Reading metadata for object %s with index header 0x%08x", object_path, raw_data_index_header)
 
             # Check whether we already have this object in our list from
             # the last segment
@@ -174,7 +179,8 @@ class BaseSegment(object):
     def _read_object_properties(self, file, object_path):
         """Read properties for an object in the segment
         """
-        num_properties = types.Uint32.read(file, self.endianness)
+        num_properties_bytes = file.read(4)
+        num_properties = _struct_unpack(self.endianness + 'L', num_properties_bytes)[0]
         if num_properties > 0:
             log.debug("Reading %d properties", num_properties)
             if self.object_properties is None:
