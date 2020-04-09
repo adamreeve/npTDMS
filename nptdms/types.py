@@ -189,7 +189,8 @@ class String(TdmsType):
 
     @staticmethod
     def read(file, endianness="<"):
-        size = Uint32.read(file, endianness)
+        size_bytes = file.read(4)
+        size = _struct_unpack(endianness + 'L', size_bytes)[0]
         return file.read(size).decode('utf-8')
 
 
