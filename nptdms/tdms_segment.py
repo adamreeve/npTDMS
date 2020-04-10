@@ -190,12 +190,11 @@ class TdmsSegmentObject(BaseSegmentObject):
         if self.data_type.nptype is not None:
             dtype = self.data_type.nptype.newbyteorder(self.endianness)
             return fromfile(file, dtype=dtype, count=number_values)
-        elif self.data_type == types.String:
-            return read_string_data(file, number_values, self.endianness)
-        data = self.new_segment_data()
-        for i in range(number_values):
-            data[i] = self.data_type.read(file, self.endianness)
-        return data
+        elif self.data_type.size is not None:
+            byte_data = fromfile(file, dtype=np.dtype('uint8'), count=number_values * self.data_type.size)
+            return self.data_type.from_bytes(byte_data, self.endianness)
+        else:
+            return self.data_type.read_values(file, number_values, self.endianness)
 
     def new_segment_data(self):
         """Return a new array to read the data of the current section into"""
@@ -204,19 +203,3 @@ class TdmsSegmentObject(BaseSegmentObject):
             return np.zeros(self.number_values, dtype=self.data_type.nptype)
         else:
             return [None] * self.number_values
-
-
-def read_string_data(file, number_values, endianness):
-    """ Read string raw data
-
-        This is stored as an array of offsets
-        followed by the contiguous string data.
-    """
-    offsets = [0]
-    for i in range(number_values):
-        offsets.append(types.Uint32.read(file, endianness))
-    strings = []
-    for i in range(number_values):
-        s = file.read(offsets[i + 1] - offsets[i])
-        strings.append(s.decode('utf-8'))
-    return strings
