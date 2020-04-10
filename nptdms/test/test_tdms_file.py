@@ -697,6 +697,20 @@ def test_channel_object_paths():
     assert obj.channel == "Channel1"
 
 
+def test_object_repr():
+    """Test getting object representations of groups and channels
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    group = tdms_data["Group"]
+    assert repr(group) == "<TdmsGroup with path /'Group'>"
+
+    channel = group["Channel1"]
+    assert repr(channel) == "<TdmsChannel with path /'Group'/'Channel1'>"
+
+
 def test_data_read_from_bytes_io():
     """Test reading data"""
 
