@@ -446,6 +446,19 @@ def test_get_objects():
     assert "/'Group'/'Channel2'" in objects.keys()
 
 
+@pytest.mark.filterwarnings('ignore:.* is deprecated')
+def test_get_object_from_group():
+    """Test passing a TdmsGroup to object returns the group"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_file = test_file.load()
+
+    groups = tdms_file.groups()
+    assert tdms_file.object(groups[0]) is groups[0]
+    assert tdms_file.object(groups[0].name) is groups[0]
+
+
 def test_group_property_read():
     """Test reading property of a group"""
 

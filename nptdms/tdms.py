@@ -325,10 +325,10 @@ class TdmsFile(object):
     def object(self, *path):
         """(Deprecated) Get a TDMS object from the file
 
-        :param path: The object group and channel. Providing no channel
+        :param path: The object group and channel names. Providing no channel
             returns a group object, and providing no channel or group
             will return the root object.
-        :rtype: :class:`TdmsObject`
+        :rtype: One of :class:`TdmsGroup`, :class:`TdmsChannel`, :class:`RootObject`
 
         For example, to get the root object::
 
@@ -348,6 +348,13 @@ class TdmsFile(object):
                     "TdmsFile[group_name] to access a group object and " +
                     "TdmsFile[group_name][channel_name] to access a channel object.")
 
+        def get_name(component):
+            try:
+                return component.name
+            except AttributeError:
+                return component
+
+        path = [get_name(c) for c in path]
         object_path = ObjectPath(*path)
         try:
             return self.objects[str(object_path)]
