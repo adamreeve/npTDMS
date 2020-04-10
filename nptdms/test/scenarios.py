@@ -776,7 +776,7 @@ def timestamp_data():
 
     test_file = GeneratedFile()
     toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
-    test_file.add_segment(toc, metadata, _timestamp_data(times))
+    test_file.add_segment(toc, metadata, timestamp_data_chunk(times))
 
     expected_data = {
         ('Group', 'TimeChannel1'): np.array([times[0], times[1]]),
@@ -834,7 +834,7 @@ def interleaved_timestamp_data():
 
     test_file = GeneratedFile()
     toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData")
-    test_file.add_segment(toc, metadata, _timestamp_data(times))
+    test_file.add_segment(toc, metadata, timestamp_data_chunk(times))
 
     expected_data = {
         ('Group', 'TimeChannel1'): np.array([times[0], times[2]]),
@@ -888,9 +888,9 @@ def interleaved_timestamp_and_numpy_data():
         # Number of properties (0)
         "00 00 00 00")
 
-    data = (_timestamp_data([times[0]]) +
+    data = (timestamp_data_chunk([times[0]]) +
             "01 00 00 00" +
-            _timestamp_data([times[1]]) +
+            timestamp_data_chunk([times[1]]) +
             "02 00 00 00")
 
     test_file = GeneratedFile()
@@ -974,7 +974,7 @@ def channel_without_data_or_data_type():
     return test_file, expected_data
 
 
-def _timestamp_data(times):
+def timestamp_data_chunk(times):
     epoch = np.datetime64('1904-01-01T00:00:00')
 
     def total_seconds(td):
