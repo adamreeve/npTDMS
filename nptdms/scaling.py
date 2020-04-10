@@ -61,6 +61,9 @@ class PolynomialScaling(object):
         return PolynomialScaling(coefficients, input_source)
 
     def scale(self, data):
+        if len(self.coefficients) == 0:
+            return np.zeros(len(data), dtype=np.dtype('float64'))
+
         # Ensure data is double type before scaling
         data = data.astype(np.dtype('float64'), copy=False)
         return np.polynomial.polynomial.polyval(data, self.coefficients)

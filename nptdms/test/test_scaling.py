@@ -71,6 +71,23 @@ def test_polynomial_scaling():
     np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
 
 
+def test_polynomial_scaling_with_no_coefficients():
+    """Test polynomial scaling when there are no coefficients, so data should be all zero
+    """
+    data = StubTdmsData(np.array([1.0, 2.0, 3.0]))
+    expected_scaled_data = np.array([0.0, 0.0, 0.0])
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Polynomial",
+        "NI_Scale[0]_Polynomial_Coefficients_Size": 0
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(data)
+
+    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+
+
 def test_polynomial_scaling_with_3_coefficients():
     """Test polynomial scaling"""
 
