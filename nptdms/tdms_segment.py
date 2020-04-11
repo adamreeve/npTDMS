@@ -25,30 +25,29 @@ class InterleavedDataSegment(BaseSegment):
         return TdmsSegmentObject(object_path, self.endianness)
 
     def _read_data_chunk(self, file, data_objects, chunk_index):
-        # If all data types have numpy types and all the lengths are
+        # If all data types are sized and all the lengths are
         # the same, then we can read all data at once with numpy,
         # which is much faster
-        all_numpy = all(
-            o.data_type.nptype is not None for o in data_objects)
+        all_sized = all(
+            o.data_type.size is not None for o in data_objects)
         same_length = (len(
             set((o.number_values for o in data_objects))) == 1)
-        if all_numpy and same_length:
-            return self._read_interleaved_numpy(file, data_objects)
+        if all_sized and same_length:
+            return self._read_interleaved_sized(file, data_objects)
         else:
             return self._read_interleaved(file, data_objects)
 
-    def _read_interleaved_numpy(self, file, data_objects):
-        """Read interleaved data where all channels have a numpy type"""
-
+    def _read_interleaved_sized(self, file, data_objects):
+        """Read interleaved data where all channels have a sized data type and the same length
+        """
         log.debug("Reading interleaved data all at once")
 
-        # For non-DAQmx, simply use the data type sizes
-        all_channel_bytes = sum(o.data_type.size for o in data_objects)
-        log.debug("all_channel_bytes: %d", all_channel_bytes)
+        total_data_width = sum(o.data_type.size for o in data_objects)
+        log.debug("total_data_width: %d", total_data_width)
 
         # Read all data into 1 byte unsigned ints first
         combined_data = read_interleaved_segment_bytes(
-            file, all_channel_bytes, data_objects[0].number_values)
+            file, total_data_width, data_objects[0].number_values)
 
         # Now get arrays for each channel
         channel_data = {}
@@ -61,10 +60,12 @@ class InterleavedDataSegment(BaseSegment):
             # be number of bytes per point * number of data points.
             # Then use ravel to flatten the results into a vector.
             object_data = combined_data[:, byte_columns].ravel()
-            # Now set correct data type, so that the array length should
-            # be correct
-            object_data.dtype = (
-                obj.data_type.nptype.newbyteorder(self.endianness))
+            if obj.data_type.nptype is not None:
+                # Set correct data type, so that the array length should be correct
+                object_data.dtype = (
+                    obj.data_type.nptype.newbyteorder(self.endianness))
+            else:
+                object_data = obj.data_type.from_bytes(object_data, self.endianness)
             channel_data[obj.path] = object_data
             data_pos += obj.data_type.size
 
