@@ -70,7 +70,11 @@ class TdmsType(object):
 
     @classmethod
     def read(cls, file, endianness="<"):
-        raise TypeError("Unsupported data type to read: %r" % cls)
+        raise NotImplementedError("Unsupported data type to read: %r" % cls)
+
+    @classmethod
+    def read_values(cls, file, number_values, endianness="<"):
+        raise NotImplementedError("Unsupported data type to read: %r" % cls)
 
 
 class Bytes(TdmsType):
@@ -193,6 +197,22 @@ class String(TdmsType):
         size = _struct_unpack(endianness + 'L', size_bytes)[0]
         return file.read(size).decode('utf-8')
 
+    @classmethod
+    def read_values(cls, file, number_values, endianness="<"):
+        """ Read string raw data
+
+            This is stored as an array of offsets
+            followed by the contiguous string data.
+        """
+        offsets = [0]
+        for i in range(number_values):
+            offsets.append(Uint32.read(file, endianness))
+        strings = []
+        for i in range(number_values):
+            s = file.read(offsets[i + 1] - offsets[i])
+            strings.append(s.decode('utf-8'))
+        return strings
+
 
 @tds_data_type(0x21, np.bool8)
 class Boolean(StructType):
@@ -248,6 +268,22 @@ class TimeStamp(TdmsType):
 
         return (cls._tdms_epoch + np.timedelta64(seconds, 's') +
                 np.timedelta64(micro_seconds, 'us'))
+
+    @classmethod
+    def from_bytes(cls, byte_array, endianness="<"):
+        """ Convert an array of bytes to an array of timestamps
+        """
+        byte_array = byte_array.reshape((-1, 16))
+        if endianness == "<":
+            second_fractions = byte_array[:, 0:8].ravel()
+            seconds = byte_array[:, 8:16].ravel()
+        else:
+            seconds = byte_array[:, 0:8].ravel()
+            second_fractions = byte_array[:, 8:16].ravel()
+        seconds.dtype = np.dtype('timedelta64[s]').newbyteorder(endianness)
+        second_fractions.dtype = np.dtype('uint64').newbyteorder(endianness)
+        micro_seconds = (second_fractions / cls._fractions_per_microsecond) * np.timedelta64(1, 'us')
+        return cls._tdms_epoch + seconds + micro_seconds
 
 
 @tds_data_type(0x08000c, np.complex64)

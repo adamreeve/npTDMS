@@ -1013,14 +1013,13 @@ class ChannelDataChunk(object):
     def __getitem__(self, index):
         """ Get a value or slice of values from this chunk
         """
-        return self._data[index]
+        return self._data()[index]
 
     def __iter__(self):
         """ Iterate over values in this chunk
         """
-        return iter(self._data)
+        return iter(self._data())
 
-    @cached_property
     def _data(self):
         if self._raw_data.data is None and self._raw_data.scaler_data is None:
             return np.empty((0, ), dtype=self._channel.dtype)
