@@ -202,6 +202,40 @@ def test_read_timestamp_data(benchmark):
     np.testing.assert_equal(tdms_file['group']['channel1'][:], timestamps)
 
 
+@pytest.mark.benchmark(group='read-timestamp-data')
+def test_read_interleaved_timestamp_data(benchmark):
+    """ Benchmark reading a file with interleaved timestamp data
+    """
+    timestamps = np.tile(np.array([
+        np.datetime64('2012-08-23T00:00:00.123', 'us'),
+        np.datetime64('2012-08-23T01:02:03.456', 'us'),
+        np.datetime64('2012-08-23T12:00:00.0', 'us'),
+        np.datetime64('2012-08-23T12:02:03.9999', 'us'),
+        np.datetime64('2012-08-23T12:02:03.9999', 'us'),
+        np.datetime64('2012-08-23T00:00:00.123', 'us'),
+        np.datetime64('2012-08-23T01:02:03.456', 'us'),
+        np.datetime64('2012-08-23T12:00:00.0', 'us'),
+        np.datetime64('2012-08-23T12:02:03.9999', 'us'),
+        np.datetime64('2012-08-23T12:02:03.9999', 'us'),
+    ]), 100)
+    data = timestamp_data_chunk(timestamps)
+
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 0x44, 100, {}),
+            channel_metadata("/'group'/'channel2'", 0x44, 100, {}),
+        ),
+        data
+    )
+
+    tdms_file = benchmark(read_from_start, test_file.get_bytes_io_file())
+
+    np.testing.assert_equal(tdms_file['group']['channel1'][:], timestamps[0::2])
+    np.testing.assert_equal(tdms_file['group']['channel2'][:], timestamps[1::2])
+
+
 @pytest.mark.benchmark(group='read-metadata')
 def test_complex_metadata_reading(benchmark):
     """ Benchmark reading metadata for a file with many channels and segments with alternating sets of objects
