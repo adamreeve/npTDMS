@@ -66,6 +66,18 @@ classes provide access to these properties as a dictionary using their ``propert
     # Get a channel property
     property_value = tdms_file["group name"]["channel name"].properties["channel_property_name"]
 
+In addition to the properties dictionary,
+all groups and channels have ``name`` and ``path`` attributes.
+The name is the human readable name of the group or channel, and the path
+is the full path to the TDMS object, which includes the group name for channels::
+
+    group = tdms_file["group name"]
+    channel = group["channel name"]
+    print(group.name)    # Prints "group name"
+    print(group.path)    # Prints "/'group name'"
+    print(channel.name)  # Prints "channel name"
+    print(channel.path)  # Prints "/'group name'/'channel name'"
+
 Reading large files
 -------------------
 

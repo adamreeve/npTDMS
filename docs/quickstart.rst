@@ -24,7 +24,9 @@ Typical usage when reading a TDMS file might look like::
 
     tdms_file = TdmsFile.read("path_to_file.tdms")
     for group in tdms_file.groups():
+        group_name = group.name
         for channel in group.channels():
+            channel_name = channel.name
             # Access dictionary of properties:
             properties = channel.properties
             # Access numpy array of data for channel:
