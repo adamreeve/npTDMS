@@ -60,8 +60,8 @@ class TdmsFile(object):
     def read(file, memmap_dir=None):
         """ Creates a new TdmsFile object and reads all data in the file
 
-        :param file: Either the path to the TDMS file to read or an already
-            opened file.
+        :param file: Either the path to the tdms file to read
+            as a string or pathlib.Path, or an already opened file.
         :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no
@@ -75,8 +75,8 @@ class TdmsFile(object):
         """ Creates a new TdmsFile object and reads metadata, leaving the file open
             to allow reading channel data
 
-        :param file: Either the path to the TDMS file to read or an already
-            opened file.
+        :param file: Either the path to the tdms file to read
+            as a string or pathlib.Path, or an already opened file.
         :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no
@@ -89,16 +89,16 @@ class TdmsFile(object):
     def read_metadata(file):
         """ Creates a new TdmsFile object and only reads the metadata
 
-        :param file: Either the path to the TDMS file to read or an already
-            opened file.
+        :param file: Either the path to the tdms file to read
+            as a string or pathlib.Path, or an already opened file.
         """
         return TdmsFile(file, read_metadata_only=True)
 
     def __init__(self, file, memmap_dir=None, read_metadata_only=False, keep_open=False):
         """Initialise a new TdmsFile object
 
-        :param file: Either the path to the TDMS file to read or an already
-            opened file.
+        :param file: Either the path to the tdms file to read
+            as a string or pathlib.Path, or an already opened file.
         :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no

@@ -4,6 +4,10 @@
 import logging
 import os
 import numpy as np
+try:
+    from pathlib import Path
+except ImportError:
+    Path = None
 
 from nptdms import types
 from nptdms.common import ObjectPath, toc_properties
@@ -26,8 +30,8 @@ class TdmsReader(object):
     def __init__(self, tdms_file):
         """ Initialise a new TdmsReader
 
-        :param tdms_file: Either the path to the tdms file to read or an already
-            opened file.
+        :param tdms_file: Either the path to the tdms file to read
+            as a string or pathlib.Path, or an already opened file.
         """
         self._segments = None
         self._prev_segment_objects = {}
@@ -45,7 +49,13 @@ class TdmsReader(object):
             # Is path to a file
             self._file = open(tdms_file, 'rb')
             self._file_path = tdms_file
-            index_file_path = tdms_file + '_index'
+            if Path is not None:
+                # tdms_file may be pathlib.Path or string
+                file_path = Path(tdms_file)
+                index_file_path = Path(file_path.parent, file_path.name + '_index')
+            else:
+                # tdms_file must be a string
+                index_file_path = tdms_file + '_index'
             if os.path.isfile(index_file_path):
                 self._index_file_path = index_file_path
 
