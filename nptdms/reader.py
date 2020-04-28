@@ -4,10 +4,6 @@
 import logging
 import os
 import numpy as np
-try:
-    from pathlib import Path
-except ImportError:
-    Path = None
 
 from nptdms import types
 from nptdms.common import ObjectPath, toc_properties
@@ -47,15 +43,9 @@ class TdmsReader(object):
             self._file = tdms_file
         else:
             # Is path to a file
-            self._file = open(tdms_file, 'rb')
-            self._file_path = tdms_file
-            if Path is not None:
-                # tdms_file may be pathlib.Path or string
-                file_path = Path(tdms_file)
-                index_file_path = Path(file_path.parent, file_path.name + '_index')
-            else:
-                # tdms_file must be a string
-                index_file_path = tdms_file + '_index'
+            self._file_path = str(tdms_file)
+            self._file = open(self._file_path, 'rb')
+            index_file_path = self._file_path + '_index'
             if os.path.isfile(index_file_path):
                 self._index_file_path = index_file_path
 
