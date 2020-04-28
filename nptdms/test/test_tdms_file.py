@@ -3,6 +3,7 @@
 from collections import defaultdict
 import logging
 import os
+import sys
 import tempfile
 from hypothesis import (assume, given, example, settings, strategies)
 import numpy as np
@@ -436,6 +437,23 @@ def test_read_with_index_file(test_file, expected_data):
     """ Test reading a file with an associated tdms_index file
     """
     with test_file.get_tempfile_with_index() as tdms_file_path:
+        tdms_file = TdmsFile.read(tdms_file_path)
+
+    for ((group, channel), expected_channel_data) in expected_data.items():
+        channel_obj = tdms_file[group][channel]
+        compare_arrays(channel_obj.data, expected_channel_data)
+
+
+@pytest.mark.skipif(sys.version_info < (3, 4), reason="pathlib only available in stdlib since 3.4")
+def test_read_file_passed_as_pathlib_path():
+    """ Test reading a file when using a pathlib Path object
+    """
+    import pathlib
+
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+
+    with test_file.get_tempfile_with_index() as tdms_file_path_str:
+        tdms_file_path = pathlib.Path(tdms_file_path_str)
         tdms_file = TdmsFile.read(tdms_file_path)
 
     for ((group, channel), expected_channel_data) in expected_data.items():
