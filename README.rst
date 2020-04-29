@@ -40,7 +40,7 @@ When you are working with large TDMS files or don't need to read all channel dat
 you can instead use ``TdmsFile.open``. This is more memory efficient but
 accessing data can be slower::
 
-    with TdmsFile.open("path_to_file.tdms"):
+    with TdmsFile.open("path_to_file.tdms") as tdms_file:
         group = tdms_file['group name']
         channel = group['channel name']
         channel_data = channel[:]
