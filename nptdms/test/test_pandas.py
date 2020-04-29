@@ -13,6 +13,8 @@ from nptdms.test.test_daqmx import daqmx_channel_metadata, daqmx_scaler_metadata
 from nptdms.test.util import (
     GeneratedFile,
     basic_segment,
+    channel_metadata,
+    channel_metadata_with_no_data,
     string_hexlify,
     segment_objects_metadata,
     hexlify_value
@@ -312,3 +314,27 @@ def test_raw_daqmx_channel_export():
     assert dataframe["/'Group'/'Channel1'[1]"].dtype == np.int16
     np.testing.assert_equal(dataframe["/'Group'/'Channel1'[0]"], expected_data[0])
     np.testing.assert_equal(dataframe["/'Group'/'Channel1'[1]"], expected_data[1])
+
+
+def test_export_with_empty_channels():
+    """Convert a group to dataframe when a channel has empty data and void data type"""
+
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 2),
+            channel_metadata_with_no_data("/'group'/'channel2'"),
+        ),
+        "01 00 00 00 02 00 00 00"
+    )
+
+    tdms_data = test_file.load()
+
+    df = tdms_data["group"].as_dataframe()
+    assert len(df) == 2
+    assert len(df.keys()) == 2
+    assert "channel1" in df.keys()
+    assert "channel2" in df.keys()
+    assert (df["channel1"] == [1, 2]).all()
+    assert (df["channel2"] == [np.NaN, np.NaN]).all()
