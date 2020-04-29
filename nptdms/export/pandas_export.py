@@ -1,3 +1,4 @@
+import numpy as np
 from nptdms.utils import OrderedDict
 
 
@@ -65,7 +66,7 @@ def _channels_to_dataframe(channels_to_export, time_index=False, absolute_time=F
     for column_name, channel in channels_to_export.items():
         index = channel.time_track(absolute_time) if time_index else None
         if scaled_data:
-            dataframe_dict[column_name] = pd.Series(data=channel.data, index=index)
+            dataframe_dict[column_name] = pd.Series(data=_array_for_pd(channel.data), index=index)
         elif channel.scaler_data_types:
             # Channel has DAQmx raw data
             for scale_id, raw_data in channel.raw_scaler_data.items():
@@ -73,5 +74,16 @@ def _channels_to_dataframe(channels_to_export, time_index=False, absolute_time=F
                 dataframe_dict[scaler_column_name] = pd.Series(data=raw_data, index=index)
         else:
             # Raw data for normal TDMS file
-            dataframe_dict[column_name] = pd.Series(data=channel.raw_data, index=index)
+            dataframe_dict[column_name] = pd.Series(data=_array_for_pd(channel.raw_data), index=index)
     return pd.DataFrame.from_dict(dataframe_dict)
+
+
+def _array_for_pd(array):
+    """ Convert data array to a format suitable for a Pandas dataframe
+    """
+    if np.issubdtype(array.dtype, np.dtype('void')):
+        # If dtype is void then the array must also be empty.
+        # Pandas doesn't like void data types, so these are converted to empty float64 arrays
+        # and Pandas will fill values with NaN
+        return np.empty(0, dtype='float64')
+    return array

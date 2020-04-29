@@ -337,4 +337,5 @@ def test_export_with_empty_channels():
     assert "channel1" in df.keys()
     assert "channel2" in df.keys()
     assert (df["channel1"] == [1, 2]).all()
-    assert (df["channel2"] == [np.NaN, np.NaN]).all()
+    assert len(df["channel2"]) == 2
+    assert np.isnan(df["channel2"]).all()
