@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.polynomial.polynomial as poly
 import re
 
 from nptdms.log import log_manager
@@ -109,29 +110,36 @@ class RtdScaling(object):
     def scale(self, data):
         """ Convert voltage data to temperature
         """
-        r_0 = self.r0_nominal_resistance
-        a = self.a
-        b = self.b
+        (a, b, r_0) = (self.a, self.b, self.r0_nominal_resistance)
 
         # R(T) = R(0)[1 + A*T + B*T^2 + (T - 100)*C*T^3]
         # R(T) = V/I
 
         r_t = data / self.current_excitation
-
         r_t = _adjust_for_lead_resistance(
             r_t, CURRENT_EXCITATION, self.resistance_configuration, self.lead_wire_resistance)
 
-        if np.all(r_t >= self.r0_nominal_resistance):
-            # For R(T) > R(0), temperature is positive and we can use the
-            # quadratic form of the equation without C:
-            return ((-a + np.sqrt(a ** 2 - 4.0 * b * (1.0 - r_t / r_0))) /
-                    (2.0 * self.b))
-        else:
-            # We would need to solve for the roots of the full quartic equation
-            # for any cases where R(T) < R(0), and work out which root is the
-            # correct solution. For R(T) > R(0) we set C to zero.
-            raise NotImplementedError(
-                "RTD scaling for temperatures < 0 is not implemented")
+        positive_temperature = r_t >= r_0
+        # First solve for positive temperatures using the quadratic form
+        temperature = (-a + np.sqrt(a ** 2 - 4.0 * b * (1.0 - r_t / r_0), where=positive_temperature)) / (2.0 * b)
+        if not np.all(positive_temperature):
+            # Use full quartic for any negative temperatures
+            for i in np.where(np.logical_not(positive_temperature))[0]:
+                temperature[i] = self._solve_quartic_form(r_t[i])
+        return temperature
+
+    def _solve_quartic_form(self, r_t):
+        (a, b, c, r_0) = (self.a, self.b, self.c, self.r0_nominal_resistance)
+        poly_coefficients = [r_0 - r_t, r_0 * a, r_0 * b, -100.0 * r_0 * c, r_0 * c]
+        roots = poly.polyroots(poly_coefficients)
+        return RtdScaling._get_negative_real_root(roots)
+
+    @staticmethod
+    def _get_negative_real_root(roots):
+        filtered = [r for r in roots if not np.iscomplex(r) and r.real < 0.0]
+        if len(filtered) != 1:
+            raise ValueError("Expected single real valued negative root for RTD equation")
+        return filtered[0].real
 
 
 class TableScaling(object):
