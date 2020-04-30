@@ -47,7 +47,7 @@ def test_linear_scaling():
 
     assert scaling.get_dtype(types.Int32, None) == np.dtype('float64')
     assert scaled_data.dtype == np.dtype('float64')
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 def test_polynomial_scaling():
@@ -69,7 +69,7 @@ def test_polynomial_scaling():
 
     assert scaling.get_dtype(types.Int32, None) == np.dtype('float64')
     assert scaled_data.dtype == np.dtype('float64')
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 def test_polynomial_scaling_with_no_coefficients():
@@ -86,7 +86,7 @@ def test_polynomial_scaling_with_no_coefficients():
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 def test_polynomial_scaling_with_3_coefficients():
@@ -106,7 +106,7 @@ def test_polynomial_scaling_with_3_coefficients():
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 @pytest.mark.parametrize(
@@ -141,7 +141,37 @@ def test_rtd_scaling(resistance_configuration, lead_resistance, expected_data):
     scaled_data = scaling.scale(data)
 
     assert scaling.get_dtype(types.DoubleFloat, None) == np.dtype('float64')
-    np.testing.assert_almost_equal(expected_data, scaled_data, decimal=3)
+    np.testing.assert_almost_equal(scaled_data, expected_data, decimal=3)
+
+
+def test_rtd_scaling_with_negative_temperature():
+    """ Test RTD scaling with negative temperature values, which requires
+        solving the full quartic Callendar-Van Dusen equation
+    """
+    data = StubTdmsData(np.array([
+        0.08, 0.09, 0.095, 0.1, 0.12, 0.14, 0.16, 0.18, 0.2, 0.22, 0.24]))
+    expected_data = np.array([
+        -50.77114, -25.48835, -12.76894, -0., 51.56605, 103.94273,
+        157.1695, 211.28915, 266.34819, 322.3973, 379.49189])
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "RTD",
+        "NI_Scale[0]_RTD_Current_Excitation": 0.001,
+        "NI_Scale[0]_RTD_R0_Nominal_Resistance": 100.0,
+        "NI_Scale[0]_RTD_A": 0.0039083,
+        "NI_Scale[0]_RTD_B": -5.775e-07,
+        "NI_Scale[0]_RTD_C": -4.183e-12,
+        "NI_Scale[0]_RTD_Lead_Wire_Resistance": 0,
+        "NI_Scale[0]_RTD_Resistance_Configuration": 2,
+        "NI_Scale[0]_RTD_Input_Source": 0xFFFFFFFF,
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(data)
+
+    assert scaling.get_dtype(types.DoubleFloat, None) == np.dtype('float64')
+    assert scaled_data.dtype == np.dtype('float64')
+    np.testing.assert_almost_equal(scaled_data, expected_data, decimal=5)
 
 
 def test_table_scaling():
@@ -170,7 +200,7 @@ def test_table_scaling():
     scaled_data = scaling.scale(data)
 
     assert scaling.get_dtype(types.DoubleFloat, None) == np.dtype('float64')
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 def test_add_scaling():
@@ -193,7 +223,7 @@ def test_add_scaling():
 
     assert scaling.get_dtype(None, {0: types.Int32, 1: types.Uint32}) == np.dtype('int64')
     assert scaled_data.dtype == np.dtype('int64')
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 def test_add_scaling_with_default_inputs():
@@ -238,7 +268,7 @@ def test_subtract_scaling():
 
     assert scaling.get_dtype(None, {0: types.Int32, 1: types.Uint32}) == np.dtype('int64')
     assert scaled_data.dtype == np.dtype('int64')
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 @pytest.mark.skipif(thermocouples_reference is None, reason="thermocouples_reference is not installed")
@@ -260,7 +290,7 @@ def test_thermocouple_scaling_voltage_to_temperature():
     scaled_data = scaling.scale(data)
 
     np.testing.assert_almost_equal(
-        expected_scaled_data, scaled_data, decimal=3)
+        scaled_data, expected_scaled_data, decimal=3)
 
 
 @pytest.mark.skipif(thermocouples_reference is None, reason="thermocouples_reference is not installed")
@@ -282,7 +312,7 @@ def test_thermocouple_scaling_temperature_to_voltage():
     scaled_data = scaling.scale(data)
 
     np.testing.assert_almost_equal(
-        expected_scaled_data, scaled_data, decimal=3)
+        scaled_data, expected_scaled_data, decimal=3)
 
 
 @pytest.mark.parametrize(
@@ -317,7 +347,7 @@ def test_thermistor_scaling_with_voltage_excitation(
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(expected_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_data)
 
 
 @pytest.mark.parametrize(
@@ -352,7 +382,7 @@ def test_thermistor_scaling_with_current_excitation(
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(expected_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_data)
 
 
 def test_thermistor_scaling_with_invalid_excitation_type():
@@ -404,7 +434,7 @@ def test_multiple_scalings_applied_in_order():
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 def test_multiple_scalings_but_all_with_raw_data_input():
@@ -433,7 +463,7 @@ def test_multiple_scalings_but_all_with_raw_data_input():
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 def test_scaling_from_group():
@@ -451,7 +481,7 @@ def test_scaling_from_group():
     scaling = get_scaling({}, group_properties, {})
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 def test_scaling_from_root():
@@ -469,7 +499,7 @@ def test_scaling_from_root():
     scaling = get_scaling({}, {}, root_properties)
     scaled_data = scaling.scale(data)
 
-    np.testing.assert_almost_equal(expected_scaled_data, scaled_data)
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
 def test_scaling_status_scaled():
