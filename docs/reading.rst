@@ -58,7 +58,7 @@ classes provide access to these properties as a dictionary using their ``propert
         print("{0}: {1}".format(name, value))
 
     # Get a single property value from the file
-    property_value = tdms_file.property("my_property_name")
+    property_value = tdms_file.properties["my_property_name"]
 
     # Get a group property
     property_value = tdms_file["group name"].properties["group_property_name"]
