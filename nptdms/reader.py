@@ -103,6 +103,7 @@ class TdmsReader(object):
             raise RuntimeError(
                 "Cannot read data unless metadata has first been read")
         for segment in self._segments:
+            self._verify_segment_start(segment)
             for chunk in segment.read_raw_data(self._file):
                 yield chunk
 
@@ -136,6 +137,7 @@ class TdmsReader(object):
 
         segment_index = start_segment
         for segment in self._segments[start_segment:end_segment + 1]:
+            self._verify_segment_start(segment)
             # By default, read all chunks in a segment
             chunk_offset = 0
             num_chunks = segment.num_chunks
@@ -197,6 +199,7 @@ class TdmsReader(object):
         index_in_segment = index - segment_start_index
         chunk_index = index_in_segment // chunk_size
 
+        self._verify_segment_start(segment)
         chunk_data = next(segment.read_raw_data_for_channel(self._file, channel_path, chunk_index, 1))
         chunk_offset = segment_start_index + chunk_index * chunk_size
         return chunk_data, chunk_offset
@@ -271,6 +274,20 @@ class TdmsReader(object):
 
         return (segment_position, toc_mask, endianness, data_position, raw_data_offset,
                 next_segment_offset, next_segment_pos)
+
+    def _verify_segment_start(self, segment):
+        """ When reading data for a segment, check for the TDSm tag at the start of the segment in an attempt
+            to detect any mismatch between tdms and tdms_index files.
+        """
+        position = segment.position
+        self._file.seek(segment.position)
+        expected_tag = b'TDSm'
+        tag = self._file.read(4)
+        if tag != expected_tag:
+            raise ValueError(
+                "Attempted to read data segment at position {0} but did not find segment start header. ".format(
+                    position) +
+                "Check that the tdms_index file matches the tdms data file.")
 
     def _get_data_file_size(self):
         current_pos = self._file.tell()
