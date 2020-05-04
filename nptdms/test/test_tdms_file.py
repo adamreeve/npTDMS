@@ -4,6 +4,7 @@ from collections import defaultdict
 import logging
 import os
 import sys
+from shutil import copyfile
 import tempfile
 from hypothesis import (assume, given, example, settings, strategies)
 import numpy as np
@@ -459,6 +460,65 @@ def test_read_file_passed_as_pathlib_path():
     for ((group, channel), expected_channel_data) in expected_data.items():
         channel_obj = tdms_file[group][channel]
         compare_arrays(channel_obj.data, expected_channel_data)
+
+
+def test_read_with_mismatching_index_file():
+    """ Test that reading data when the index file doesn't match the data file raises an error
+    """
+
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 2),
+            channel_metadata("/'group'/'channel2'", 3, 2),
+        ),
+        "01 00 00 00" "02 00 00 00"
+        "03 00 00 00" "04 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 2),
+            channel_metadata("/'group'/'channel2'", 3, 2),
+        ),
+        "01 00 00 00" "02 00 00 00"
+        "03 00 00 00" "04 00 00 00"
+    )
+
+    test_file_with_index = GeneratedFile()
+    test_file_with_index.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 3),
+            channel_metadata("/'group'/'channel2'", 3, 3),
+        ),
+        "01 00 00 00" "02 00 00 00" "03 00 00 00"
+        "04 00 00 00" "05 00 00 00" "06 00 00 00"
+    )
+    test_file_with_index.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 3),
+            channel_metadata("/'group'/'channel2'", 3, 3),
+        ),
+        "01 00 00 00" "02 00 00 00" "03 00 00 00"
+        "04 00 00 00" "05 00 00 00" "06 00 00 00"
+    )
+
+    with test_file.get_tempfile(delete=False) as tdms_file:
+        with test_file_with_index.get_tempfile_with_index() as tdms_file_with_index_path:
+            # Move index file from second file to match the name of the first file
+            new_index_file = tdms_file.name + '_index'
+            copyfile(tdms_file_with_index_path + '_index', new_index_file)
+            try:
+                tdms_file.file.close()
+                with pytest.raises(ValueError) as exc_info:
+                    _ = TdmsFile.read(tdms_file.name)
+                assert 'Check that the tdms_index file matches the tdms data file' in str(exc_info.value)
+            finally:
+                os.remove(new_index_file)
+                os.remove(tdms_file.name)
 
 
 @pytest.mark.filterwarnings('ignore:.* is deprecated')
