@@ -75,6 +75,7 @@ class TdmsReader(object):
                 # Read metadata first to work out how much space we need
                 previous_segment = None
                 while True:
+                    start_position = file.tell()
                     try:
                         segment = self._read_segment_metadata(
                             file, segment_position, previous_segment, reading_index_file)
@@ -88,8 +89,11 @@ class TdmsReader(object):
                     previous_segment = segment
 
                     segment_position = segment.next_segment_pos
-                    if not reading_index_file:
-                        file.seek(segment.next_segment_pos)
+                    if reading_index_file:
+                        lead_size = 7 * 4
+                        file.seek(start_position + lead_size + segment.raw_data_offset, os.SEEK_SET)
+                    else:
+                        file.seek(segment.next_segment_pos, os.SEEK_SET)
         finally:
             if reading_index_file:
                 file.close()

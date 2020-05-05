@@ -974,6 +974,29 @@ def channel_without_data_or_data_type():
     return test_file, expected_data
 
 
+@scenario
+def extra_padding_after_metadata():
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
+        ) + "00 00 00 00 00 00 00 00",
+        "01 00 00 00" "02 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
+        ) + "00 00 00 00 00 00 00 00",
+        "03 00 00 00" "04 00 00 00"
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([1, 2, 3, 4], dtype=np.int32),
+    }
+    return test_file, expected_data
+
+
 def timestamp_data_chunk(times):
     epoch = np.datetime64('1904-01-01T00:00:00')
 
