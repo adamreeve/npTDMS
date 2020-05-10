@@ -57,48 +57,61 @@ class TdmsFile(object):
     """
 
     @staticmethod
-    def read(file, memmap_dir=None):
+    def read(file, raw_timestamps=False, memmap_dir=None):
         """ Creates a new TdmsFile object and reads all data in the file
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+        :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
+            but this loses some precision.
+            Setting this to true will read timestamps as a custom TdmsTimestamp type.
         :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
         """
-        return TdmsFile(file, memmap_dir=memmap_dir)
+        return TdmsFile(file, raw_timestamps=raw_timestamps, memmap_dir=memmap_dir)
 
     @staticmethod
-    def open(file, memmap_dir=None):
+    def open(file, raw_timestamps=False, memmap_dir=None):
         """ Creates a new TdmsFile object and reads metadata, leaving the file open
             to allow reading channel data
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+        :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
+            but this loses some precision.
+            Setting this to true will read timestamps as a custom TdmsTimestamp type.
         :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
         """
-        return TdmsFile(file, memmap_dir=memmap_dir, read_metadata_only=True, keep_open=True)
+        return TdmsFile(
+            file, raw_timestamps=raw_timestamps, memmap_dir=memmap_dir, read_metadata_only=True, keep_open=True)
 
     @staticmethod
-    def read_metadata(file):
+    def read_metadata(file, raw_timestamps=False):
         """ Creates a new TdmsFile object and only reads the metadata
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+        :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
+            but this loses some precision.
+            Setting this to true will read timestamps as a custom TdmsTimestamp type.
         """
-        return TdmsFile(file, read_metadata_only=True)
+        return TdmsFile(file, raw_timestamps=raw_timestamps, read_metadata_only=True)
 
-    def __init__(self, file, memmap_dir=None, read_metadata_only=False, keep_open=False):
+    def __init__(self, file, raw_timestamps=False, memmap_dir=None, read_metadata_only=False, keep_open=False):
         """Initialise a new TdmsFile object
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+        :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
+            but this loses some precision.
+            Setting this to true will read timestamps as a custom TdmsTimestamp type.
         :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no
@@ -111,6 +124,7 @@ class TdmsFile(object):
         """
 
         self._memmap_dir = memmap_dir
+        self._raw_timestamps = raw_timestamps
         self._groups = OrderedDict()
         self._properties = {}
         self._channel_data = {}
