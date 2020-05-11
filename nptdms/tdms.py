@@ -15,6 +15,7 @@ from nptdms.reader import TdmsReader
 from nptdms.channel_data import get_data_receiver
 from nptdms.export import hdf_export, pandas_export
 from nptdms.base_segment import RawChannelDataChunk
+from nptdms.timestamp import TdmsTimestamp
 
 
 log = log_manager.get_logger(__name__)
@@ -244,15 +245,16 @@ class TdmsFile(object):
         group_channels = OrderedDict()
         for (path_string, obj) in tdms_reader.object_metadata.items():
             path = ObjectPath.from_string(path_string)
+            obj_properties = self._convert_properties(obj.properties)
             if path.is_root:
                 # Root object provides properties for the whole file
-                self._properties = obj.properties
+                self._properties = obj_properties
             elif path.is_group:
-                group_properties[path.group] = obj.properties
+                group_properties[path.group] = obj_properties
             else:
                 # Object is a channel
                 channel = TdmsChannel(
-                    self, path, obj.properties, obj.data_type,
+                    self, path, obj_properties, obj.data_type,
                     obj.scaler_data_types, obj.num_values)
                 if path.group in group_channels:
                     group_channels[path.group].append(channel)
@@ -337,6 +339,14 @@ class TdmsFile(object):
                         channel_data.append_scaler_data(scaler_id, scaler_data)
 
         return channel_data
+
+    def _convert_properties(self, properties):
+        def convert_prop(val):
+            if isinstance(val, TdmsTimestamp) and not self._raw_timestamps:
+                # Convert timestamps to numpy datetime64 if raw timestamps are not requested
+                return val.as_datetime64()
+            return val
+        return {k: convert_prop(v) for (k, v) in properties.items()}
 
     def object(self, *path):
         """(Deprecated) Get a TDMS object from the file

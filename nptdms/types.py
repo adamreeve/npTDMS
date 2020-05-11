@@ -2,6 +2,7 @@
 
 import numpy as np
 import struct
+from nptdms.timestamp import TdmsTimestamp
 
 
 __all__ = [
@@ -230,9 +231,6 @@ class TimeStamp(TdmsType):
     # 01/01/1904 00:00:00.00 UTC, ignoring leap seconds,
     # and number of 2^-64 fractions of a second.
     # Note that the TDMS epoch is not the Unix epoch.
-
-    # We convert times to numpy datetime64s with microsecond precision,
-    # so lose some precision compared with  TDMS.
     _tdms_epoch = np.datetime64('1904-01-01 00:00:00', 'us')
     _fractions_per_microsecond = float(10**-6) / 2**-64
 
@@ -263,11 +261,7 @@ class TimeStamp(TdmsType):
         else:
             (seconds, second_fractions) = _struct_unpack(
                  endianness + 'qQ', data)
-        micro_seconds = int(
-            float(second_fractions) / cls._fractions_per_microsecond)
-
-        return (cls._tdms_epoch + np.timedelta64(seconds, 's') +
-                np.timedelta64(micro_seconds, 'us'))
+        return TdmsTimestamp(seconds, second_fractions)
 
     @classmethod
     def from_bytes(cls, byte_array, endianness="<"):
