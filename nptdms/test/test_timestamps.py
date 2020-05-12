@@ -64,8 +64,18 @@ def test_read_raw_timestamp_data():
         tdms_data = TdmsFile.read(temp_file.file, raw_timestamps=True)
         data = tdms_data['group']['channel1'][:]
         assert isinstance(data, TimestampArray)
-        np.testing.assert_equal(data['seconds'], expected_seconds)
-        np.testing.assert_equal(data['second_fractions'], expected_second_fractions)
+        np.testing.assert_equal(data.seconds, expected_seconds)
+        np.testing.assert_equal(data.second_fractions, expected_second_fractions)
+
+
+def test_timestamp_repr():
+    timestamp = TdmsTimestamp(3672033330, 12345678900000000000)
+    assert repr(timestamp) == 'TdmsTimestamp(3672033330, 12345678900000000000)'
+
+
+def test_timestamp_str():
+    timestamp = TdmsTimestamp(3672033330, 12345678900000000000)
+    assert str(timestamp) == '2020-05-11T09:15:30.669261'
 
 
 def test_timestamp_array_slicing():
@@ -84,8 +94,8 @@ def test_timestamp_array_get_single_item():
 
 def test_timestamp_array_field_access():
     timestamp_array = _get_test_timestamp_array()
-    seconds = timestamp_array['seconds']
-    second_fractions = timestamp_array['second_fractions']
+    seconds = timestamp_array.seconds
+    second_fractions = timestamp_array.second_fractions
     assert isinstance(seconds, np.ndarray)
     assert not isinstance(seconds, TimestampArray)
     assert seconds.dtype == np.dtype('<i8')
@@ -132,7 +142,6 @@ def test_timestamp_array_to_datetime64_with_ns_precision():
     ]
 )
 def test_error_raised_with_creating_timestamp_array_with_invalid_input_type(input_array):
-
     with pytest.raises(ValueError) as exc_info:
         _ = TimestampArray(input_array)
     assert str(exc_info.value) == "Input array must have a dtype with 'seconds' and 'second_fractions' fields"
