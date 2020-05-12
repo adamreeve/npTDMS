@@ -53,10 +53,20 @@ class TimestampArray(np.ndarray):
 
             The input array must be a structured numpy array with 'seconds' and 'second_fractions' fields.
         """
+        obj = np.asarray(input_array).view(cls)
         field_names = input_array.dtype.names
-        if field_names != ('seconds', 'second_fractions'):
+        if field_names == ('second_fractions', 'seconds'):
+            obj._field_indices = (1, 0)
+        elif field_names == ('seconds', 'second_fractions'):
+            obj._field_indices = (0, 1)
+        else:
             raise ValueError("Input array must have a dtype with 'seconds' and 'second_fractions' fields")
-        return np.asarray(input_array).view(cls)
+        return obj
+
+    def __array_finalize__(self, obj):
+        if obj is None:
+            return
+        self._field_indices = getattr(obj, '_field_indices', '<')
 
     def __getitem__(self, item):
         val = super(TimestampArray, self).__getitem__(item)
@@ -66,7 +76,7 @@ class TimestampArray(np.ndarray):
             return val.view(np.ndarray)
         if isinstance(item, int):
             # Getting a single item
-            return TdmsTimestamp(val[0], val[1])
+            return TdmsTimestamp(val[self._field_indices[0]], val[self._field_indices[1]])
         # else getting a slice returns a new TimestampArray
         return val
 

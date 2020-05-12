@@ -2,7 +2,7 @@
 
 import numpy as np
 import struct
-from nptdms.timestamp import TdmsTimestamp
+from nptdms.timestamp import TdmsTimestamp, TimestampArray
 
 
 __all__ = [
@@ -269,15 +269,10 @@ class TimeStamp(TdmsType):
         """
         byte_array = byte_array.reshape((-1, 16))
         if endianness == "<":
-            second_fractions = byte_array[:, 0:8].ravel()
-            seconds = byte_array[:, 8:16].ravel()
+            dtype = np.dtype([('second_fractions', '<u8'), ('seconds', '<i8')])
         else:
-            seconds = byte_array[:, 0:8].ravel()
-            second_fractions = byte_array[:, 8:16].ravel()
-        seconds.dtype = np.dtype('timedelta64[s]').newbyteorder(endianness)
-        second_fractions.dtype = np.dtype('uint64').newbyteorder(endianness)
-        micro_seconds = (second_fractions / cls._fractions_per_microsecond) * np.timedelta64(1, 'us')
-        return cls._tdms_epoch + seconds + micro_seconds
+            dtype = np.dtype([('seconds', '<i8'), ('second_fractions', '<u8')])
+        return TimestampArray(byte_array.view(dtype).reshape(-1)).as_datetime64()
 
 
 @tds_data_type(0x08000c, np.complex64)
