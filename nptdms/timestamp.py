@@ -74,7 +74,7 @@ class TimestampArray(np.ndarray):
             # Getting a field, we don't want to return this as a TimestampArray
             # but as a normal numpy ndarray
             return val.view(np.ndarray)
-        if isinstance(item, int):
+        if isinstance(item, (int, np.number)):
             # Getting a single item
             return TdmsTimestamp(val[self._field_indices[0]], val[self._field_indices[1]])
         # else getting a slice returns a new TimestampArray

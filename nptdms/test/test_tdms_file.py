@@ -274,6 +274,18 @@ def test_indexing_channel_with_integer_and_caching():
                 compare_arrays(values, expected_channel_data)
 
 
+@given(index=strategies.integers(0, 1))
+def test_indexing_timestamp_channel_with_integer(index):
+    """ Test indexing into a timestamp data channel with an integer index
+    """
+    test_file, expected_data = scenarios.timestamp_data().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                assert channel_object[index] == expected_channel_data[index]
+
+
 def test_indexing_scaled_channel_with_integer():
     """ Test indexing into a channel with an integer index when the channel is scaled
     """
