@@ -15,7 +15,7 @@ from nptdms.reader import TdmsReader
 from nptdms.channel_data import get_data_receiver
 from nptdms.export import hdf_export, pandas_export
 from nptdms.base_segment import RawChannelDataChunk
-from nptdms.timestamp import TdmsTimestamp
+from nptdms.timestamp import TdmsTimestamp, TimestampArray
 
 
 log = log_manager.get_logger(__name__)
@@ -193,6 +193,7 @@ class TdmsFile(object):
         reader = self._get_reader()
         channel_offsets = defaultdict(int)
         for chunk in reader.read_raw_data():
+            self._convert_data_chunk(chunk)
             yield DataChunk(self, chunk, channel_offsets)
             for path, data in chunk.channel_data.items():
                 channel_offsets[path] += len(data)
@@ -308,10 +309,13 @@ class TdmsFile(object):
     def _read_channel_data_chunks(self, channel):
         reader = self._get_reader()
         for chunk in reader.read_raw_data_for_channel(channel.path):
+            self._convert_channel_data_chunk(chunk)
             yield chunk
 
     def _read_channel_data_chunk_for_index(self, channel, index):
-        return self._get_reader().read_channel_chunk_for_index(channel.path, index)
+        (chunk, offset) = self._get_reader().read_channel_chunk_for_index(channel.path, index)
+        self._convert_channel_data_chunk(chunk)
+        return chunk, offset
 
     def _read_channel_data(self, channel, offset=0, length=None):
         if offset < 0:
@@ -347,6 +351,14 @@ class TdmsFile(object):
                 return val.as_datetime64()
             return val
         return {k: convert_prop(v) for (k, v) in properties.items()}
+
+    def _convert_data_chunk(self, chunk):
+        for channel_chunk in chunk.channel_data.values():
+            self._convert_channel_data_chunk(channel_chunk)
+
+    def _convert_channel_data_chunk(self, channel_chunk):
+        if not self._raw_timestamps and isinstance(channel_chunk.data, TimestampArray):
+            channel_chunk.data = channel_chunk.data.as_datetime64()
 
     def object(self, *path):
         """(Deprecated) Get a TDMS object from the file
