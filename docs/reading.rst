@@ -132,9 +132,51 @@ and your operating system will then page data in and out of memory as required::
 Timestamps
 ----------
 
-Timestamps are represented by numpy datetime64 objects with microsecond precision.
-Note that TDMS files are capable of storing times with a precision of 2 :sup:`-64` seconds,
-so some precision is lost when reading them in npTDMS.
+By default, timestamps are read as numpy datetime64 objects with microsecond precision.
+However, TDMS files are capable of storing times with a precision of 2\ :sup:`-64` seconds.
+If you need access to this higher precision timestamp data, all methods for constructing a :py:class:`~nptdms.TdmsFile`
+accept a ``raw_timestamps`` parameter.
+When this is true, any timestamp properties will be returned as a :py:class:`~nptdms.timestamp.TdmsTimestamp`
+object. This has ``seconds`` and ``second_fractions`` attributes which are the number of seconds
+since the epoch 1904-01-01 00:00:00 UTC, and a positive number of 2\ :sup:`-64` fractions of a second.
+This class has a :py:meth:`~nptdms.timestamp.TdmsTimestamp.as_datetime64` method for converting to a numpy datetime64
+object. For example::
+
+    >>> timestamp = channel.properties['wf_start_time']
+    >>> timestamp
+    TdmsTimestamp(3670436596, 11242258187010646344)
+    >>> timestamp.seconds
+    3670436596
+    >>> timestamp.second_fractions
+    11242258187010646344
+    >>> print(timestamp)
+    2020-04-22T21:43:16.609444
+    >>> timestamp.as_datetime64('ns')
+    numpy.datetime64('2020-04-22T21:43:16.609444037')
+
+When setting ``raw_timestamps`` to true, channels with timestamp data will return data as a
+:py:class:`~nptdms.timestamp.TimestampArray` rather than as a ``datetime64`` array.
+This is a subclass of ``numpy.ndarray`` with additional properties and an
+:py:meth:`~nptdms.timestamp.TimestampArray.as_datetime64` method for converting to a datetime64 array,
+and elements in the array are returned as :py:class:`~nptdms.timestamp.TdmsTimestamp` instances::
+
+    >>> timestamp_data = channel[:]
+    >>> timestamp_data
+    TimestampArray([(8942011409353408512, 3670436596), (9643130391967563776, 3670436596),
+                    (9661619779500244992, 3670436596), ..., (1366710545511612416, 3670502040),
+                    (1476995959824056320, 3670502040), (1587685994415521792, 3670502040)],
+                   dtype=[('second_fractions', '<u8'), ('seconds', '<i8')])
+    >> timestamp_data[0]
+    TdmsTimestamp(3670436596, 8942011409353408512)
+    >>> timestamp_data.seconds
+    array([3670436596, 3670436596, 3670436596, ..., 3670502040, 3670502040, 3670502040], dtype=int64)
+    >>> timestamp_data.second_fractions
+    array([8942011409353408512, 9643130391967563776, 9661619779500244992, ..., 1366710545511612416,
+           1476995959824056320, 1587685994415521792], dtype=uint64)
+    >>> timestamp_data.as_datetime64('us')
+    array(['2020-04-22T21:43:16.484747', '2020-04-22T21:43:16.522755', '2020-04-22T21:43:16.523757', ...,
+           '2020-04-23T15:54:00.074089', '2020-04-23T15:54:00.080068', '2020-04-23T15:54:00.086068'],
+          dtype='datetime64[us]')
 
 Timestamps in TDMS files are stored in UTC time and npTDMS does not do any timezone conversions.
 If timestamps need to be converted to the local timezone,

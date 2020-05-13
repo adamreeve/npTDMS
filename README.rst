@@ -93,9 +93,6 @@ Limitations
 This module doesn't support TDMS files with XML headers or with
 extended precision floating point data.
 
-TDMS files support timestamps with a resolution of 2^-64 seconds but these
-are read as numpy datetime64 values with microsecond resolution.
-
 Contributors/Thanks
 -------------------
 
