@@ -139,8 +139,7 @@ accept a ``raw_timestamps`` parameter.
 When this is true, any timestamp properties will be returned as a :py:class:`~nptdms.timestamp.TdmsTimestamp`
 object. This has ``seconds`` and ``second_fractions`` attributes which are the number of seconds
 since the epoch 1904-01-01 00:00:00 UTC, and a positive number of 2\ :sup:`-64` fractions of a second.
-This class has a :py:meth:`~nptdms.timestamp.TdmsTimestamp.as_datetime64` method for converting to a numpy datetime64
-object. For example::
+This class has methods for converting to a numpy datetime64 object or datetime.datetime. For example::
 
     >>> timestamp = channel.properties['wf_start_time']
     >>> timestamp
@@ -153,6 +152,8 @@ object. For example::
     2020-04-22T21:43:16.609444
     >>> timestamp.as_datetime64('ns')
     numpy.datetime64('2020-04-22T21:43:16.609444037')
+    >>> timestamp.as_datetime()
+    datetime.datetime(2020, 4, 22, 21, 43, 16, 609444)
 
 When setting ``raw_timestamps`` to true, channels with timestamp data will return data as a
 :py:class:`~nptdms.timestamp.TimestampArray` rather than as a ``datetime64`` array.

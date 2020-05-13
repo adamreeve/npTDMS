@@ -1,3 +1,4 @@
+from datetime import datetime, timedelta
 import numpy as np
 
 
@@ -40,6 +41,13 @@ class TdmsTimestamp(object):
                 EPOCH +
                 np.timedelta64(self.seconds, 's') +
                 ((self.second_fractions / fractions_per_step) * np.timedelta64(1, resolution)))
+
+    def as_datetime(self):
+        """ Convert this timestamp to a Python datetime.datetime object
+        """
+        fractions_per_us = _fractions_per_step['us']
+        microseconds = (self.second_fractions / fractions_per_us)
+        return datetime(1904, 1, 1, 0, 0, 0) + timedelta(seconds=self.seconds) + timedelta(microseconds=microseconds)
 
 
 class TimestampArray(np.ndarray):

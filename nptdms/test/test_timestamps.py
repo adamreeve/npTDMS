@@ -1,6 +1,7 @@
 """ Test reading timestamp properties and data
 """
 
+from datetime import datetime
 import numpy as np
 import struct
 import pytest
@@ -36,10 +37,29 @@ def test_read_raw_timestamp_properties():
         start_time = tdms_data['group']['channel1'].properties['wf_start_time']
         assert start_time.seconds == 3524551547
         assert start_time.second_fractions == second_fractions
-        assert start_time.as_datetime64() == np.datetime64('2015-09-08T10:05:47.669260', 'us')
-        assert start_time.as_datetime64().dtype == np.dtype('datetime64[us]')
-        assert start_time.as_datetime64('ns') == np.datetime64('2015-09-08T10:05:47.669260594', 'ns')
-        assert start_time.as_datetime64('ns').dtype == np.dtype('datetime64[ns]')
+
+
+def test_timestamp_as_datetime64():
+    """ Test converting a timestamp to a numpy datetime64
+    """
+    second_fractions = 1234567890 * 10 ** 10
+    seconds = 3524551547
+    timestamp = TdmsTimestamp(seconds, second_fractions)
+
+    assert timestamp.as_datetime64() == np.datetime64('2015-09-08T10:05:47.669260', 'us')
+    assert timestamp.as_datetime64().dtype == np.dtype('datetime64[us]')
+    assert timestamp.as_datetime64('ns') == np.datetime64('2015-09-08T10:05:47.669260594', 'ns')
+    assert timestamp.as_datetime64('ns').dtype == np.dtype('datetime64[ns]')
+
+
+def test_timestamp_as_datetime():
+    """ Test converting a timestamp to a datetime.datetime
+    """
+    second_fractions = 1234567890 * 10 ** 10
+    seconds = 3524551547
+    timestamp = TdmsTimestamp(seconds, second_fractions)
+
+    assert timestamp.as_datetime() == datetime(2015, 9, 8, 10, 5, 47, 669261)
 
 
 def test_read_raw_timestamp_data():
