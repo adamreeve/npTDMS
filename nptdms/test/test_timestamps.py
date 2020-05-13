@@ -2,9 +2,11 @@
 """
 
 import numpy as np
+import struct
 import pytest
 from nptdms import TdmsFile
 from nptdms.timestamp import TdmsTimestamp, TimestampArray
+from nptdms.types import TimeStamp
 from nptdms.test.util import (
     GeneratedFile,
     channel_metadata,
@@ -66,6 +68,23 @@ def test_read_raw_timestamp_data():
         assert isinstance(data, TimestampArray)
         np.testing.assert_equal(data.seconds, expected_seconds)
         np.testing.assert_equal(data.second_fractions, expected_second_fractions)
+
+
+def test_read_big_endian_timestamp_data():
+    seconds = 3672033330
+    second_fractions = 1234567890 * 10 ** 10
+    data = (
+        struct.pack(">q", seconds) + struct.pack(">Q", 0) +
+        struct.pack(">q", seconds) + struct.pack(">Q", second_fractions) +
+        struct.pack(">q", seconds + 1) + struct.pack(">Q", 0) +
+        struct.pack(">q", seconds + 1) + struct.pack(">Q", second_fractions))
+    expected_seconds = np.array([seconds, seconds, seconds + 1, seconds + 1], np.dtype('int64'))
+    expected_second_fractions = np.array([0, second_fractions, 0, second_fractions], np.dtype('uint64'))
+
+    timestamp_array = TimeStamp.from_bytes(np.frombuffer(data, dtype=np.dtype('uint8')), '>')
+
+    np.testing.assert_equal(timestamp_array.seconds, expected_seconds)
+    np.testing.assert_equal(timestamp_array.second_fractions, expected_second_fractions)
 
 
 def test_timestamp_repr():
@@ -145,6 +164,21 @@ def test_error_raised_with_creating_timestamp_array_with_invalid_input_type(inpu
     with pytest.raises(ValueError) as exc_info:
         _ = TimestampArray(input_array)
     assert str(exc_info.value) == "Input array must have a dtype with 'seconds' and 'second_fractions' fields"
+
+
+def test_error_raised_converting_timestamp_with_invalid_resolution():
+    timestamp_array = _get_test_timestamp_array()
+    timestamp = timestamp_array[0]
+    with pytest.raises(ValueError) as exc_info:
+        _ = timestamp.as_datetime64('invalid_res')
+    assert str(exc_info.value) == "Unsupported resolution for converting to numpy datetime64: 'invalid_res'"
+
+
+def test_error_raised_converting_timestamp_array_with_invalid_resolution():
+    timestamp_array = _get_test_timestamp_array()
+    with pytest.raises(ValueError) as exc_info:
+        _ = timestamp_array.as_datetime64('invalid_res')
+    assert str(exc_info.value) == "Unsupported resolution for converting to numpy datetime64: 'invalid_res'"
 
 
 def _get_test_timestamp_array():
