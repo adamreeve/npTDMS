@@ -284,7 +284,7 @@ class TdmsFile(object):
             for group in self.groups():
                 for channel in group.channels():
                     self._channel_data[channel.path] = get_data_receiver(
-                        channel, len(channel), self._memmap_dir)
+                        channel, len(channel), self._raw_timestamps, self._memmap_dir)
 
         with Timer(log, "Read data"):
             # Now actually read all the data
@@ -327,7 +327,7 @@ class TdmsFile(object):
             else:
                 num_values = min(length, len(channel) - offset)
             num_values = max(0, num_values)
-            channel_data = get_data_receiver(channel, num_values, self._memmap_dir)
+            channel_data = get_data_receiver(channel, num_values, self._raw_timestamps, self._memmap_dir)
 
         with Timer(log, "Read data for channel"):
             # Now actually read all the data

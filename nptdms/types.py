@@ -272,7 +272,7 @@ class TimeStamp(TdmsType):
             dtype = np.dtype([('second_fractions', '<u8'), ('seconds', '<i8')])
         else:
             dtype = np.dtype([('seconds', '<i8'), ('second_fractions', '<u8')])
-        return TimestampArray(byte_array.view(dtype).reshape(-1)).as_datetime64()
+        return TimestampArray(byte_array.view(dtype).reshape(-1))
 
 
 @tds_data_type(0x08000c, np.complex64)
