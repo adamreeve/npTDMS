@@ -81,6 +81,17 @@ Data Types for Property Values
 
 .. autoclass:: TimeStamp
 
+Timestamps
+----------
+
+.. module:: nptdms.timestamp
+
+.. autoclass:: TdmsTimestamp
+  :members:
+
+.. autoclass:: TimestampArray()
+  :members:
+
 Indices and Tables
 ------------------
 

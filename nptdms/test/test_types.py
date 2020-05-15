@@ -23,7 +23,7 @@ def test_timestamp_round_trip(time_string):
     timestamp = types.TimeStamp(expected_datetime)
     data_file = io.BytesIO(timestamp.bytes)
 
-    read_datetime = types.TimeStamp.read(data_file)
+    read_datetime = types.TimeStamp.read(data_file).as_datetime64()
 
     assert expected_datetime == read_datetime
 
@@ -39,7 +39,7 @@ def test_timestamp_from_datetime():
 
     read_datetime = types.TimeStamp.read(data_file)
 
-    assert expected_datetime == read_datetime
+    assert expected_datetime == read_datetime.as_datetime64()
 
 
 def test_timestamp_from_date():
@@ -53,4 +53,4 @@ def test_timestamp_from_date():
 
     read_datetime = types.TimeStamp.read(data_file)
 
-    assert expected_datetime == read_datetime
+    assert expected_datetime == read_datetime.as_datetime64()

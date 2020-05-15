@@ -2,6 +2,7 @@
 
 import numpy as np
 import struct
+from nptdms.timestamp import TdmsTimestamp, TimestampArray
 
 
 __all__ = [
@@ -230,9 +231,6 @@ class TimeStamp(TdmsType):
     # 01/01/1904 00:00:00.00 UTC, ignoring leap seconds,
     # and number of 2^-64 fractions of a second.
     # Note that the TDMS epoch is not the Unix epoch.
-
-    # We convert times to numpy datetime64s with microsecond precision,
-    # so lose some precision compared with  TDMS.
     _tdms_epoch = np.datetime64('1904-01-01 00:00:00', 'us')
     _fractions_per_microsecond = float(10**-6) / 2**-64
 
@@ -263,11 +261,7 @@ class TimeStamp(TdmsType):
         else:
             (seconds, second_fractions) = _struct_unpack(
                  endianness + 'qQ', data)
-        micro_seconds = int(
-            float(second_fractions) / cls._fractions_per_microsecond)
-
-        return (cls._tdms_epoch + np.timedelta64(seconds, 's') +
-                np.timedelta64(micro_seconds, 'us'))
+        return TdmsTimestamp(seconds, second_fractions)
 
     @classmethod
     def from_bytes(cls, byte_array, endianness="<"):
@@ -275,15 +269,10 @@ class TimeStamp(TdmsType):
         """
         byte_array = byte_array.reshape((-1, 16))
         if endianness == "<":
-            second_fractions = byte_array[:, 0:8].ravel()
-            seconds = byte_array[:, 8:16].ravel()
+            dtype = np.dtype([('second_fractions', '<u8'), ('seconds', '<i8')])
         else:
-            seconds = byte_array[:, 0:8].ravel()
-            second_fractions = byte_array[:, 8:16].ravel()
-        seconds.dtype = np.dtype('timedelta64[s]').newbyteorder(endianness)
-        second_fractions.dtype = np.dtype('uint64').newbyteorder(endianness)
-        micro_seconds = (second_fractions / cls._fractions_per_microsecond) * np.timedelta64(1, 'us')
-        return cls._tdms_epoch + seconds + micro_seconds
+            dtype = np.dtype([('seconds', '>i8'), ('second_fractions', '>u8')])
+        return TimestampArray(byte_array.view(dtype).reshape(-1))
 
 
 @tds_data_type(0x08000c, np.complex64)

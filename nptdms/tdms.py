@@ -15,6 +15,7 @@ from nptdms.reader import TdmsReader
 from nptdms.channel_data import get_data_receiver
 from nptdms.export import hdf_export, pandas_export
 from nptdms.base_segment import RawChannelDataChunk
+from nptdms.timestamp import TdmsTimestamp, TimestampArray
 
 
 log = log_manager.get_logger(__name__)
@@ -57,48 +58,61 @@ class TdmsFile(object):
     """
 
     @staticmethod
-    def read(file, memmap_dir=None):
+    def read(file, raw_timestamps=False, memmap_dir=None):
         """ Creates a new TdmsFile object and reads all data in the file
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+        :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
+            but this loses some precision.
+            Setting this to true will read timestamps as a custom TdmsTimestamp type.
         :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
         """
-        return TdmsFile(file, memmap_dir=memmap_dir)
+        return TdmsFile(file, raw_timestamps=raw_timestamps, memmap_dir=memmap_dir)
 
     @staticmethod
-    def open(file, memmap_dir=None):
+    def open(file, raw_timestamps=False, memmap_dir=None):
         """ Creates a new TdmsFile object and reads metadata, leaving the file open
             to allow reading channel data
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+        :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
+            but this loses some precision.
+            Setting this to true will read timestamps as a custom TdmsTimestamp type.
         :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
         """
-        return TdmsFile(file, memmap_dir=memmap_dir, read_metadata_only=True, keep_open=True)
+        return TdmsFile(
+            file, raw_timestamps=raw_timestamps, memmap_dir=memmap_dir, read_metadata_only=True, keep_open=True)
 
     @staticmethod
-    def read_metadata(file):
+    def read_metadata(file, raw_timestamps=False):
         """ Creates a new TdmsFile object and only reads the metadata
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+        :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
+            but this loses some precision.
+            Setting this to true will read timestamps as a custom TdmsTimestamp type.
         """
-        return TdmsFile(file, read_metadata_only=True)
+        return TdmsFile(file, raw_timestamps=raw_timestamps, read_metadata_only=True)
 
-    def __init__(self, file, memmap_dir=None, read_metadata_only=False, keep_open=False):
+    def __init__(self, file, raw_timestamps=False, memmap_dir=None, read_metadata_only=False, keep_open=False):
         """Initialise a new TdmsFile object
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+        :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
+            but this loses some precision.
+            Setting this to true will read timestamps as a custom TdmsTimestamp type.
         :param memmap_dir: The directory to store memory mapped data files in,
             or None to read data into memory. The data files are created
             as temporary files and are deleted when the channel data is no
@@ -111,6 +125,7 @@ class TdmsFile(object):
         """
 
         self._memmap_dir = memmap_dir
+        self._raw_timestamps = raw_timestamps
         self._groups = OrderedDict()
         self._properties = {}
         self._channel_data = {}
@@ -178,6 +193,7 @@ class TdmsFile(object):
         reader = self._get_reader()
         channel_offsets = defaultdict(int)
         for chunk in reader.read_raw_data():
+            self._convert_data_chunk(chunk)
             yield DataChunk(self, chunk, channel_offsets)
             for path, data in chunk.channel_data.items():
                 channel_offsets[path] += len(data)
@@ -230,15 +246,16 @@ class TdmsFile(object):
         group_channels = OrderedDict()
         for (path_string, obj) in tdms_reader.object_metadata.items():
             path = ObjectPath.from_string(path_string)
+            obj_properties = self._convert_properties(obj.properties)
             if path.is_root:
                 # Root object provides properties for the whole file
-                self._properties = obj.properties
+                self._properties = obj_properties
             elif path.is_group:
-                group_properties[path.group] = obj.properties
+                group_properties[path.group] = obj_properties
             else:
                 # Object is a channel
                 channel = TdmsChannel(
-                    self, path, obj.properties, obj.data_type,
+                    self, path, obj_properties, obj.data_type,
                     obj.scaler_data_types, obj.num_values)
                 if path.group in group_channels:
                     group_channels[path.group].append(channel)
@@ -268,7 +285,7 @@ class TdmsFile(object):
             for group in self.groups():
                 for channel in group.channels():
                     self._channel_data[channel.path] = get_data_receiver(
-                        channel, len(channel), self._memmap_dir)
+                        channel, len(channel), self._raw_timestamps, self._memmap_dir)
 
         with Timer(log, "Read data"):
             # Now actually read all the data
@@ -292,10 +309,13 @@ class TdmsFile(object):
     def _read_channel_data_chunks(self, channel):
         reader = self._get_reader()
         for chunk in reader.read_raw_data_for_channel(channel.path):
+            self._convert_channel_data_chunk(chunk)
             yield chunk
 
     def _read_channel_data_chunk_for_index(self, channel, index):
-        return self._get_reader().read_channel_chunk_for_index(channel.path, index)
+        (chunk, offset) = self._get_reader().read_channel_chunk_for_index(channel.path, index)
+        self._convert_channel_data_chunk(chunk)
+        return chunk, offset
 
     def _read_channel_data(self, channel, offset=0, length=None):
         if offset < 0:
@@ -311,7 +331,7 @@ class TdmsFile(object):
             else:
                 num_values = min(length, len(channel) - offset)
             num_values = max(0, num_values)
-            channel_data = get_data_receiver(channel, num_values, self._memmap_dir)
+            channel_data = get_data_receiver(channel, num_values, self._raw_timestamps, self._memmap_dir)
 
         with Timer(log, "Read data for channel"):
             # Now actually read all the data
@@ -323,6 +343,22 @@ class TdmsFile(object):
                         channel_data.append_scaler_data(scaler_id, scaler_data)
 
         return channel_data
+
+    def _convert_properties(self, properties):
+        def convert_prop(val):
+            if isinstance(val, TdmsTimestamp) and not self._raw_timestamps:
+                # Convert timestamps to numpy datetime64 if raw timestamps are not requested
+                return val.as_datetime64()
+            return val
+        return {k: convert_prop(v) for (k, v) in properties.items()}
+
+    def _convert_data_chunk(self, chunk):
+        for channel_chunk in chunk.channel_data.values():
+            self._convert_channel_data_chunk(channel_chunk)
+
+    def _convert_channel_data_chunk(self, channel_chunk):
+        if not self._raw_timestamps and isinstance(channel_chunk.data, TimestampArray):
+            channel_chunk.data = channel_chunk.data.as_datetime64()
 
     def object(self, *path):
         """(Deprecated) Get a TDMS object from the file

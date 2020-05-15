@@ -740,43 +740,15 @@ def timestamp_data():
         np.datetime64('2012-08-23T12:02:03.9999', 'us'),
     ]
 
-    metadata = (
-        # Number of objects
-        "02 00 00 00"
-        # Length of the object path
-        "17 00 00 00")
-    metadata += string_hexlify("/'Group'/'TimeChannel1'")
-    metadata += (
-        # Length of index information
-        "14 00 00 00"
-        # Raw data data type
-        "44 00 00 00"
-        # Dimension
-        "01 00 00 00"
-        # Number of raw data values
-        "02 00 00 00"
-        "00 00 00 00"
-        # Number of properties (0)
-        "00 00 00 00")
-    metadata += (
-        "17 00 00 00")
-    metadata += string_hexlify("/'Group'/'TimeChannel2'")
-    metadata += (
-        # Length of index information
-        "14 00 00 00"
-        # Raw data data type
-        "44 00 00 00"
-        # Dimension
-        "01 00 00 00"
-        # Number of raw data values
-        "02 00 00 00"
-        "00 00 00 00"
-        # Number of properties (0)
-        "00 00 00 00")
-
     test_file = GeneratedFile()
-    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
-    test_file.add_segment(toc, metadata, timestamp_data_chunk(times))
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'Group'/'TimeChannel1'", 0x44, 2),
+            channel_metadata("/'Group'/'TimeChannel2'", 0x44, 2),
+        ),
+        timestamp_data_chunk(times)
+    )
 
     expected_data = {
         ('Group', 'TimeChannel1'): np.array([times[0], times[1]]),
