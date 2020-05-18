@@ -350,7 +350,7 @@ class TdmsFile(object):
                 # Convert timestamps to numpy datetime64 if raw timestamps are not requested
                 return val.as_datetime64()
             return val
-        return {k: convert_prop(v) for (k, v) in properties.items()}
+        return OrderedDict((k, convert_prop(v)) for (k, v) in properties.items())
 
     def _convert_data_chunk(self, chunk):
         for channel_chunk in chunk.channel_data.values():
