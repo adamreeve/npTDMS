@@ -127,7 +127,7 @@ class TdmsFile(object):
         self._memmap_dir = memmap_dir
         self._raw_timestamps = raw_timestamps
         self._groups = OrderedDict()
-        self._properties = {}
+        self._properties = OrderedDict()
         self._channel_data = {}
         self._reader = None
         self.data_read = False
@@ -244,19 +244,30 @@ class TdmsFile(object):
         # Use object metadata to build group and channel objects
         group_properties = OrderedDict()
         group_channels = OrderedDict()
+        object_properties = {
+            path_string: self._convert_properties(obj.properties)
+            for path_string, obj in tdms_reader.object_metadata.items()}
+        try:
+            self._properties = object_properties['/']
+        except KeyError:
+            pass
+
         for (path_string, obj) in tdms_reader.object_metadata.items():
+            properties = object_properties[path_string]
             path = ObjectPath.from_string(path_string)
-            obj_properties = self._convert_properties(obj.properties)
             if path.is_root:
-                # Root object provides properties for the whole file
-                self._properties = obj_properties
+                pass
             elif path.is_group:
-                group_properties[path.group] = obj_properties
+                group_properties[path.group] = properties
             else:
                 # Object is a channel
+                try:
+                    channel_group_properties = object_properties[path.group_path()]
+                except KeyError:
+                    channel_group_properties = OrderedDict()
                 channel = TdmsChannel(
-                    self, path, obj_properties, obj.data_type,
-                    obj.scaler_data_types, obj.num_values)
+                    self, path, obj.data_type,
+                    obj.scaler_data_types, obj.num_values, properties, channel_group_properties, self._properties)
                 if path.group in group_channels:
                     group_channels[path.group].append(channel)
                 else:
@@ -598,14 +609,16 @@ class TdmsChannel(object):
     """
 
     def __init__(
-            self, tdms_file, path, properties, data_type=None,
-            scaler_data_types=None, number_values=0):
+            self, tdms_file, path, data_type,
+            scaler_data_types, number_values, properties, group_properties, file_properties):
         self._tdms_file = tdms_file
         self._path = path
         self.properties = properties
         self._length = number_values
         self.data_type = data_type
         self.scaler_data_types = scaler_data_types
+        self._group_properties = group_properties
+        self._file_properties = file_properties
 
         self._raw_data = None
         self._cached_chunk = None
@@ -729,7 +742,7 @@ class TdmsChannel(object):
         """
         channel_offset = 0
         for raw_data_chunk in self._tdms_file._read_channel_data_chunks(self):
-            yield ChannelDataChunk(self._tdms_file, self, raw_data_chunk, channel_offset)
+            yield ChannelDataChunk(self, raw_data_chunk, channel_offset)
             channel_offset += len(raw_data_chunk)
 
     def read_data(self, offset=0, length=None, scaled=True):
@@ -909,10 +922,8 @@ class TdmsChannel(object):
 
     @cached_property
     def _scaling(self):
-        group_properties = self._tdms_file[self._path.group].properties
-        file_properties = self._tdms_file.properties
         return scaling.get_scaling(
-            self.properties, group_properties, file_properties)
+            self.properties, self._group_properties, self._file_properties)
 
     def _set_raw_data(self, data):
         self._raw_data = data
@@ -1003,7 +1014,6 @@ class GroupDataChunk(object):
         self.name = group.name
         self._channels = OrderedDict(
             (channel.name, ChannelDataChunk(
-                tdms_file,
                 channel,
                 raw_data_chunk.channel_data.get(channel.path, RawChannelDataChunk.empty()),
                 channel_offsets[channel.path]))
@@ -1033,9 +1043,8 @@ class ChannelDataChunk(object):
     :ivar ~.name: Name of the channel
     :ivar ~.offset: Starting index of this chunk of data in the entire channel
     """
-    def __init__(self, tdms_file, channel, raw_data_chunk, offset):
+    def __init__(self, channel, raw_data_chunk, offset):
         self._path = channel._path
-        self._tdms_file = tdms_file
         self._channel = channel
         self.name = channel.name
         self.offset = offset
