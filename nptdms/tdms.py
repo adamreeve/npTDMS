@@ -127,19 +127,16 @@ class TdmsFile(object):
         self._memmap_dir = memmap_dir
         self._raw_timestamps = raw_timestamps
         self._groups = OrderedDict()
-        self._properties = {}
+        self._properties = OrderedDict()
         self._channel_data = {}
-        self._reader = None
         self.data_read = False
 
-        reader = TdmsReader(file)
+        self._reader = TdmsReader(file)
         try:
-            self._read_file(reader, read_metadata_only)
+            self._read_file(self._reader, read_metadata_only)
         finally:
-            if keep_open:
-                self._reader = reader
-            else:
-                reader.close()
+            if not keep_open:
+                self._reader.close()
 
     def groups(self):
         """Returns a list of the groups in this file
@@ -190,10 +187,9 @@ class TdmsFile(object):
 
         :rtype: Generator that yields :class:`DataChunk` objects
         """
-        reader = self._get_reader()
         channel_offsets = defaultdict(int)
-        for chunk in reader.read_raw_data():
-            self._convert_data_chunk(chunk)
+        for chunk in self._reader.read_raw_data():
+            _convert_data_chunk(chunk, self._raw_timestamps)
             yield DataChunk(self, chunk, channel_offsets)
             for path, data in chunk.channel_data.items():
                 channel_offsets[path] += len(data)
@@ -232,31 +228,37 @@ class TdmsFile(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
-    def _get_reader(self):
-        if self._reader is None:
-            raise RuntimeError(
-                "Cannot read data after the underlying TDMS reader is closed")
-        return self._reader
-
     def _read_file(self, tdms_reader, read_metadata_only):
         tdms_reader.read_metadata()
 
         # Use object metadata to build group and channel objects
         group_properties = OrderedDict()
         group_channels = OrderedDict()
+        object_properties = {
+            path_string: self._convert_properties(obj.properties)
+            for path_string, obj in tdms_reader.object_metadata.items()}
+        try:
+            self._properties = object_properties['/']
+        except KeyError:
+            pass
+
         for (path_string, obj) in tdms_reader.object_metadata.items():
+            properties = object_properties[path_string]
             path = ObjectPath.from_string(path_string)
-            obj_properties = self._convert_properties(obj.properties)
             if path.is_root:
-                # Root object provides properties for the whole file
-                self._properties = obj_properties
+                pass
             elif path.is_group:
-                group_properties[path.group] = obj_properties
+                group_properties[path.group] = properties
             else:
                 # Object is a channel
+                try:
+                    channel_group_properties = object_properties[path.group_path()]
+                except KeyError:
+                    channel_group_properties = OrderedDict()
                 channel = TdmsChannel(
-                    self, path, obj_properties, obj.data_type,
-                    obj.scaler_data_types, obj.num_values)
+                    path, obj.data_type, obj.scaler_data_types, obj.num_values,
+                    properties, channel_group_properties, self._properties,
+                    tdms_reader, self._raw_timestamps, self._memmap_dir)
                 if path.group in group_channels:
                     group_channels[path.group].append(channel)
                 else:
@@ -306,59 +308,13 @@ class TdmsFile(object):
 
         self.data_read = True
 
-    def _read_channel_data_chunks(self, channel):
-        reader = self._get_reader()
-        for chunk in reader.read_raw_data_for_channel(channel.path):
-            self._convert_channel_data_chunk(chunk)
-            yield chunk
-
-    def _read_channel_data_chunk_for_index(self, channel, index):
-        (chunk, offset) = self._get_reader().read_channel_chunk_for_index(channel.path, index)
-        self._convert_channel_data_chunk(chunk)
-        return chunk, offset
-
-    def _read_channel_data(self, channel, offset=0, length=None):
-        if offset < 0:
-            raise ValueError("offset must be non-negative")
-        if length is not None and length < 0:
-            raise ValueError("length must be non-negative")
-        reader = self._get_reader()
-
-        with Timer(log, "Allocate space for channel"):
-            # Allocate space for data
-            if length is None:
-                num_values = len(channel) - offset
-            else:
-                num_values = min(length, len(channel) - offset)
-            num_values = max(0, num_values)
-            channel_data = get_data_receiver(channel, num_values, self._raw_timestamps, self._memmap_dir)
-
-        with Timer(log, "Read data for channel"):
-            # Now actually read all the data
-            for chunk in reader.read_raw_data_for_channel(channel.path, offset, length):
-                if chunk.data is not None:
-                    channel_data.append_data(chunk.data)
-                if chunk.scaler_data is not None:
-                    for scaler_id, scaler_data in chunk.scaler_data.items():
-                        channel_data.append_scaler_data(scaler_id, scaler_data)
-
-        return channel_data
-
     def _convert_properties(self, properties):
         def convert_prop(val):
             if isinstance(val, TdmsTimestamp) and not self._raw_timestamps:
                 # Convert timestamps to numpy datetime64 if raw timestamps are not requested
                 return val.as_datetime64()
             return val
-        return {k: convert_prop(v) for (k, v) in properties.items()}
-
-    def _convert_data_chunk(self, chunk):
-        for channel_chunk in chunk.channel_data.values():
-            self._convert_channel_data_chunk(channel_chunk)
-
-    def _convert_channel_data_chunk(self, channel_chunk):
-        if not self._raw_timestamps and isinstance(channel_chunk.data, TimestampArray):
-            channel_chunk.data = channel_chunk.data.as_datetime64()
+        return OrderedDict((k, convert_prop(v)) for (k, v) in properties.items())
 
     def object(self, *path):
         """(Deprecated) Get a TDMS object from the file
@@ -598,14 +554,19 @@ class TdmsChannel(object):
     """
 
     def __init__(
-            self, tdms_file, path, properties, data_type=None,
-            scaler_data_types=None, number_values=0):
-        self._tdms_file = tdms_file
+            self, path, data_type, scaler_data_types, number_values,
+            properties, group_properties, file_properties,
+            tdms_reader, raw_timestamps, memmap_dir):
         self._path = path
         self.properties = properties
         self._length = number_values
         self.data_type = data_type
         self.scaler_data_types = scaler_data_types
+        self._group_properties = group_properties
+        self._file_properties = file_properties
+        self._reader = tdms_reader
+        self._raw_timestamps = raw_timestamps
+        self._memmap_dir = memmap_dir
 
         self._raw_data = None
         self._cached_chunk = None
@@ -728,8 +689,8 @@ class TdmsChannel(object):
         :rtype: Generator that yields :class:`ChannelDataChunk` objects
         """
         channel_offset = 0
-        for raw_data_chunk in self._tdms_file._read_channel_data_chunks(self):
-            yield ChannelDataChunk(self._tdms_file, self, raw_data_chunk, channel_offset)
+        for raw_data_chunk in self._read_channel_data_chunks():
+            yield ChannelDataChunk(self, raw_data_chunk, channel_offset)
             channel_offset += len(raw_data_chunk)
 
     def read_data(self, offset=0, length=None, scaled=True):
@@ -745,7 +706,7 @@ class TdmsChannel(object):
             Set this parameter to False to return raw unscaled data.
             For DAQmx data a dictionary of scaler id to raw scaler data will be returned.
         """
-        raw_data = self._tdms_file._read_channel_data(self, offset, length)
+        raw_data = self._read_channel_data(offset, length)
         if raw_data is None:
             dtype = self.dtype if scaled else self._raw_data_dtype()
             return np.empty((0,), dtype=dtype)
@@ -891,7 +852,7 @@ class TdmsChannel(object):
             if bounds[0] <= index < bounds[1]:
                 return self._cached_chunk[index - bounds[0]]
 
-        chunk, chunk_offset = self._tdms_file._read_channel_data_chunk_for_index(self, index)
+        chunk, chunk_offset = self._read_channel_data_chunk_for_index(index)
         scaled_chunk = self._scale_data(chunk)
         self._cached_chunk = scaled_chunk
         self._cached_chunk_bounds = (chunk_offset, chunk_offset + len(scaled_chunk))
@@ -909,10 +870,44 @@ class TdmsChannel(object):
 
     @cached_property
     def _scaling(self):
-        group_properties = self._tdms_file[self._path.group].properties
-        file_properties = self._tdms_file.properties
         return scaling.get_scaling(
-            self.properties, group_properties, file_properties)
+            self.properties, self._group_properties, self._file_properties)
+
+    def _read_channel_data_chunks(self):
+        for chunk in self._reader.read_raw_data_for_channel(self.path):
+            _convert_channel_data_chunk(chunk, self._raw_timestamps)
+            yield chunk
+
+    def _read_channel_data_chunk_for_index(self, index):
+        (chunk, offset) = self._reader.read_channel_chunk_for_index(self.path, index)
+        _convert_channel_data_chunk(chunk, self._raw_timestamps)
+        return chunk, offset
+
+    def _read_channel_data(self, offset=0, length=None):
+        if offset < 0:
+            raise ValueError("offset must be non-negative")
+        if length is not None and length < 0:
+            raise ValueError("length must be non-negative")
+
+        with Timer(log, "Allocate space for channel"):
+            # Allocate space for data
+            if length is None:
+                num_values = len(self) - offset
+            else:
+                num_values = min(length, len(self) - offset)
+            num_values = max(0, num_values)
+            channel_data = get_data_receiver(self, num_values, self._raw_timestamps, self._memmap_dir)
+
+        with Timer(log, "Read data for channel"):
+            # Now actually read all the data
+            for chunk in self._reader.read_raw_data_for_channel(self.path, offset, length):
+                if chunk.data is not None:
+                    channel_data.append_data(chunk.data)
+                if chunk.scaler_data is not None:
+                    for scaler_id, scaler_data in chunk.scaler_data.items():
+                        channel_data.append_scaler_data(scaler_id, scaler_data)
+
+        return channel_data
 
     def _set_raw_data(self, data):
         self._raw_data = data
@@ -1003,7 +998,6 @@ class GroupDataChunk(object):
         self.name = group.name
         self._channels = OrderedDict(
             (channel.name, ChannelDataChunk(
-                tdms_file,
                 channel,
                 raw_data_chunk.channel_data.get(channel.path, RawChannelDataChunk.empty()),
                 channel_offsets[channel.path]))
@@ -1033,9 +1027,8 @@ class ChannelDataChunk(object):
     :ivar ~.name: Name of the channel
     :ivar ~.offset: Starting index of this chunk of data in the entire channel
     """
-    def __init__(self, tdms_file, channel, raw_data_chunk, offset):
+    def __init__(self, channel, raw_data_chunk, offset):
         self._path = channel._path
-        self._tdms_file = tdms_file
         self._channel = channel
         self.name = channel.name
         self.offset = offset
@@ -1102,3 +1095,13 @@ def _deprecated(name, detail=None):
     if detail is not None:
         message += " {0}".format(detail)
     warnings.warn(message)
+
+
+def _convert_data_chunk(chunk, raw_timestamps):
+    for channel_chunk in chunk.channel_data.values():
+        _convert_channel_data_chunk(channel_chunk, raw_timestamps)
+
+
+def _convert_channel_data_chunk(channel_chunk, raw_timestamps):
+    if not raw_timestamps and isinstance(channel_chunk.data, TimestampArray):
+        channel_chunk.data = channel_chunk.data.as_datetime64()

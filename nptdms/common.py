@@ -50,6 +50,11 @@ class ObjectPath(object):
     def is_channel(self):
         return self.channel is not None
 
+    def group_path(self):
+        """ For channel paths, returns the path of the channel's group as a string
+        """
+        return _components_to_path(self.group, None)
+
     @staticmethod
     def from_string(path_string):
         components = list(_path_components(path_string))

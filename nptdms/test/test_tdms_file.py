@@ -6,6 +6,7 @@ import os
 import sys
 from shutil import copyfile
 import tempfile
+import weakref
 from hypothesis import (assume, given, example, settings, strategies)
 import numpy as np
 import pytest
@@ -840,3 +841,25 @@ def test_debug_logging(caplog):
 
     assert "Reading metadata for object /'group'/'channel1' with index header 0x00000014" in caplog.text
     assert "Object data type: Int32" in caplog.text
+
+
+def test_memory_released_when_tdms_file_out_of_scope():
+    """ Tests that when a TDMS file object goes out of scope,
+        TDMS channels and their data are also freed.
+        This ensures there are no circular references between a TDMS file
+        and its channels, which would mean the GC is needed to free these objects.
+    """
+
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    with test_file.get_tempfile() as temp_file:
+        tdms_data = TdmsFile.read(temp_file.file)
+        chan = tdms_data['group']['channel1']
+        chan_ref = weakref.ref(chan)
+        data_ref = weakref.ref(chan.data)
+        raw_data_ref = weakref.ref(chan.raw_data)
+    del tdms_data
+    del chan
+
+    assert raw_data_ref() is None
+    assert data_ref() is None
+    assert chan_ref() is None

@@ -60,6 +60,7 @@ class TdmsReader(object):
     def read_metadata(self):
         """ Read all metadata and structure information from a TdmsFile
         """
+        self._ensure_open()
 
         if self._index_file_path is not None:
             reading_index_file = True
@@ -103,6 +104,7 @@ class TdmsReader(object):
 
         :returns: A generator that yields RawDataChunk objects
         """
+        self._ensure_open()
         if self._segments is None:
             raise RuntimeError(
                 "Cannot read data unless metadata has first been read")
@@ -121,6 +123,7 @@ class TdmsReader(object):
             Fewer values will be returned if attempting to read beyond the end of the available data.
         :returns: A generator that yields RawChannelDataChunk objects
         """
+        self._ensure_open()
         if self._segments is None:
             raise RuntimeError("Cannot read data unless metadata has first been read")
 
@@ -186,6 +189,7 @@ class TdmsReader(object):
         :returns: Tuple of raw channel data chunk and the integer offset to the beginning of the chunk
         :rtype: (RawChannelDataChunk, int)
         """
+        self._ensure_open()
         if self._segments is None:
             raise RuntimeError("Cannot read data unless metadata has first been read")
 
@@ -358,6 +362,11 @@ class TdmsReader(object):
         self._segment_chunk_sizes = segment_chunk_sizes
         self._segment_channel_offsets = {
             path: np.cumsum(segment_count) for (path, segment_count) in segment_num_values.items()}
+
+    def _ensure_open(self):
+        if self._file is None:
+            raise RuntimeError(
+                "Cannot read data after the underlying TDMS reader is closed")
 
 
 def _number_of_segment_values(segment_object, segment):
