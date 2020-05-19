@@ -863,3 +863,26 @@ def test_memory_released_when_tdms_file_out_of_scope():
     assert raw_data_ref() is None
     assert data_ref() is None
     assert chan_ref() is None
+
+
+def test_close_after_read():
+    test_file, _ = scenarios.single_segment_with_one_channel().values
+    temp_file = test_file.get_tempfile(delete=False)
+    try:
+        temp_file.file.close()
+        tdms_data = TdmsFile.read(temp_file.name)
+        tdms_data.close()
+    finally:
+        os.remove(temp_file.name)
+
+
+def test_multiple_close_after_open():
+    test_file, _ = scenarios.single_segment_with_one_channel().values
+    temp_file = test_file.get_tempfile(delete=False)
+    try:
+        temp_file.file.close()
+        with TdmsFile.open(temp_file.name) as tdms_data:
+            tdms_data.close()
+        tdms_data.close()
+    finally:
+        os.remove(temp_file.name)

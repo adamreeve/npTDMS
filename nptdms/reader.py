@@ -50,6 +50,10 @@ class TdmsReader(object):
                 self._index_file_path = index_file_path
 
     def close(self):
+        if self._file is None:
+            # Already closed
+            return
+
         if self._file_path is not None:
             # File path was provided so we opened the file and
             # should close it.
