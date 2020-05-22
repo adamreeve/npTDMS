@@ -176,6 +176,7 @@ def test_writing_properties_with_numpy_typed_values():
         "int64prop": np.int64(64),
         "float32prop": np.float32(32.0),
         "float64prop": np.float64(64.0),
+        "boolprop": np.bool_(True),
     }
 
     tdms_properties = read_properties_dict(properties)
@@ -185,6 +186,7 @@ def test_writing_properties_with_numpy_typed_values():
     assert tdms_properties["int64prop"] == Int64(64)
     assert tdms_properties["float32prop"] == SingleFloat(32.0)
     assert tdms_properties["float64prop"] == DoubleFloat(64.0)
+    assert tdms_properties["boolprop"] == Boolean(True)
 
 
 def test_error_raised_when_cannot_convert_property_value():
