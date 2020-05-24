@@ -266,7 +266,7 @@ def _to_tdms_value(value):
         return numpy_data_types[value.dtype](value)
     if isinstance(value, TdmsType):
         return value
-    if isinstance(value, bool):
+    if isinstance(value, bool) or isinstance(value, np.bool_):
         return Boolean(value)
     if isinstance(value, (int, long)):
         return to_int_property_value(value)
