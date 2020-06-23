@@ -42,13 +42,13 @@ tds_data_types = {}
 numpy_data_types = {}
 
 
-def tds_data_type(enum_value, np_type):
+def tds_data_type(enum_value, np_type, set_np_type=True):
     def decorator(cls):
         cls.enum_value = enum_value
         cls.nptype = None if np_type is None else np.dtype(np_type)
         if enum_value is not None:
             tds_data_types[enum_value] = cls
-        if np_type is not None:
+        if set_np_type and np_type is not None:
             numpy_data_types[np.dtype(np_type)] = cls
         return cls
     return decorator
@@ -167,13 +167,13 @@ class ExtendedFloat(TdmsType):
     pass
 
 
-@tds_data_type(0x19, np.single)
+@tds_data_type(0x19, np.single, set_np_type=False)
 class SingleFloatWithUnit(StructType):
     size = 4
     struct_declaration = "f"
 
 
-@tds_data_type(0x1A, np.double)
+@tds_data_type(0x1A, np.double, set_np_type=False)
 class DoubleFloatWithUnit(StructType):
     size = 8
     struct_declaration = "d"
