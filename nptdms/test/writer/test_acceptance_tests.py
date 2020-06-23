@@ -6,12 +6,12 @@ import numpy as np
 import os
 import tempfile
 
-from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject
+from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject, types
 
 
 def test_can_read_tdms_file_after_writing():
-    a_input = np.linspace(0.0, 1.0, 100)
-    b_input = np.linspace(0.0, 100.0, 100)
+    a_input = np.linspace(0.0, 1.0, 100, dtype='float32')
+    b_input = np.linspace(0.0, 100.0, 100, dtype='float64')
 
     a_segment = ChannelObject("group", "a", a_input)
     b_segment = ChannelObject("group", "b", b_input)
@@ -23,13 +23,17 @@ def test_can_read_tdms_file_after_writing():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    a_output = tdms_file["group"]["a"].data
-    b_output = tdms_file["group"]["b"].data
+    a_output = tdms_file["group"]["a"]
+    b_output = tdms_file["group"]["b"]
 
+    assert a_output.data_type == types.SingleFloat
+    assert b_output.data_type == types.DoubleFloat
+    assert a_output.dtype == np.dtype('float32')
+    assert b_output.dtype == np.dtype('float64')
     assert len(a_output) == len(a_input)
     assert len(b_output) == len(b_input)
-    assert (a_output == a_input).all()
-    assert (b_output == b_input).all()
+    assert (a_output[:] == a_input).all()
+    assert (b_output[:] == b_input).all()
 
 
 def test_can_read_tdms_file_properties_after_writing():
@@ -296,35 +300,35 @@ def test_can_write_floats_from_list():
 
 def test_can_write_ints_from_list():
     test_cases = [
-        (np.int8, [0, 1]),
-        (np.int8, [-2 ** 7, 0]),
-        (np.int8, [0, 2 ** 7 - 1]),
+        (np.int8, types.Int8, [0, 1]),
+        (np.int8, types.Int8, [-2 ** 7, 0]),
+        (np.int8, types.Int8, [0, 2 ** 7 - 1]),
 
-        (np.uint8, [0, 2 ** 7]),
-        (np.uint8, [0, 2 ** 8 - 1]),
+        (np.uint8, types.Uint8, [0, 2 ** 7]),
+        (np.uint8, types.Uint8, [0, 2 ** 8 - 1]),
 
-        (np.int16, [-2 ** 15, 0]),
-        (np.int16, [0, 2 ** 15 - 1]),
+        (np.int16, types.Int16, [-2 ** 15, 0]),
+        (np.int16, types.Int16, [0, 2 ** 15 - 1]),
 
-        (np.uint16, [0, 2 ** 15]),
-        (np.uint16, [0, 2 ** 16 - 1]),
+        (np.uint16, types.Uint16, [0, 2 ** 15]),
+        (np.uint16, types.Uint16, [0, 2 ** 16 - 1]),
 
-        (np.int32, [-2 ** 31, 0]),
-        (np.int32, [0, 2 ** 31 - 1]),
+        (np.int32, types.Int32, [-2 ** 31, 0]),
+        (np.int32, types.Int32, [0, 2 ** 31 - 1]),
 
-        (np.uint32, [0, 2 ** 31]),
-        (np.uint32, [0, 2 ** 32 - 1]),
+        (np.uint32, types.Uint32, [0, 2 ** 31]),
+        (np.uint32, types.Uint32, [0, 2 ** 32 - 1]),
 
-        (np.int64, [-2 ** 63, 0]),
-        (np.int64, [0, 2 ** 63 - 1]),
+        (np.int64, types.Int64, [-2 ** 63, 0]),
+        (np.int64, types.Int64, [0, 2 ** 63 - 1]),
 
-        (np.uint64, [0, 2 ** 63]),
-        (np.uint64, [0, 2 ** 64 - 1]),
+        (np.uint64, types.Uint64, [0, 2 ** 63]),
+        (np.uint64, types.Uint64, [0, 2 ** 64 - 1]),
     ]
 
-    for expected_type, input_data in test_cases:
-        test_case = "data = %s, expected_type = %s" % (
-            input_data, expected_type)
+    for expected_dtype, expected_tdms_type, input_data in test_cases:
+        test_case = "data = %s, expected_dtype = %s" % (
+            input_data, expected_dtype)
         segment = ChannelObject("group", "data", input_data)
 
         output_file = BytesIO()
@@ -334,9 +338,10 @@ def test_can_write_ints_from_list():
         output_file.seek(0)
         tdms_file = TdmsFile(output_file)
 
-        output_data = tdms_file["group"]["data"].data
+        output_data = tdms_file["group"]["data"]
 
-        assert output_data.dtype == expected_type, test_case
+        assert output_data.data_type == expected_tdms_type, test_case
+        assert output_data.dtype == expected_dtype, test_case
         assert len(output_data) == len(input_data), test_case
         for (input_val, output_val) in zip(input_data, output_data):
             assert output_val == input_val, test_case
@@ -359,13 +364,15 @@ def test_can_write_complex():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    output_data = tdms_file["group"]["complex64_data"].data
+    output_data = tdms_file["group"]["complex64_data"]
+    assert output_data.data_type == types.ComplexSingleFloat
     assert output_data.dtype == np.complex64
     assert len(output_data) == 2
     assert output_data[0] == input_complex64_data[0]
     assert output_data[1] == input_complex64_data[1]
 
-    output_data = tdms_file["group"]["complex128_data"].data
+    output_data = tdms_file["group"]["complex128_data"]
+    assert output_data.data_type == types.ComplexDoubleFloat
     assert output_data.dtype == np.complex128
     assert len(output_data) == 2
     assert output_data[0] == input_complex128_data[0]
