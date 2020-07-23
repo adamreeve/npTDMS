@@ -229,6 +229,8 @@ class ChannelObject(TdmsObject):
         self.group = group
         self.channel = channel
         self.data = _to_np_array(data)
+        if self.data.ndim != 1:
+            raise ValueError("Channel data must be a 1d array")
         self.properties = properties
 
     @property

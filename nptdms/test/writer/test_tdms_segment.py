@@ -8,7 +8,7 @@ except ImportError:
     OrderedDict = dict
 import numpy as np
 
-from nptdms.writer import TdmsSegment, read_properties_dict
+from nptdms.writer import ChannelObject, TdmsSegment, read_properties_dict
 from nptdms.types import *
 
 
@@ -196,6 +196,20 @@ def test_error_raised_when_cannot_convert_property_value():
 
     with pytest.raises(TypeError):
         read_properties_dict(properties)
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        np.array(0.0, dtype=np.dtype('float32')),
+        np.zeros((2, 2), dtype=np.dtype('float32')),
+        np.zeros((2, 2, 2), dtype=np.dtype('float32')),
+    ]
+)
+def test_channel_with_invalid_data(data):
+    with pytest.raises(ValueError) as exc_info:
+        _ = ChannelObject("Group", "Channel", data, {})
+    assert str(exc_info.value) == "Channel data must be a 1d array"
 
 
 def _assert_sequence_equal(values, expected_values):
