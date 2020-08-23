@@ -65,10 +65,14 @@ class DaqmxSegment(BaseSegment):
                     scaler for scaler in obj.daqmx_metadata.scalers
                     if scaler.raw_buffer_index == raw_buffer_index]
                 for scaler in scalers_for_raw_buffer_index:
-                    offset = scaler.raw_byte_offset
+                    if obj.daqmx_metadata.scaler_type == DIGITAL_LINE_SCALER:
+                        # raw_byte_offset is actually a bit offset
+                        byte_offset = scaler.raw_byte_offset // 8
+                    else:
+                        byte_offset = scaler.raw_byte_offset
                     scaler_size = scaler.data_type.size
                     byte_columns = tuple(
-                        range(offset, offset + scaler_size))
+                        range(byte_offset, byte_offset + scaler_size))
                     # Select columns for this scaler, so that number of values
                     # will be number of bytes per point * number of data
                     # points. Then use ravel to flatten the results into a
@@ -79,7 +83,10 @@ class DaqmxSegment(BaseSegment):
                     this_scaler_data.dtype = (
                         scaler.data_type.nptype.newbyteorder(self.endianness))
                     if obj.daqmx_metadata.scaler_type == DIGITAL_LINE_SCALER:
-                        this_scaler_data = np.bitwise_and(this_scaler_data, 1)
+                        bit_offset = scaler.raw_byte_offset % 8
+                        bitmask = 1 << bit_offset
+                        this_scaler_data = np.bitwise_and(this_scaler_data, bitmask)
+                        this_scaler_data = np.right_shift(this_scaler_data, bit_offset)
                     scaler_data[obj.path][scaler.scale_id] = this_scaler_data
 
         return RawDataChunk.scaler_data(scaler_data)
