@@ -4,6 +4,7 @@
 from collections import defaultdict
 import logging
 import numpy as np
+import pytest
 
 from nptdms import TdmsFile
 from nptdms.log import log_manager
@@ -407,16 +408,16 @@ def test_digital_line_scaler_data():
     """ Test loading a DAQmx file with a single channel of U8 digital line scaler data
     """
 
-    scaler_metadata = daqmx_scaler_metadata(0, 0, 2, digital_line_scaler=True)
+    scaler_metadata = digital_scaler_metadata(0, 0, 0)
     metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
         daqmx_channel_metadata("Channel1", 4, [4], [scaler_metadata], digital_line_scaler=True))
     data = (
         "00 00 00 00"
-        "00 00 01 00"
+        "01 00 00 00"
         "00 00 00 00"
-        "00 00 01 00"
+        "01 00 00 00"
     )
 
     test_file = GeneratedFile()
@@ -429,30 +430,46 @@ def test_digital_line_scaler_data():
     np.testing.assert_array_equal(data, [0, 1, 0, 1])
 
 
-def test_digital_line_scaler_data_uses_first_bit_of_bytes():
-    """ Test DAQmx digital line scaler data only uses the first bit in each byte to represent a 1 or 0 value
+@pytest.mark.parametrize('byte_offset', [0, 1, 2, 3])
+def test_digital_line_scaler_with_multiple_channels(byte_offset):
+    """ Test DAQmx digital line scaler data with multiple channels
     """
 
-    scaler_metadata = daqmx_scaler_metadata(0, 0, 2, digital_line_scaler=True)
+    scaler_metadata_0 = digital_scaler_metadata(0, 0, byte_offset * 8 + 0)
+    scaler_metadata_1 = digital_scaler_metadata(0, 0, byte_offset * 8 + 1)
+    scaler_metadata_2 = digital_scaler_metadata(0, 0, byte_offset * 8 + 2)
     metadata = segment_objects_metadata(
         root_metadata(),
         group_metadata(),
-        daqmx_channel_metadata("Channel1", 4, [4], [scaler_metadata], digital_line_scaler=True))
-    data = (
-        "00 00 00 00"
-        "00 00 01 00"
-        "00 00 02 00"
-        "00 00 03 00"
+        daqmx_channel_metadata("Channel0", 4, [4], [scaler_metadata_0], digital_line_scaler=True),
+        daqmx_channel_metadata("Channel1", 4, [4], [scaler_metadata_1], digital_line_scaler=True),
+        daqmx_channel_metadata("Channel2", 4, [4], [scaler_metadata_2], digital_line_scaler=True),
     )
+    byte_values = [
+        "00",
+        "01",
+        "02",
+        "03",
+        "04",
+        "05",
+        "06",
+        "07",
+    ]
+    hex_data = " ".join("00" * byte_offset + b + "00" * (3 - byte_offset) for b in byte_values)
 
     test_file = GeneratedFile()
-    test_file.add_segment(segment_toc(), metadata, data)
+    test_file.add_segment(segment_toc(), metadata, hex_data)
     tdms_data = test_file.load()
 
-    data = tdms_data["Group"]["Channel1"].raw_data
+    for (channel_name, expected_data) in [
+        ("Channel0", [0, 1, 0, 1, 0, 1, 0, 1]),
+        ("Channel1", [0, 0, 1, 1, 0, 0, 1, 1]),
+        ("Channel2", [0, 0, 0, 0, 1, 1, 1, 1]),
+    ]:
+        data = tdms_data["Group"][channel_name].raw_data
 
-    assert data.dtype == np.uint8
-    np.testing.assert_array_equal(data, [0, 1, 0, 1])
+        assert data.dtype == np.uint8
+        np.testing.assert_array_equal(data, expected_data, "Incorrect data for channel '%s'" % channel_name)
 
 
 def test_lazily_reading_channel():
@@ -683,7 +700,7 @@ def group_metadata():
         "00 00 00 00")
 
 
-def daqmx_scaler_metadata(scale_id, type_id, byte_offset, raw_buffer_index=0, digital_line_scaler=False):
+def daqmx_scaler_metadata(scale_id, type_id, byte_offset, raw_buffer_index=0):
     return (
         # DAQmx data type (type ids don't match TDMS types)
         hexlify_value("<I", type_id) +
@@ -692,7 +709,21 @@ def daqmx_scaler_metadata(scale_id, type_id, byte_offset, raw_buffer_index=0, di
         # Raw byte offset
         hexlify_value("<I", byte_offset) +
         # Sample format bitmap (don't know what this is for...)
-        ("00" if digital_line_scaler else "00 00 00 00") +
+        "00 00 00 00" +
+        # Scale ID
+        hexlify_value("<I", scale_id))
+
+
+def digital_scaler_metadata(scale_id, type_id, bit_offset, raw_buffer_index=0):
+    return (
+        # DAQmx data type (type ids don't match TDMS types)
+        hexlify_value("<I", type_id) +
+        # Raw buffer index
+        hexlify_value("<I", raw_buffer_index) +
+        # Raw byte offset
+        hexlify_value("<I", bit_offset) +
+        # Sample format bitmap (don't know what this is for...)
+        "00" +
         # Scale ID
         hexlify_value("<I", scale_id))
 

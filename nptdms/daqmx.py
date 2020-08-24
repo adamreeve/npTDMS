@@ -65,10 +65,10 @@ class DaqmxSegment(BaseSegment):
                     scaler for scaler in obj.daqmx_metadata.scalers
                     if scaler.raw_buffer_index == raw_buffer_index]
                 for scaler in scalers_for_raw_buffer_index:
-                    offset = scaler.raw_byte_offset
+                    byte_offset = scaler.byte_offset()
                     scaler_size = scaler.data_type.size
                     byte_columns = tuple(
-                        range(offset, offset + scaler_size))
+                        range(byte_offset, byte_offset + scaler_size))
                     # Select columns for this scaler, so that number of values
                     # will be number of bytes per point * number of data
                     # points. Then use ravel to flatten the results into a
@@ -78,9 +78,8 @@ class DaqmxSegment(BaseSegment):
                     # should be correct
                     this_scaler_data.dtype = (
                         scaler.data_type.nptype.newbyteorder(self.endianness))
-                    if obj.daqmx_metadata.scaler_type == DIGITAL_LINE_SCALER:
-                        this_scaler_data = np.bitwise_and(this_scaler_data, 1)
-                    scaler_data[obj.path][scaler.scale_id] = this_scaler_data
+                    processed_data = scaler.postprocess_data(this_scaler_data)
+                    scaler_data[obj.path][scaler.scale_id] = processed_data
 
         return RawDataChunk.scaler_data(scaler_data)
 
@@ -163,8 +162,9 @@ class DaqMxMetadata(object):
 
         # size of vector of format changing scalers
         scaler_vector_length = types.Uint32.read(f, endianness)
+        scaler_class = _scaler_classes[scaler_type]
         self.scalers = [
-            DaqMxScaler(f, endianness, scaler_type)
+            scaler_class(f, endianness)
             for _ in range(scaler_vector_length)]
 
         # Read raw data widths.
@@ -200,18 +200,60 @@ class DaqMxScaler(object):
         'sample_format_bitmap',
         ]
 
-    def __init__(self, open_file, endianness, scaler_type):
+    def __init__(self, open_file, endianness):
         data_type_code = types.Uint32.read(open_file, endianness)
         self.data_type = DAQMX_TYPES[data_type_code]
 
         # more info for format changing scaler
         self.raw_buffer_index = types.Uint32.read(open_file, endianness)
         self.raw_byte_offset = types.Uint32.read(open_file, endianness)
-        if scaler_type == DIGITAL_LINE_SCALER:
-            self.sample_format_bitmap = types.Uint8.read(open_file, endianness)
-        else:
-            self.sample_format_bitmap = types.Uint32.read(open_file, endianness)
+        self.sample_format_bitmap = types.Uint32.read(open_file, endianness)
         self.scale_id = types.Uint32.read(open_file, endianness)
+
+    def byte_offset(self):
+        return self.raw_byte_offset
+
+    def postprocess_data(self, data):
+        return data
+
+    def __repr__(self):
+        properties = (
+            "%s=%s" % (name, _get_attr_repr(self, name))
+            for name in self.__slots__)
+
+        properties_list = ", ".join(properties)
+        return "%s(%s)" % (self.__class__.__name__, properties_list)
+
+
+class DigitalLineScaler(object):
+    """ Details of a DAQmx digital line scaler read from a TDMS file
+    """
+
+    __slots__ = [
+        'scale_id',
+        'data_type',
+        'raw_buffer_index',
+        'raw_bit_offset',
+        'sample_format_bitmap',
+        ]
+
+    def __init__(self, open_file, endianness):
+        data_type_code = types.Uint32.read(open_file, endianness)
+        self.data_type = DAQMX_TYPES[data_type_code]
+
+        # more info for format changing scaler
+        self.raw_buffer_index = types.Uint32.read(open_file, endianness)
+        self.raw_bit_offset = types.Uint32.read(open_file, endianness)
+        self.sample_format_bitmap = types.Uint8.read(open_file, endianness)
+        self.scale_id = types.Uint32.read(open_file, endianness)
+
+    def byte_offset(self):
+        return self.raw_bit_offset // 8
+
+    def postprocess_data(self, data):
+        bit_offset = self.raw_bit_offset % 8
+        bitmask = 1 << bit_offset
+        return np.right_shift(np.bitwise_and(data, bitmask), bit_offset)
 
     def __repr__(self):
         properties = (
@@ -237,4 +279,10 @@ DAQMX_TYPES = {
     3: types.Int16,
     4: types.Uint32,
     5: types.Int32,
+}
+
+
+_scaler_classes = {
+    FORMAT_CHANGING_SCALER: DaqMxScaler,
+    DIGITAL_LINE_SCALER: DigitalLineScaler,
 }
