@@ -222,3 +222,14 @@ The :py:class:`~nptdms.TdmsFile` class has :py:meth:`~nptdms.TdmsFile.as_datafra
 In addition there is an :py:meth:`~nptdms.TdmsGroup.as_dataframe` method on :py:class:`~nptdms.TdmsGroup`
 and an :py:meth:`~nptdms.TdmsGroup.as_dataframe` method on :py:class:`~nptdms.TdmsChannel`
 for converting a single group or channel to a Pandas DataFrame.
+
+Thread safety
+-------------
+
+When a TDMS file is opened with :py:meth:`~nptdms.TdmsFile.open`, the returned :py:class:`~nptdms.TdmsFile`
+object is not thread-safe and reading from it concurrently will result in undefined behaviour.
+If you need to read from the same file concurrently you should open a new :py:class:`~nptdms.TdmsFile`
+per thread.
+
+When a TDMS file is read with :py:meth:`~nptdms.TdmsFile.read`, the returned :py:class:`~nptdms.TdmsFile`
+is safe to read from concurrently as all data has been read from the file upfront.
