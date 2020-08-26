@@ -450,18 +450,6 @@ def test_read_data_after_close_throws():
         assert "Cannot read data after the underlying TDMS reader is closed" in str(exc_info.value)
 
 
-def test_read_data_after_open_in_read_mode_throws():
-    """ Trying to read channel data after reading all data initially should throw
-    """
-    test_file, expected_data = scenarios.single_segment_with_one_channel().values
-    group, channel = list(expected_data.keys())[0]
-    with test_file.get_tempfile() as temp_file:
-        tdms_file = TdmsFile.read(temp_file.file)
-        with pytest.raises(RuntimeError) as exc_info:
-            tdms_file[group][channel].read_data()
-        assert "Cannot read data after the underlying TDMS reader is closed" in str(exc_info.value)
-
-
 def test_access_data_property_after_opening_throws():
     """ Accessing the data property after opening without reading data should throw
     """
