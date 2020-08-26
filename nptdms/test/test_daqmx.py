@@ -597,6 +597,51 @@ def test_lazily_reading_a_subset_of_raw_channel_data():
             np.testing.assert_array_equal(data_2[0], [18, 19])
 
 
+@pytest.mark.parametrize('offset,length', [
+    (0, None),
+    (1, None),
+    (0, 2),
+    (1, 2),
+])
+def test_read_raw_data(offset, length):
+    # Single scale which is just the raw DAQmx scaler data
+    properties = {
+        "NI_Number_Of_Scales": (3, "01 00 00 00"),
+    }
+    scaler_1 = daqmx_scaler_metadata(1, 3, 0)
+    scaler_2 = daqmx_scaler_metadata(2, 3, 2)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 4, [4], [scaler_1], properties),
+        daqmx_channel_metadata("Channel2", 4, [4], [scaler_2], properties))
+    data = (
+        # Data for segment
+        "01 00"
+        "11 00"
+        "02 00"
+        "12 00"
+        "03 00"
+        "13 00"
+        "04 00"
+        "14 00"
+    )
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc(), metadata, data)
+
+    end = None if length is None else offset + length
+    with test_file.get_tempfile() as temp_file:
+        tdms_file = TdmsFile.read(temp_file.file)
+        data_1 = tdms_file["Group"]["Channel1"].read_data(offset=offset, length=length, scaled=False)
+        assert data_1[1].dtype == np.int16
+        np.testing.assert_array_equal(data_1[1], [1, 2, 3, 4][offset:end])
+
+        data_2 = tdms_file["Group"]["Channel2"].read_data(offset=offset, length=length, scaled=False)
+        assert data_2[2].dtype == np.int16
+        np.testing.assert_array_equal(data_2[2], [17, 18, 19, 20][offset:end])
+
+
 def test_stream_data_chunks():
     """Test streaming chunks of DAQmx data from a TDMS file
     """

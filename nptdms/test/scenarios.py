@@ -46,12 +46,12 @@ def single_segment_with_one_channel():
     test_file.add_segment(
         ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
         segment_objects_metadata(
-            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 4),
         ),
-        "01 00 00 00" "02 00 00 00"
+        "01 00 00 00" "02 00 00 00" "03 00 00 00" "04 00 00 00"
     )
     expected_data = {
-        ('group', 'channel1'): np.array([1, 2], dtype=np.int32),
+        ('group', 'channel1'): np.array([1, 2, 3, 4], dtype=np.int32),
     }
     return test_file, expected_data
 
