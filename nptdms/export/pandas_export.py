@@ -66,7 +66,7 @@ def _channels_to_dataframe(channels_to_export, time_index=False, absolute_time=F
     for column_name, channel in channels_to_export.items():
         index = channel.time_track(absolute_time) if time_index else None
         if scaled_data:
-            dataframe_dict[column_name] = pd.Series(data=_array_for_pd(channel.data), index=index)
+            dataframe_dict[column_name] = pd.Series(data=_array_for_pd(channel[:]), index=index)
         elif channel.scaler_data_types:
             # Channel has DAQmx raw data
             for scale_id, raw_data in channel.raw_scaler_data.items():
