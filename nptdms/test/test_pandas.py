@@ -8,6 +8,7 @@ try:
 except ImportError:
     pytest.skip("Skipping Pandas tests as Pandas is not installed", allow_module_level=True)
 
+from nptdms import TdmsFile
 from nptdms.test import scenarios
 from nptdms.test.test_daqmx import daqmx_channel_metadata, daqmx_scaler_metadata
 from nptdms.test.util import (
@@ -136,14 +137,14 @@ def timed_segment():
     return toc, metadata, data
 
 
-def test_file_as_dataframe():
+@pytest.mark.parametrize('lazy_load', [True, False])
+def test_file_as_dataframe(lazy_load):
     """Test converting file to Pandas dataframe"""
 
     test_file = GeneratedFile()
     test_file.add_segment(*timed_segment())
-    tdms_data = test_file.load()
 
-    df = tdms_data.as_dataframe()
+    df = on_test_file(test_file, lazy_load, lambda tdms_data: tdms_data.as_dataframe())
 
     assert len(df) == 2
     assert "/'Group'/'Channel1'" in df.keys()
@@ -191,14 +192,15 @@ def test_file_as_dataframe_with_absolute_time():
     assert (df.index == expected_start)[0]
 
 
-def test_group_as_dataframe():
+@pytest.mark.parametrize('lazy_load', [True, False])
+def test_group_as_dataframe(lazy_load):
     """Convert a group to dataframe"""
 
     test_file = GeneratedFile()
     test_file.add_segment(*timed_segment())
-    tdms_data = test_file.load()
 
-    df = tdms_data["Group"].as_dataframe()
+    df = on_test_file(test_file, lazy_load, lambda tdms_data: tdms_data["Group"].as_dataframe())
+
     assert len(df) == 2
     assert len(df.keys()) == 2
     assert "Channel1" in df.keys()
@@ -207,14 +209,16 @@ def test_group_as_dataframe():
     assert (df["Channel2"] == [3, 4]).all()
 
 
-def test_channel_as_dataframe():
+@pytest.mark.parametrize('lazy_load', [True, False])
+def test_channel_as_dataframe(lazy_load):
     """Convert a channel to dataframe"""
 
     test_file = GeneratedFile()
     test_file.add_segment(*timed_segment())
-    tdms_data = test_file.load()
 
-    df = tdms_data["Group"]["Channel2"].as_dataframe()
+    df = on_test_file(
+        test_file, lazy_load, lambda tdms_data: tdms_data["Group"]["Channel2"].as_dataframe())
+
     assert len(df) == 2
     assert len(df.keys()) == 1
     assert "/'Group'/'Channel2'" in df.keys()
@@ -265,19 +269,21 @@ def test_channel_as_dataframe_with_absolute_time():
     assert (df.index == expected_start)[0]
 
 
-def test_channel_as_dataframe_with_raw_data():
+@pytest.mark.parametrize('lazy_load', [True, False])
+def test_channel_as_dataframe_with_raw_data(lazy_load):
     """Convert channel to Pandas dataframe with absolute time index"""
 
     test_file, _ = scenarios.scaled_data().values
     expected_raw_data = np.array([1, 2, 3, 4], dtype=np.int32)
-    tdms_data = test_file.load()
 
-    df = tdms_data["group"]["channel1"].as_dataframe(scaled_data=False)
+    df = on_test_file(
+        test_file, lazy_load, lambda tdms_data: tdms_data["group"]["channel1"].as_dataframe(scaled_data=False))
 
     np.testing.assert_equal(df["/'group'/'channel1'"], expected_raw_data)
 
 
-def test_raw_daqmx_channel_export():
+@pytest.mark.parametrize('lazy_load', [True, False])
+def test_raw_daqmx_channel_export(lazy_load):
     """ Test exporting raw daqmx data for a channel
     """
 
@@ -302,10 +308,9 @@ def test_raw_daqmx_channel_export():
     segment_toc = (
         "kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocDAQmxRawData")
     test_file.add_segment(segment_toc, metadata, data)
-    tdms_data = test_file.load()
-    channel = tdms_data["Group"]["Channel1"]
+    dataframe = on_test_file(
+        test_file, lazy_load, lambda tdms_data: tdms_data["Group"]["Channel1"].as_dataframe(scaled_data=False))
 
-    dataframe = channel.as_dataframe(scaled_data=False)
     expected_data = {
         0: np.array([1, 2, 3, 4], dtype=np.int16),
         1: np.array([17, 18, 19, 20], dtype=np.int16),
@@ -339,3 +344,12 @@ def test_export_with_empty_channels():
     assert (df["channel1"] == [1, 2]).all()
     assert len(df["channel2"]) == 2
     assert np.isnan(df["channel2"]).all()
+
+
+def on_test_file(test_file, lazy_load, func):
+    if lazy_load:
+        with test_file.get_tempfile() as temp_file:
+            with TdmsFile.open(temp_file) as tdms_file:
+                return func(tdms_file)
+    else:
+        return func(test_file.load())
