@@ -69,12 +69,14 @@ def _channels_to_dataframe(channels_to_export, time_index=False, absolute_time=F
             dataframe_dict[column_name] = pd.Series(data=_array_for_pd(channel[:]), index=index)
         elif channel.scaler_data_types:
             # Channel has DAQmx raw data
-            for scale_id, raw_data in channel.raw_scaler_data.items():
+            raw_data = channel.read_data(scaled=False)
+            for scale_id, scaler_data in raw_data.items():
                 scaler_column_name = column_name + "[{0:d}]".format(scale_id)
-                dataframe_dict[scaler_column_name] = pd.Series(data=raw_data, index=index)
+                dataframe_dict[scaler_column_name] = pd.Series(data=scaler_data, index=index)
         else:
             # Raw data for normal TDMS file
-            dataframe_dict[column_name] = pd.Series(data=_array_for_pd(channel.raw_data), index=index)
+            raw_data = channel.read_data(scaled=False)
+            dataframe_dict[column_name] = pd.Series(data=_array_for_pd(raw_data), index=index)
     return pd.DataFrame.from_dict(dataframe_dict)
 
 
