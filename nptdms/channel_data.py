@@ -172,6 +172,22 @@ class TimestampDataReceiver(object):
         self._data_insert_position += len(new_data)
 
 
+class RawDataSlice(object):
+    def __init__(self, data, scaler_data):
+        self.data = data
+        self.scaler_data = scaler_data
+
+
+def slice_raw_data(raw_data, offset, length=None):
+    if offset == 0 and length is None:
+        return raw_data
+    end = None if length is None else offset + length
+    data = None if raw_data.data is None else raw_data.data[offset:end]
+    scaler_data = dict(
+        (scale_id, scaler_data[offset:end]) for (scale_id, scaler_data) in raw_data.scaler_data.items())
+    return RawDataSlice(data, scaler_data)
+
+
 def _new_numpy_array(dtype, num_values, memmap_dir=None):
     """Initialise a new numpy array for data
 

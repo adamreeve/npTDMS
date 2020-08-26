@@ -52,6 +52,18 @@ def test_lazily_read_channel_data(test_file, expected_data):
                 compare_arrays(actual_data, expected_data)
 
 
+def test_read_raw_channel_data():
+    """Test reading raw channel data"""
+
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    with test_file.get_tempfile() as temp_file:
+        tdms_file = TdmsFile.read(temp_file.file)
+        for ((group, channel), expected_data) in expected_data.items():
+            actual_data = tdms_file[group][channel].read_data(scaled=False)
+            assert actual_data.dtype == expected_data.dtype
+            compare_arrays(actual_data, expected_data)
+
+
 def test_lazily_read_raw_channel_data():
     """Test reading raw channel data lazily"""
 
@@ -62,6 +74,30 @@ def test_lazily_read_raw_channel_data():
                 actual_data = tdms_file[group][channel].read_data(scaled=False)
                 assert actual_data.dtype == expected_data.dtype
                 compare_arrays(actual_data, expected_data)
+
+
+def test_read_raw_channel_data_slice():
+    """Test reading a slice of raw channel data"""
+
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    with test_file.get_tempfile() as temp_file:
+        tdms_file = TdmsFile.read(temp_file.file)
+        for ((group, channel), expected_data) in expected_data.items():
+            actual_data = tdms_file[group][channel].read_data(offset=1, length=2, scaled=False)
+            assert actual_data.dtype == expected_data.dtype
+            compare_arrays(actual_data, expected_data[1:3])
+
+
+def test_lazily_read_raw_channel_data_slice():
+    """Test reading raw channel data lazily"""
+
+    test_file, expected_data = scenarios.single_segment_with_one_channel().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_data) in expected_data.items():
+                actual_data = tdms_file[group][channel].read_data(offset=1, length=2, scaled=False)
+                assert actual_data.dtype == expected_data.dtype
+                compare_arrays(actual_data, expected_data[1:3])
 
 
 def test_lazily_read_channel_data_with_file_path():
@@ -409,18 +445,6 @@ def test_read_data_after_close_throws():
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             pass
-        with pytest.raises(RuntimeError) as exc_info:
-            tdms_file[group][channel].read_data()
-        assert "Cannot read data after the underlying TDMS reader is closed" in str(exc_info.value)
-
-
-def test_read_data_after_open_in_read_mode_throws():
-    """ Trying to read channel data after reading all data initially should throw
-    """
-    test_file, expected_data = scenarios.single_segment_with_one_channel().values
-    group, channel = list(expected_data.keys())[0]
-    with test_file.get_tempfile() as temp_file:
-        tdms_file = TdmsFile.read(temp_file.file)
         with pytest.raises(RuntimeError) as exc_info:
             tdms_file[group][channel].read_data()
         assert "Cannot read data after the underlying TDMS reader is closed" in str(exc_info.value)

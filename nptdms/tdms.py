@@ -12,7 +12,7 @@ from nptdms.utils import Timer, OrderedDict, cached_property
 from nptdms.log import log_manager
 from nptdms.common import ObjectPath
 from nptdms.reader import TdmsReader
-from nptdms.channel_data import get_data_receiver
+from nptdms.channel_data import get_data_receiver, slice_raw_data
 from nptdms.export import hdf_export, pandas_export
 from nptdms.base_segment import RawChannelDataChunk
 from nptdms.timestamp import TdmsTimestamp, TimestampArray
@@ -706,7 +706,11 @@ class TdmsChannel(object):
             Set this parameter to False to return raw unscaled data.
             For DAQmx data a dictionary of scaler id to raw scaler data will be returned.
         """
-        raw_data = self._read_channel_data(offset, length)
+        if self._raw_data is None:
+            raw_data = self._read_channel_data(offset, length)
+        else:
+            raw_data = slice_raw_data(self._raw_data, offset, length)
+
         if raw_data is None:
             dtype = self.dtype if scaled else self._raw_data_dtype()
             return np.empty((0,), dtype=dtype)
