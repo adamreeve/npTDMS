@@ -303,6 +303,47 @@ def test_thermocouple_scaling_temperature_to_voltage():
         scaled_data, expected_scaled_data, decimal=3)
 
 
+def test_thermocouple_scaling_voltage_to_temperature_benchmark(benchmark):
+    """Test thermocouple scaling from a voltage in uV to temperature"""
+
+    data = StubTdmsData(np.tile(np.array([0.0, 10.0, 100.0, 1000.0]), 100))
+    expected_scaled_data = np.tile(np.array([0.000000, 0.250843, 2.508899, 24.983648]), 100)
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Thermocouple",
+        "NI_Scale[0]_Thermocouple_Thermocouple_Type": 10073,
+        "NI_Scale[0]_Thermocouple_Scaling_Direction": 0,
+        "NI_Scale[0]_Thermocouple_Input_Source": 0xFFFFFFFF,
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = benchmark(scaling.scale, data)
+
+    np.testing.assert_almost_equal(
+        scaled_data, expected_scaled_data, decimal=3)
+
+
+def test_thermocouple_scaling_temperature_to_voltage_benchmark(benchmark):
+    """Test thermocouple scaling from a temperature to voltage in uV"""
+
+    data = StubTdmsData(np.tile(np.array([0.0, 10.0, 50.0, 100.0]), 100))
+    expected_scaled_data = np.tile(np.array([
+        0.0, 396.8619078, 2023.0778862, 4096.2302187]), 100)
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Thermocouple",
+        "NI_Scale[0]_Thermocouple_Thermocouple_Type": 10073,
+        "NI_Scale[0]_Thermocouple_Scaling_Direction": 1,
+        "NI_Scale[0]_Thermocouple_Input_Source": 0xFFFFFFFF,
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = benchmark(scaling.scale, data)
+
+    np.testing.assert_almost_equal(
+        scaled_data, expected_scaled_data, decimal=3)
+
+
 @pytest.mark.parametrize(
     "resistance_configuration,lead_resistance,expected_data",
     [
