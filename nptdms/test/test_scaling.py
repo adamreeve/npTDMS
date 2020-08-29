@@ -266,7 +266,7 @@ def test_thermocouple_scaling_voltage_to_temperature():
     """Test thermocouple scaling from a voltage in uV to temperature"""
 
     data = StubTdmsData(np.array([0.0, 10.0, 100.0, 1000.0]))
-    expected_scaled_data = np.array([0.0, 0.2534448,  2.5309141, 24.9940185])
+    expected_scaled_data = np.array([0.000000, 0.250843, 2.508899, 24.983648])
 
     properties = {
         "NI_Number_Of_Scales": 1,
