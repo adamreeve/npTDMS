@@ -3,6 +3,7 @@ import numpy.polynomial.polynomial as poly
 import re
 
 from nptdms.log import log_manager
+import nptdms.thermocouples as thermocouples
 
 
 log = log_manager.get_logger(__name__)
@@ -266,21 +267,19 @@ class ThermocoupleScaling(object):
         parameter.
     """
     def __init__(self, type_code, scaling_direction, input_source):
-        from thermocouples_reference import thermocouples
-
         # Thermocouple types from
         # http://zone.ni.com/reference/en-XX/help/371361R-01/glang/tdms_create_scalinginfo/#instance2
-        thermocouple_type = {
-            10047: 'B',
-            10055: 'E',
-            10072: 'J',
-            10073: 'K',
-            10077: 'N',
-            10082: 'R',
-            10085: 'S',
-            10086: 'T',
-        }[type_code]
-        self.thermocouple = thermocouples[thermocouple_type]
+        thermocouple_types = {
+            10047: thermocouples.type_b,
+            10055: thermocouples.type_e,
+            10072: thermocouples.type_j,
+            10073: thermocouples.type_k,
+            10077: thermocouples.type_n,
+            10082: thermocouples.type_r,
+            10085: thermocouples.type_s,
+            10086: thermocouples.type_t,
+        }
+        self.thermocouple = thermocouple_types[type_code]
 
         self.scaling_direction = scaling_direction
         self.input_source = input_source
@@ -299,31 +298,12 @@ class ThermocoupleScaling(object):
     def scale(self, data):
         """ Apply thermocouple scaling
         """
-
-        # Note that the thermocouples_reference package uses mV for voltages,
-        # but TDMS uses uV.
-        nan = float('nan')
-
-        def scale_uv_to_c(micro_volts):
-            """Convert micro volts to degrees celcius"""
-            milli_volts = micro_volts / 1000.0
-            try:
-                return self.thermocouple.inverse_CmV(milli_volts, Tref=0.0)
-            except ValueError:
-                return nan
-
-        def scale_c_to_uv(temp):
-            """Convert degrees celcius to micro volts"""
-            try:
-                return 1000.0 * self.thermocouple.emf_mVC(temp, Tref=0.0)
-            except ValueError:
-                return nan
-
+        # Note that the thermocouple conversions use mV for voltages, but TDMS uses uV.
         if self.scaling_direction == 1:
-            scaled = np.vectorize(scale_c_to_uv)(data)
+            return 1000.0 * self.thermocouple.celcius_to_mv(data)
         else:
-            scaled = np.vectorize(scale_uv_to_c)(data)
-        return scaled
+            milli_volts = data / 1000.0
+            return self.thermocouple.mv_to_celcius(milli_volts)
 
 
 class AddScaling(object):

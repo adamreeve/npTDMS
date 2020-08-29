@@ -6,15 +6,6 @@ import pytest
 from nptdms import types
 from nptdms.scaling import get_scaling
 
-try:
-    import thermocouples_reference
-except ImportError:
-    thermocouples_reference = None
-try:
-    import scipy
-except ImportError:
-    scipy = None
-
 
 def test_unsupported_scaling_type():
     """Raw data is returned unscaled when the scaling type is unsupported.
@@ -271,8 +262,6 @@ def test_subtract_scaling():
     np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
-@pytest.mark.skipif(thermocouples_reference is None, reason="thermocouples_reference is not installed")
-@pytest.mark.skipif(scipy is None, reason="scipy is not installed")
 def test_thermocouple_scaling_voltage_to_temperature():
     """Test thermocouple scaling from a voltage in uV to temperature"""
 
@@ -293,7 +282,6 @@ def test_thermocouple_scaling_voltage_to_temperature():
         scaled_data, expected_scaled_data, decimal=3)
 
 
-@pytest.mark.skipif(thermocouples_reference is None, reason="thermocouples_reference is not installed")
 def test_thermocouple_scaling_temperature_to_voltage():
     """Test thermocouple scaling from a temperature to voltage in uV"""
 

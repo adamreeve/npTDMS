@@ -44,7 +44,7 @@ setup(
       'test': ['pytest>=3.1.0', 'hypothesis', 'pytest-benchmark', 'mock<4.0;python_version<"3.4"'],
       'pandas': ['pandas'],
       'hdf': ['h5py>=2.10.0'],
-      'thermocouple_scaling': ['thermocouples_reference', 'scipy'],
+      'thermocouple_scaling': [],
   },
   entry_points = """
   [console_scripts]
