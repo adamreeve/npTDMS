@@ -2,13 +2,24 @@ import numpy as np
 import numpy.polynomial.polynomial as poly
 
 
+""" This module converts between temperature and voltage for type B, E, J, K, N, R, S, and T
+    thermocouples using the piecewise polynomial reference functions from NIST (https://srdata.nist.gov/its90/main/).
+    The approximate inverse functions are used to convert from voltage to temperature.
+"""
+
+
 class Thermocouple(object):
+    """ Converts between temperature and voltage for a specific type of thermocouple given its reference functions
+    """
+
     def __init__(self, forward_polynomials, inverse_polynomials, exponential_term=None):
         self._forward_polynomials = forward_polynomials
         self._inverse_polynomials = inverse_polynomials
         self._exponential_term = exponential_term
 
-    def celcius_to_mv(self, temperature):
+    def celsius_to_mv(self, temperature):
+        """ Convert a temperature in degrees Celsius to a voltage in mV
+        """
         conditions = [
             p.within_range(temperature)
             for p in self._forward_polynomials]
@@ -21,13 +32,16 @@ class Thermocouple(object):
         if self._exponential_term is None:
             return voltage
 
+        # Special case for type K thermocouples that have an additional exponential term
         a_0, a_1, a_2 = self._exponential_term
         return voltage + np.piecewise(
             temperature,
             [temperature >= 0],
             [lambda t: a_0 * np.exp(a_1 * np.square(t - a_2)), 0.0])
 
-    def mv_to_celcius(self, voltage):
+    def mv_to_celsius(self, voltage):
+        """ Convert a voltage in mV to a temperature in degrees Celsius
+        """
         conditions = [
             p.within_range(voltage)
             for p in self._inverse_polynomials]
@@ -39,6 +53,8 @@ class Thermocouple(object):
 
 
 class Polynomial(object):
+    """ A single polynomial function with associated applicable range
+    """
     def __init__(self, applicable_range, coefficients):
         self._applicable_range = applicable_range
         self._coefficients = coefficients

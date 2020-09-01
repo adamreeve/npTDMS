@@ -34,7 +34,7 @@ def test_scale_temperature_to_voltage():
         ],
         inverse_polynomials=[]
     )
-    voltages = thermocouple.celcius_to_mv(np.array([0.0, 9.0, 10.0, 11.0, 19.0, 20.0, 21.0]))
+    voltages = thermocouple.celsius_to_mv(np.array([0.0, 9.0, 10.0, 11.0, 19.0, 20.0, 21.0]))
     np.testing.assert_almost_equal(voltages, np.array([0.0, 9.0, 21.0, 23.0, 39.0, 62.0, 65.0]))
 
 
@@ -53,7 +53,7 @@ def test_scale_voltage_to_temperature():
                 coefficients=[2.0, 3.0]),
         ]
     )
-    temperatures = thermocouple.mv_to_celcius(np.array([0.0, 9.0, 10.0, 11.0, 19.0, 20.0, 21.0]))
+    temperatures = thermocouple.mv_to_celsius(np.array([0.0, 9.0, 10.0, 11.0, 19.0, 20.0, 21.0]))
     np.testing.assert_almost_equal(temperatures, np.array([0.0, 9.0, 21.0, 23.0, 39.0, 62.0, 65.0]))
 
 
@@ -139,11 +139,11 @@ def test_type_t_voltage_to_temperature(voltage):
 
 def _test_temperature_to_voltage(reference_thermocouple, thermocouple, temperature):
     reference_voltage = reference_thermocouple.emf_mVC(temperature, Tref=0.0)
-    voltage = thermocouple.celcius_to_mv(temperature)
+    voltage = thermocouple.celsius_to_mv(temperature)
     assert abs(voltage - reference_voltage) < 1.0E-6
 
 
 def _test_voltage_to_temperature(reference_thermocouple, thermocouple, voltage, max_error):
     reference_temperature = reference_thermocouple.inverse_CmV(voltage, Tref=0.0)
-    temperature = thermocouple.mv_to_celcius(voltage)
+    temperature = thermocouple.mv_to_celsius(voltage)
     assert abs(temperature - reference_temperature) < max_error + 1.0E-6

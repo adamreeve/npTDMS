@@ -73,7 +73,7 @@ class PolynomialScaling(object):
 
 class RtdScaling(object):
     """ Converts a signal from a resistance temperature detector into
-        degrees celcius using the Callendar-Van Dusen equation
+        degrees Celsius using the Callendar-Van Dusen equation
     """
     def __init__(
             self, current_excitation, r0_nominal_resistance,
@@ -262,7 +262,7 @@ class ThermistorScaling(object):
 
 
 class ThermocoupleScaling(object):
-    """ Convert between voltages in uV and degrees celcius for a Thermocouple.
+    """ Convert between voltages in uV and degrees Celsius for a Thermocouple.
         Can convert in either direction depending on the scaling direction
         parameter.
     """
@@ -300,10 +300,10 @@ class ThermocoupleScaling(object):
         """
         # Note that the thermocouple conversions use mV for voltages, but TDMS uses uV.
         if self.scaling_direction == 1:
-            return 1000.0 * self.thermocouple.celcius_to_mv(data)
+            return 1000.0 * self.thermocouple.celsius_to_mv(data)
         else:
             milli_volts = data / 1000.0
-            return self.thermocouple.mv_to_celcius(milli_volts)
+            return self.thermocouple.mv_to_celsius(milli_volts)
 
 
 class AddScaling(object):

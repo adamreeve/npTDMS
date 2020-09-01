@@ -51,7 +51,7 @@ setup(
       ],
       'pandas': ['pandas'],
       'hdf': ['h5py>=2.10.0'],
-      'thermocouple_scaling': [],
+      'thermocouple_scaling': [],  # Kept for backwards compatibility
   },
   entry_points = """
   [console_scripts]
