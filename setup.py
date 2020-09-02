@@ -41,10 +41,17 @@ setup(
   ],
   install_requires = ['numpy'],
   extras_require = {
-      'test': ['pytest>=3.1.0', 'hypothesis', 'pytest-benchmark', 'mock<4.0;python_version<"3.4"'],
+      'test': [
+          'pytest>=3.1.0',
+          'hypothesis',
+          'pytest-benchmark',
+          'mock<4.0;python_version<"3.4"',
+          'thermocouples_reference',
+          'scipy',
+      ],
       'pandas': ['pandas'],
       'hdf': ['h5py>=2.10.0'],
-      'thermocouple_scaling': ['thermocouples_reference', 'scipy'],
+      'thermocouple_scaling': [],  # Kept for backwards compatibility
   },
   entry_points = """
   [console_scripts]
