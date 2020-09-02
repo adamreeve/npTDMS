@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 from hypothesis import (given, strategies, settings)
 
 from nptdms import thermocouples
@@ -55,6 +56,51 @@ def test_scale_voltage_to_temperature():
     )
     temperatures = thermocouple.mv_to_celsius(np.array([0.0, 9.0, 10.0, 11.0, 19.0, 20.0, 21.0]))
     np.testing.assert_almost_equal(temperatures, np.array([0.0, 9.0, 21.0, 23.0, 39.0, 62.0, 65.0]))
+
+
+def test_non_contiguous_forward_polynomial_ranges():
+    with pytest.raises(ValueError) as exc_info:
+        _ = thermocouples.Thermocouple(
+            forward_polynomials=[
+                thermocouples.Polynomial(
+                    applicable_range=thermocouples.Range(None, 10),
+                    coefficients=[0.0, 1.0]),
+                thermocouples.Polynomial(
+                    applicable_range=thermocouples.Range(11, None),
+                    coefficients=[0.0, 1.0]),
+            ],
+            inverse_polynomials=[]
+        )
+    assert "Polynomial ranges must be contiguous" in str(exc_info.value)
+
+
+def test_non_contiguous_inverse_polynomial_ranges():
+    with pytest.raises(ValueError) as exc_info:
+        _ = thermocouples.Thermocouple(
+            forward_polynomials=[],
+            inverse_polynomials=[
+                thermocouples.Polynomial(
+                    applicable_range=thermocouples.Range(None, 10),
+                    coefficients=[0.0, 1.0]),
+                thermocouples.Polynomial(
+                    applicable_range=thermocouples.Range(11, None),
+                    coefficients=[0.0, 1.0]),
+            ]
+        )
+    assert "Polynomial ranges must be contiguous" in str(exc_info.value)
+
+
+def test_no_range():
+    with pytest.raises(ValueError) as exc_info:
+        _ = thermocouples.Range(None, None)
+    assert "At least one of start and end must be provided" in str(exc_info.value)
+
+
+@pytest.mark.parametrize("start,end", [(2.0, 1.0), (1.0, 1.0)])
+def test_invalid_range(start, end):
+    with pytest.raises(ValueError) as exc_info:
+        _ = thermocouples.Range(start, end)
+    assert "start must be less than end" in str(exc_info.value)
 
 
 @given(temperature=strategies.floats(0.0, 1820.0))

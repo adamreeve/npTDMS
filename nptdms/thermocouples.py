@@ -13,6 +13,8 @@ class Thermocouple(object):
     """
 
     def __init__(self, forward_polynomials, inverse_polynomials, exponential_term=None):
+        _verify_contiguous(forward_polynomials)
+        _verify_contiguous(inverse_polynomials)
         self._forward_polynomials = forward_polynomials
         self._inverse_polynomials = inverse_polynomials
         self._exponential_term = exponential_term
@@ -56,11 +58,11 @@ class Polynomial(object):
     """ A single polynomial function with associated applicable range
     """
     def __init__(self, applicable_range, coefficients):
-        self._applicable_range = applicable_range
+        self.applicable_range = applicable_range
         self._coefficients = coefficients
 
     def within_range(self, value):
-        return self._applicable_range.within_range(value)
+        return self.applicable_range.within_range(value)
 
     def apply(self, x):
         return poly.polyval(x, self._coefficients)
@@ -70,15 +72,28 @@ class Range(object):
     """ A range with inclusive start and exclusive end
     """
     def __init__(self, start, end):
-        self._start = start
-        self._end = end
+        if start is None and end is None:
+            raise ValueError("At least one of start and end must be provided")
+        if start is not None and end is not None and start >= end:
+            raise ValueError("start must be less than end")
+
+        self.start = start
+        self.end = end
 
     def within_range(self, value):
-        if self._start is None:
-            return value <= self._end
-        if self._end is None:
-            return self._start <= value
-        return (self._start <= value) & (value < self._end)
+        if self.start is None:
+            return value < self.end
+        if self.end is None:
+            return self.start <= value
+        return (self.start <= value) & (value < self.end)
+
+
+def _verify_contiguous(polynomials):
+    prev_end = None
+    for polynomial in polynomials:
+        if prev_end is not None and polynomial.applicable_range.start != prev_end:
+            raise ValueError("Polynomial ranges must be contiguous")
+        prev_end = polynomial.applicable_range.end
 
 
 type_b = Thermocouple(
