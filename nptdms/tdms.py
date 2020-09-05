@@ -478,6 +478,12 @@ class TdmsChannel(object):
         """
         return self._path.channel
 
+    @property
+    def group_name(self):
+        """ The name of the group that contains this channel
+        """
+        return self._path.group
+
     @cached_property
     def dtype(self):
         """ NumPy data type of the channel data

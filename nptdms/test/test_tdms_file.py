@@ -750,6 +750,7 @@ def test_channel_object_paths():
     channel = tdms_data["Group"]["Channel1"]
     assert channel.path == "/'Group'/'Channel1'"
     assert channel.name == "Channel1"
+    assert channel.group_name == "Group"
 
 
 def test_object_repr():
