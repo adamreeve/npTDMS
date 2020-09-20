@@ -4,7 +4,6 @@
 """
 
 from collections import defaultdict
-import warnings
 import numpy as np
 
 from nptdms import scaling, types
@@ -19,11 +18,6 @@ from nptdms.timestamp import TdmsTimestamp, TimestampArray
 
 
 log = log_manager.get_logger(__name__)
-
-
-# Have to get a reference to the builtin property decorator
-# so we can use it in TdmsObject, which has a property method.
-_property_builtin = property
 
 
 class TdmsFile(object):
@@ -146,7 +140,7 @@ class TdmsFile(object):
 
         return list(self._groups.values())
 
-    @_property_builtin
+    @property
     def properties(self):
         """ Return the properties of this file as a dictionary
 
@@ -316,96 +310,6 @@ class TdmsFile(object):
             return val
         return OrderedDict((k, convert_prop(v)) for (k, v) in properties.items())
 
-    def object(self, *path):
-        """(Deprecated) Get a TDMS object from the file
-
-        :param path: The object group and channel names. Providing no channel
-            returns a group object, and providing no channel or group
-            will return the root object.
-        :rtype: One of :class:`TdmsGroup`, :class:`TdmsChannel`, :class:`RootObject`
-
-        For example, to get the root object::
-
-            object()
-
-        To get a group::
-
-            object("group_name")
-
-        To get a channel::
-
-            object("group_name", "channel_name")
-        """
-
-        _deprecated("TdmsFile.object",
-                    "Use TdmsFile.properties to access properties of the root object, " +
-                    "TdmsFile[group_name] to access a group object and " +
-                    "TdmsFile[group_name][channel_name] to access a channel object.")
-
-        def get_name(component):
-            try:
-                return component.name
-            except AttributeError:
-                return component
-
-        path = [get_name(c) for c in path]
-        object_path = ObjectPath(*path)
-        try:
-            return self.objects[str(object_path)]
-        except KeyError:
-            raise KeyError("Invalid object path: %s" % object_path)
-
-    def group_channels(self, group):
-        """(Deprecated) Returns a list of channel objects for the given group
-
-        :param group: Group or name of the group to get channels for.
-        :rtype: List of :class:`TdmsObject` objects.
-        """
-
-        _deprecated("TdmsFile.group_channels", "Use TdmsFile[group_name].channels().")
-
-        if isinstance(group, TdmsGroup):
-            return group.channels()
-
-        return self._groups[group].channels()
-
-    def channel_data(self, group, channel):
-        """(Deprecated)  Get the data for a channel
-
-        :param group: The name of the group the channel is in.
-        :param channel: The name of the channel to get data for.
-        :returns: The channel data.
-        :rtype: NumPy array.
-        """
-
-        _deprecated("TdmsFile.channel_data", "Use TdmsFile[group_name][channel_name].data.")
-
-        if self._reader is None:
-            # Data should have already been loaded
-            return self[group][channel].data
-        else:
-            # Data must be lazily loaded
-            return self[group][channel].read_data()
-
-    @_property_builtin
-    def objects(self):
-        """ (Deprecated) A dictionary of objects in the TDMS file, where the keys are the object paths.
-        """
-
-        _deprecated("TdmsFile.objects", "Use TdmsFile.groups() to access all groups in the file, " +
-                    "and group.channels() to access all channels in a group.")
-
-        objects = OrderedDict()
-        root_path = ObjectPath()
-        objects[str(root_path)] = RootObject(self._properties)
-
-        for group in self.groups():
-            objects[group.path] = group
-            for channel in group.channels():
-                objects[channel.path] = channel
-
-        return objects
-
 
 class TdmsGroup(object):
     """ Represents a group of channels in a TDMS file.
@@ -434,13 +338,13 @@ class TdmsGroup(object):
     def __repr__(self):
         return "<TdmsGroup with path %s>" % self.path
 
-    @_property_builtin
+    @property
     def path(self):
         """ Path to the TDMS object for this group
         """
         return str(self._path)
 
-    @_property_builtin
+    @property
     def name(self):
         """ The name of this group
         """
@@ -488,44 +392,6 @@ class TdmsGroup(object):
             raise KeyError(
                 "There is no channel named '%s' in group '%s' of the TDMS file" %
                 (channel_name, self.name))
-
-    def property(self, property_name):
-        """(Deprecated) Returns the value of a TDMS property
-
-        :param property_name: The name of the property to get.
-        :returns: The value of the requested property.
-        :raises: KeyError if the property isn't found.
-        """
-
-        _deprecated("TdmsGroup.property", "Use TdmsGroup.properties[property_name].")
-
-        try:
-            return self.properties[property_name]
-        except KeyError:
-            raise KeyError(
-                "Object does not have property '%s'" % property_name)
-
-    @_property_builtin
-    def group(self):
-        """ (Deprecated) Returns the name of the group for this object,
-            or None if it is the root object.
-        """
-        _deprecated("TdmsGroup.group", "Use TdmsGroup.name.")
-        return self._path.group
-
-    @_property_builtin
-    def channel(self):
-        """ (Deprecated) Returns the name of the channel for this object,
-            or None if it is a group or the root object.
-        """
-        _deprecated("TdmsGroup.channel", "This always returns None.")
-        return None
-
-    @_property_builtin
-    def has_data(self):
-        """(Deprecated)"""
-        _deprecated("TdmsGroup.has_data", "This always returns False.")
-        return False
 
 
 class TdmsChannel(object):
@@ -600,17 +466,23 @@ class TdmsChannel(object):
         else:
             raise TypeError("Invalid index type '%s', expected int, slice or Ellipsis" % type(index).__name__)
 
-    @_property_builtin
+    @property
     def path(self):
         """ Path to the TDMS object for this channel
         """
         return str(self._path)
 
-    @_property_builtin
+    @property
     def name(self):
         """ The name of this channel
         """
         return self._path.channel
+
+    @property
+    def group_name(self):
+        """ The name of the group that contains this channel
+        """
+        return self._path.group
 
     @cached_property
     def dtype(self):
@@ -650,7 +522,7 @@ class TdmsChannel(object):
             return np.empty((0, ), dtype=self.dtype)
         return self._scale_data(self._raw_data)
 
-    @_property_builtin
+    @property
     def raw_data(self):
         """ If the TdmsFile was created by reading all data, this property
         provides direct access to the numpy array of raw, unscaled data.
@@ -671,7 +543,7 @@ class TdmsChannel(object):
                     "for a scale_id")
         return self._raw_data.data
 
-    @_property_builtin
+    @property
     def raw_scaler_data(self):
         """ If the TdmsFile was created by reading all data, this property
         provides direct access to the numpy array of raw DAQmx scaler data
@@ -916,49 +788,6 @@ class TdmsChannel(object):
     def _set_raw_data(self, data):
         self._raw_data = data
 
-    def property(self, property_name):
-        """(Deprecated) Returns the value of a TDMS property
-
-        :param property_name: The name of the property to get.
-        :returns: The value of the requested property.
-        :raises: KeyError if the property isn't found.
-        """
-        _deprecated("TdmsChannel.property", "Use TdmsChannel.properties[property_name]")
-
-        try:
-            return self.properties[property_name]
-        except KeyError:
-            raise KeyError(
-                "Object does not have property '%s'" % property_name)
-
-    @_property_builtin
-    def group(self):
-        """ (Deprecated) Returns the name of the group for this object,
-            or None if it is the root object.
-        """
-        _deprecated("TdmsChannel.group")
-        return self._path.group
-
-    @_property_builtin
-    def channel(self):
-        """ (Deprecated) Returns the name of the channel for this object,
-            or None if it is a group or the root object.
-        """
-        _deprecated("TdmsChannel.channel", "Use TdmsChannel.name")
-        return self._path.channel
-
-    @_property_builtin
-    def has_data(self):
-        """(Deprecated)"""
-        _deprecated("TdmsChannel.has_data", "This always returns True")
-        return True
-
-    @_property_builtin
-    def number_values(self):
-        """(Deprecated)"""
-        _deprecated("TdmsChannel.number_values", "Use len(channel)")
-        return self._length
-
 
 class DataChunk(object):
     """ A chunk of data in a TDMS file
@@ -1064,41 +893,6 @@ class ChannelDataChunk(object):
             raise ValueError("Missing scaling information for DAQmx data")
         else:
             return self._raw_data.data
-
-
-class RootObject(object):
-    def __init__(self, properties):
-        self.properties = properties
-
-    def property(self, property_name):
-        _deprecated("RootObject", "Use TdmsFile.properties to access properties from the root object")
-        try:
-            return self.properties[property_name]
-        except KeyError:
-            raise KeyError(
-                "Object does not have property '%s'" % property_name)
-
-    @_property_builtin
-    def group(self):
-        _deprecated("RootObject", "Use TdmsFile.properties to access properties from the root object")
-        return None
-
-    @_property_builtin
-    def channel(self):
-        _deprecated("RootObject", "Use TdmsFile.properties to access properties from the root object")
-        return None
-
-    @_property_builtin
-    def has_data(self):
-        _deprecated("RootObject", "Use TdmsFile.properties to access properties from the root object")
-        return False
-
-
-def _deprecated(name, detail=None):
-    message = "'{0}' is deprecated and will be removed in a future release.".format(name)
-    if detail is not None:
-        message += " {0}".format(detail)
-    warnings.warn(message)
 
 
 def _convert_data_chunk(chunk, raw_timestamps):

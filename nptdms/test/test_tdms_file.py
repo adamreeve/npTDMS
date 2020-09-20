@@ -116,19 +116,6 @@ def test_lazily_read_channel_data_with_file_path():
         os.remove(temp_file.name)
 
 
-@pytest.mark.filterwarnings('ignore:.* is deprecated')
-def test_lazily_read_channel_data_with_channel_data_method():
-    """Test reading channel data lazily using the channel_data method of TdmsFile
-    """
-    test_file, expected_data = scenarios.single_segment_with_two_channels().values
-    with test_file.get_tempfile() as temp_file:
-        with TdmsFile.open(temp_file.file) as tdms_file:
-            for ((group, channel), expected_data) in expected_data.items():
-                actual_data = tdms_file.channel_data(group, channel)
-                assert actual_data.dtype == expected_data.dtype
-                np.testing.assert_almost_equal(actual_data, expected_data)
-
-
 @given(offset=strategies.integers(0, 100), length=strategies.integers(0, 100))
 @example(offset=0, length=0)
 @example(offset=0, length=100)
@@ -558,35 +545,6 @@ def test_read_with_mismatching_index_file():
                 os.remove(tdms_file.name)
 
 
-@pytest.mark.filterwarnings('ignore:.* is deprecated')
-def test_get_objects():
-    """Test reading data"""
-
-    test_file = GeneratedFile()
-    test_file.add_segment(*basic_segment())
-    tdms_file = test_file.load()
-
-    objects = tdms_file.objects
-    assert len(objects) == 4
-    assert "/" in objects.keys()
-    assert "/'Group'" in objects.keys()
-    assert "/'Group'/'Channel1'" in objects.keys()
-    assert "/'Group'/'Channel2'" in objects.keys()
-
-
-@pytest.mark.filterwarnings('ignore:.* is deprecated')
-def test_get_object_from_group():
-    """Test passing a TdmsGroup to object returns the group"""
-
-    test_file = GeneratedFile()
-    test_file.add_segment(*basic_segment())
-    tdms_file = test_file.load()
-
-    groups = tdms_file.groups()
-    assert tdms_file.object(groups[0]) is groups[0]
-    assert tdms_file.object(groups[0].name) is groups[0]
-
-
 def test_get_len_of_file():
     """Test getting the length of a TdmsFile
     """
@@ -772,44 +730,27 @@ def test_single_quote_in_name():
     assert len(data_1) == 2
 
 
-@pytest.mark.filterwarnings('ignore:.* is deprecated')
-def test_root_object_paths():
-    """Test the group and channel properties for the root object"""
-    test_file = GeneratedFile()
-    test_file.add_segment(*basic_segment())
-    tdms_data = test_file.load()
-
-    obj = tdms_data.object()
-    assert obj.group is None
-    assert obj.channel is None
-
-
-@pytest.mark.filterwarnings('ignore:.* is deprecated')
 def test_group_object_paths():
-    """Test the group and channel properties for a group"""
+    """Test the path and name properties for a group"""
     test_file = GeneratedFile()
     test_file.add_segment(*basic_segment())
     tdms_data = test_file.load()
 
-    obj = tdms_data["Group"]
-    assert obj.path == "/'Group'"
-    assert obj.name == "Group"
-    assert obj.group == "Group"
-    assert obj.channel is None
+    group = tdms_data["Group"]
+    assert group.path == "/'Group'"
+    assert group.name == "Group"
 
 
-@pytest.mark.filterwarnings('ignore:.* is deprecated')
 def test_channel_object_paths():
-    """Test the group and channel properties for a group"""
+    """Test the path and name properties for a channel"""
     test_file = GeneratedFile()
     test_file.add_segment(*basic_segment())
     tdms_data = test_file.load()
 
-    obj = tdms_data["Group"]["Channel1"]
-    assert obj.path == "/'Group'/'Channel1'"
-    assert obj.name == "Channel1"
-    assert obj.group == "Group"
-    assert obj.channel == "Channel1"
+    channel = tdms_data["Group"]["Channel1"]
+    assert channel.path == "/'Group'/'Channel1'"
+    assert channel.name == "Channel1"
+    assert channel.group_name == "Group"
 
 
 def test_object_repr():
