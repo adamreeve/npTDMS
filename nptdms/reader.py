@@ -147,6 +147,7 @@ class TdmsReader(object):
         end_segment = np.searchsorted(segment_offsets, end_index, side='left')
 
         segment_index = start_segment
+        values_read = 0
         for segment in self._segments[start_segment:end_segment + 1]:
             self._verify_segment_start(segment)
             # By default, read all chunks in a segment
@@ -155,7 +156,6 @@ class TdmsReader(object):
             chunk_size = chunk_sizes[segment_index]
             segment_start_index = 0 if segment_index == 0 else segment_offsets[segment_index - 1]
             remaining_values_to_skip = 0
-            remaining_values_to_trim = 0
 
             # For the first and last segments, we may not need to read all chunks,
             # and may need to trim some data from the beginning or end of the chunk.
@@ -177,12 +177,12 @@ class TdmsReader(object):
                     num_values_to_trim -= final_chunk_size
 
                 num_chunks -= num_values_to_trim // chunk_size
-                remaining_values_to_trim = num_values_to_trim % chunk_size
 
             for i, chunk in enumerate(
                     segment.read_raw_data_for_channel(self._file, channel_path, chunk_offset, num_chunks)):
                 skip = remaining_values_to_skip if i == 0 else 0
-                trim = remaining_values_to_trim if i == (num_chunks - 1) else 0
+                values_read += len(chunk) - skip
+                trim = 0 if values_read < length else values_read - length
                 yield _trim_channel_chunk(chunk, skip, trim)
 
             segment_index += 1

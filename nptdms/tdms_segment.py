@@ -24,7 +24,9 @@ class InterleavedDataSegment(BaseSegment):
     def _new_segment_object(self, object_path):
         return TdmsSegmentObject(object_path, self.endianness)
 
-    def _read_data_chunk(self, file, data_objects, chunk_index):
+    def _read_data_chunks(self, file, data_objects, num_chunks):
+        """ Read multiple data chunks at once
+        """
         # If all data types are sized and all the lengths are
         # the same, then we can read all data at once with numpy,
         # which is much faster
@@ -33,11 +35,23 @@ class InterleavedDataSegment(BaseSegment):
         same_length = (len(
             set((o.number_values for o in data_objects))) == 1)
         if all_sized and same_length:
-            return self._read_interleaved_sized(file, data_objects)
+            return [self._read_interleaved_sized(file, data_objects, num_chunks)]
         else:
-            return self._read_interleaved(file, data_objects)
+            return [self._read_interleaved(file, data_objects, num_chunks)]
 
-    def _read_interleaved_sized(self, file, data_objects):
+    def _read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk):
+        """ Read multiple data chunks for a single channel at once
+        """
+        num_chunks = stop_chunk - chunk_offset
+        all_chunks = self._read_data_chunks(file, data_objects, num_chunks)
+        return [BaseSegment._data_chunk_to_channel_chunk(chunk, channel_path) for chunk in all_chunks]
+
+    def _read_data_chunk(self, file, data_objects, chunk_index):
+        """ Not used for interleaved data, multiple chunks are read at once
+        """
+        raise NotImplementedError("Reading a single chunk is not implemented for interleaved data")
+
+    def _read_interleaved_sized(self, file, data_objects, num_chunks):
         """Read interleaved data where all channels have a sized data type and the same length
         """
         log.debug("Reading interleaved data all at once")
@@ -47,7 +61,7 @@ class InterleavedDataSegment(BaseSegment):
 
         # Read all data into 1 byte unsigned ints first
         combined_data = read_interleaved_segment_bytes(
-            file, total_data_width, data_objects[0].number_values)
+            file, total_data_width, data_objects[0].number_values * num_chunks)
 
         # Now get arrays for each channel
         channel_data = {}
@@ -71,7 +85,7 @@ class InterleavedDataSegment(BaseSegment):
 
         return RawDataChunk.channel_data(channel_data)
 
-    def _read_interleaved(self, file, data_objects):
+    def _read_interleaved(self, file, data_objects, num_chunks):
         """Read interleaved data that doesn't have a numpy type"""
 
         log.debug("Reading interleaved data point by point")
@@ -80,7 +94,7 @@ class InterleavedDataSegment(BaseSegment):
         for obj in data_objects:
             object_data[obj.path] = obj.new_segment_data()
             points_added[obj.path] = 0
-        while any([points_added[o.path] < o.number_values
+        while any([points_added[o.path] < (o.number_values * num_chunks)
                    for o in data_objects]):
             for obj in data_objects:
                 if points_added[obj.path] < obj.number_values:
