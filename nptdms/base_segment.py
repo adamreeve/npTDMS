@@ -422,7 +422,7 @@ def fromfile(file, dtype, count, *args, **kwargs):
         return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
     except (TypeError, IOError, UnsupportedOperation):
         return np.frombuffer(
-            file.read(count * np.dtype(dtype).itemsize),
+            file.read(int(count * np.dtype(dtype).itemsize)),
             dtype=dtype, count=count, *args, **kwargs)
 
 
