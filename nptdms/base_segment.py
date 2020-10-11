@@ -207,8 +207,8 @@ class BaseSegment(object):
             total_data_size, f.tell(), self.num_chunks)
 
         data_objects = [o for o in self.ordered_objects if o.has_data]
-        for chunk in range(self.num_chunks):
-            yield self._read_data_chunk(f, data_objects, chunk)
+        for chunk in self._read_data_chunks(f, data_objects, self.num_chunks):
+            yield chunk
 
     def read_raw_data_for_channel(self, f, channel_path, chunk_offset=0, num_chunks=None):
         """Read raw data from a TDMS segment
@@ -232,8 +232,8 @@ class BaseSegment(object):
         if chunk_offset > 0:
             f.seek(chunk_size * chunk_offset, os.SEEK_CUR)
         stop_chunk = self.num_chunks if num_chunks is None else num_chunks + chunk_offset
-        for chunk_index in range(chunk_offset, stop_chunk):
-            yield self._read_channel_data_chunk(f, data_objects, chunk_index, channel_path)
+        for chunk in self._read_channel_data_chunks(f, data_objects, channel_path, chunk_offset, stop_chunk):
+            yield chunk
 
     def _calculate_chunks(self):
         """
@@ -272,10 +272,24 @@ class BaseSegment(object):
             o.data_size
             for o in self.ordered_objects if o.has_data])
 
+    def _read_data_chunks(self, file, data_objects, num_chunks):
+        """ Read multiple data chunks at once
+            In the base case we read each chunk individually but subclasses can override this
+        """
+        for chunk in range(num_chunks):
+            yield self._read_data_chunk(file, data_objects, chunk)
+
     def _read_data_chunk(self, file, data_objects, chunk_index):
         """ Read data from a chunk for all channels
         """
         raise NotImplementedError("Data chunk reading must be implemented in base classes")
+
+    def _read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk):
+        """ Read multiple data chunks for a single channel at once
+            In the base case we read each chunk individually but subclasses can override this
+        """
+        for chunk_index in range(chunk_offset, stop_chunk):
+            yield self._read_channel_data_chunk(file, data_objects, chunk_index, channel_path)
 
     def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
         """ Read data from a chunk for a single channel
@@ -284,6 +298,10 @@ class BaseSegment(object):
         # and then select only the requested channel.
         # Derived classes can implement more optimised reading.
         data_chunk = self._read_data_chunk(file, data_objects, chunk_index)
+        return BaseSegment._data_chunk_to_channel_chunk(data_chunk, channel_path)
+
+    @staticmethod
+    def _data_chunk_to_channel_chunk(data_chunk, channel_path):
         try:
             return data_chunk.channel_data[channel_path]
         except KeyError:
@@ -404,7 +422,7 @@ def fromfile(file, dtype, count, *args, **kwargs):
         return np.fromfile(file, dtype=dtype, count=count, *args, **kwargs)
     except (TypeError, IOError, UnsupportedOperation):
         return np.frombuffer(
-            file.read(count * np.dtype(dtype).itemsize),
+            file.read(int(count * np.dtype(dtype).itemsize)),
             dtype=dtype, count=count, *args, **kwargs)
 
 
