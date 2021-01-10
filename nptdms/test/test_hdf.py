@@ -242,7 +242,7 @@ def test_as_hdf_string(tmp_path):
     assert h5_strings.dtype.kind == 'O'
     assert h5_strings.shape[0] == len(strings)
     for expected, read in zip(strings, h5_strings[...]):
-        assert expected == read
+        assert expected == _as_string(read)
     h5.close()
 
 
@@ -288,7 +288,7 @@ def test_unicode_string_data(tmp_path):
     data = tdms_data["Group"]["String"].data
     assert len(data) == len(strings)
     for expected, read in zip(strings, data):
-        assert expected == read
+        assert expected == _as_string(read)
 
     h5_path = tmp_path / 'h5_unicode_strings_test.h5'
     h5 = tdms_data.as_hdf(h5_path)
@@ -319,3 +319,10 @@ def test_add_to_file_under_group(tmp_path):
         np.testing.assert_almost_equal(h5_channel[...], expected_data)
     np.testing.assert_almost_equal(h5['preexisting_data'], preexisting_data)
     h5.close()
+
+
+def _as_string(bytes_or_string):
+    # h5py reads string data as bytes by default since 3.0
+    if isinstance(bytes_or_string, bytes):
+        return bytes_or_string.decode('UTF-8')
+    return bytes_or_string
