@@ -284,6 +284,18 @@ def test_indexing_channel_with_integer(index):
                 assert channel_object[index] == expected_channel_data[index]
 
 
+@given(index=strategies.integers(-8, -1))
+def test_indexing_channel_with_negative_integer(index):
+    """ Test indexing into a channel with a negative integer index
+    """
+    test_file, expected_data = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_object = tdms_file[group][channel]
+                assert channel_object[index] == expected_channel_data[index]
+
+
 def test_indexing_channel_with_integer_and_caching():
     """ Test indexing into a channel with an integer index, reusing the same file to test caching
     """
