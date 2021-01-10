@@ -288,7 +288,7 @@ def test_unicode_string_data(tmp_path):
     data = tdms_data["Group"]["String"].data
     assert len(data) == len(strings)
     for expected, read in zip(strings, data):
-        assert expected == _as_string(read)
+        assert expected == read
 
     h5_path = tmp_path / 'h5_unicode_strings_test.h5'
     h5 = tdms_data.as_hdf(h5_path)
@@ -296,7 +296,7 @@ def test_unicode_string_data(tmp_path):
     assert h5_strings.dtype.kind == 'O'
     assert h5_strings.shape[0] == len(strings)
     for expected, read in zip(strings, h5_strings[...]):
-        assert expected == read
+        assert expected == _as_string(read)
     h5.close()
 
 
