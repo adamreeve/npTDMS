@@ -719,8 +719,11 @@ class TdmsChannel(object):
             return read_data[::step]
 
     def _read_at_index(self, index):
+        orig_index = index
+        if index < 0:
+            index = self._length + index
         if index < 0 or index >= self._length:
-            raise IndexError("Index {0} is outside of the channel bounds [0, {1}]".format(index, self._length - 1))
+            raise IndexError("Index {0} is outside of the channel bounds [0, {1}]".format(orig_index, self._length - 1))
 
         if self._cached_chunk is not None:
             # Check if we've already read and cached the chunk containing this index
