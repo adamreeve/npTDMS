@@ -3,37 +3,19 @@ import numpy as np
 
 from nptdms import types
 from nptdms.base_segment import (
-    BaseSegment, BaseSegmentObject, RawDataChunk, read_interleaved_segment_bytes)
+    BaseSegmentObject, BaseDataReader, RawDataChunk, read_interleaved_segment_bytes)
 from nptdms.log import log_manager
 
 
 log = log_manager.get_logger(__name__)
 
-
 FORMAT_CHANGING_SCALER = 0x00001269
 DIGITAL_LINE_SCALER = 0x0000126A
 
 
-class DaqmxSegment(BaseSegment):
+class DaqmxDataReader(BaseDataReader):
     """ A TDMS segment with DAQmx data
     """
-
-    def _new_segment_object(self, object_path):
-        return DaqmxSegmentObject(object_path, self.endianness)
-
-    def _get_chunk_size(self):
-        # For DAQmxRawData, each channel in a segment has the same number
-        # of values and contains the same raw data widths, so use
-        # the first valid channel metadata to calculate the data size.
-        try:
-            return next(
-                o.number_values * o.total_raw_data_width
-                for o in self.ordered_objects
-                if o.has_data and
-                o.number_values * o.total_raw_data_width > 0)
-        except StopIteration:
-            return 0
-
     def _read_data_chunk(self, file, data_objects, chunk_index):
         """Read data from DAQmx data segment"""
 
@@ -82,6 +64,20 @@ class DaqmxSegment(BaseSegment):
                     scaler_data[obj.path][scaler.scale_id] = processed_data
 
         return RawDataChunk.scaler_data(scaler_data)
+
+
+def get_daqmx_chunk_size(ordered_objects):
+    # For DAQmxRawData, each channel in a segment has the same number
+    # of values and contains the same raw data widths, so use
+    # the first valid channel metadata to calculate the data size.
+    try:
+        return next(
+            o.number_values * o.total_raw_data_width
+            for o in ordered_objects
+            if o.has_data and
+            o.number_values * o.total_raw_data_width > 0)
+    except StopIteration:
+        return 0
 
 
 class DaqmxSegmentObject(BaseSegmentObject):

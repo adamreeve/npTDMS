@@ -155,6 +155,43 @@ def test_two_channel_i16():
     np.testing.assert_array_equal(data_2, [17, 18, 19, 20])
 
 
+def test_two_channels_without_daqmx_toc_flag():
+    """ Test loading a DAQmx file with two channels of DAQmx data but where
+        the segment header is missing the DAQmx flag (see issue #226)
+    """
+
+    scaler_1 = daqmx_scaler_metadata(0, 3, 0)
+    scaler_2 = daqmx_scaler_metadata(0, 3, 2)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 4, [4], [scaler_1]),
+        daqmx_channel_metadata("Channel2", 4, [4], [scaler_2]))
+    data = (
+        # Data for segment
+        "01 00"
+        "11 00"
+        "02 00"
+        "12 00"
+        "03 00"
+        "13 00"
+        "04 00"
+        "14 00"
+    )
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc_non_daqmx(), metadata, data)
+    tdms_data = test_file.load()
+
+    data_1 = tdms_data["Group"]["Channel1"].raw_data
+    assert data_1.dtype == np.int16
+    np.testing.assert_array_equal(data_1, [1, 2, 3, 4])
+
+    data_2 = tdms_data["Group"]["Channel2"].raw_data
+    assert data_2.dtype == np.int16
+    np.testing.assert_array_equal(data_2, [17, 18, 19, 20])
+
+
 def test_mixed_channel_widths():
     """ Test loading a DAQmx file with channels with different widths
     """
@@ -718,6 +755,11 @@ def test_daqmx_debug_logging(caplog):
 def segment_toc():
     return (
         "kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocDAQmxRawData")
+
+
+def segment_toc_non_daqmx():
+    return (
+        "kTocMetaData", "kTocRawData", "kTocNewObjList")
 
 
 def root_metadata():

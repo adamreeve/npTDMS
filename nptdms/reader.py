@@ -9,8 +9,7 @@ from nptdms import types
 from nptdms.common import ObjectPath, toc_properties
 from nptdms.utils import Timer, OrderedDict
 from nptdms.base_segment import RawChannelDataChunk
-from nptdms.tdms_segment import ContiguousDataSegment, InterleavedDataSegment
-from nptdms.daqmx import DaqmxSegment
+from nptdms.tdms_segment import TdmsSegment
 from nptdms.log import log_manager
 
 
@@ -221,15 +220,9 @@ class TdmsReader(object):
         (position, toc_mask, endianness, data_position, raw_data_offset,
          next_segment_offset, next_segment_pos) = self._read_lead_in(file, segment_position, is_index_file)
 
-        segment_args = (
+        segment = TdmsSegment(
             position, toc_mask, endianness, next_segment_offset,
             next_segment_pos, raw_data_offset, data_position)
-        if toc_mask & toc_properties['kTocDAQmxRawData']:
-            segment = DaqmxSegment(*segment_args)
-        elif toc_mask & toc_properties['kTocInterleavedData']:
-            segment = InterleavedDataSegment(*segment_args)
-        else:
-            segment = ContiguousDataSegment(*segment_args)
 
         segment.read_segment_objects(
             file, self._prev_segment_objects, previous_segment)
