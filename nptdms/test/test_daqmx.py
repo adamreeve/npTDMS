@@ -7,7 +7,9 @@ import numpy as np
 import pytest
 
 from nptdms import TdmsFile
+from nptdms import types
 from nptdms.log import log_manager
+from nptdms.test.scenarios import timestamp_hexlify
 from nptdms.test.util import (
     GeneratedFile, hexlify_value, string_hexlify, segment_objects_metadata, hex_properties)
 
@@ -190,6 +192,58 @@ def test_two_channels_without_daqmx_toc_flag():
     data_2 = tdms_data["Group"]["Channel2"].raw_data
     assert data_2.dtype == np.int16
     np.testing.assert_array_equal(data_2, [17, 18, 19, 20])
+
+
+def test_daqmx_metadata_without_daqmx_raw_data():
+    """ Test loading a file that uses DAQmx format metadata but where the data types are not raw data (see issue #226)
+    """
+
+    scaler_1 = daqmx_scaler_metadata(0, 0xFFFFFFFF, 0)  # Timestamp data
+    scaler_2 = daqmx_scaler_metadata(0, 7, 16)
+    scaler_3 = daqmx_scaler_metadata(0, 9, 24)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 4, [32], [scaler_1], data_type=types.TimeStamp.enum_value),
+        daqmx_channel_metadata("Channel2", 4, [32], [scaler_2], data_type=types.Int64.enum_value),
+        daqmx_channel_metadata("Channel3", 4, [32], [scaler_3], data_type=types.DoubleFloat.enum_value))
+
+    times = [
+        np.datetime64('2012-08-23T00:00:00.123', 'us'),
+        np.datetime64('2012-08-23T01:02:03.456', 'us'),
+        np.datetime64('2012-08-23T12:00:00.0', 'us'),
+        np.datetime64('2012-08-23T12:02:03.9999', 'us'),
+    ]
+
+    data = (
+        timestamp_hexlify(times[0]) +
+        "01 00 00 00 00 00 00 00" +
+        hexlify_value("<d", 1.0) +
+        timestamp_hexlify(times[1]) +
+        "02 00 00 00 00 00 00 00" +
+        hexlify_value("<d", 2.0) +
+        timestamp_hexlify(times[2]) +
+        "03 00 00 00 00 00 00 00" +
+        hexlify_value("<d", 3.0) +
+        timestamp_hexlify(times[3]) +
+        "04 00 00 00 00 00 00 00" +
+        hexlify_value("<d", 4.0)
+    )
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc_non_daqmx(), metadata, data)
+    tdms_data = test_file.load()
+
+    data_1 = tdms_data["Group"]["Channel1"][:]
+    np.testing.assert_array_equal(data_1, times)
+
+    data_2 = tdms_data["Group"]["Channel2"][:]
+    assert data_2.dtype == np.int64
+    np.testing.assert_array_equal(data_2, [1, 2, 3, 4])
+
+    data_3 = tdms_data["Group"]["Channel3"][:]
+    assert data_3.dtype == np.float64
+    np.testing.assert_array_equal(data_3, [1.0, 2.0, 3.0, 4.0])
 
 
 def test_mixed_channel_widths():
@@ -888,8 +942,11 @@ def digital_scaler_metadata(scale_id, type_id, bit_offset, raw_buffer_index=0):
 
 def daqmx_channel_metadata(
         channel_name, num_values,
-        raw_data_widths, scaler_metadata, properties=None, digital_line_scaler=False):
+        raw_data_widths, scaler_metadata, properties=None, digital_line_scaler=False,
+        data_type=None):
     path = "/'Group'/'" + channel_name + "'"
+    # Default to DAQmx data type
+    data_type = 0xFFFFFFFF if data_type is None else data_type
     return (
         # Length of the object path
         hexlify_value("<I", len(path)) +
@@ -897,8 +954,8 @@ def daqmx_channel_metadata(
         string_hexlify(path) +
         # Raw data index (DAQmx)
         ("6A 12 00 00" if digital_line_scaler else "69 12 00 00") +
-        # Data type (DAQmx)
-        "FF FF FF FF"
+        # Data type
+        hexlify_value("<I", data_type) +
         # Array  dimension
         "01 00 00 00" +
         # Number of values (chunk size)

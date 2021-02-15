@@ -387,12 +387,7 @@ class InterleavedDataReader(BaseDataReader):
             # be number of bytes per point * number of data points.
             # Then use ravel to flatten the results into a vector.
             object_data = combined_data[:, byte_columns].ravel()
-            if obj.data_type.nptype is not None:
-                # Set correct data type, so that the array length should be correct
-                object_data.dtype = (
-                    obj.data_type.nptype.newbyteorder(self.endianness))
-            else:
-                object_data = obj.data_type.from_bytes(object_data, self.endianness)
+            object_data = obj.data_type.from_bytes(object_data, self.endianness)
             channel_data[obj.path] = object_data
             data_pos += obj.data_type.size
 
