@@ -347,6 +347,33 @@ def test_indexing_channel_with_ellipsis():
                 compare_arrays(channel_object[...], expected_channel_data)
 
 
+def test_file_items():
+    """ Test iterating over group names and group objects using the items method
+    """
+    test_file, _ = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            groups = list(tdms_file.items())
+            assert len(groups) == 1
+            assert groups[0][0] == 'group'
+            assert groups[0][1].name == 'group'
+
+
+def test_group_items():
+    """ Test iterating over group names and group objects using the items method
+    """
+    test_file, _ = scenarios.chunked_segment().values
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            group = tdms_file['group']
+            channels = list(group.items())
+            assert len(channels) == 2
+            assert channels[0][0] == 'channel1'
+            assert channels[0][1].name == 'channel1'
+            assert channels[1][0] == 'channel2'
+            assert channels[1][1].name == 'channel2'
+
+
 @pytest.fixture(scope="module")
 def opened_tdms_file():
     """ Allow re-use of an opened TDMS file

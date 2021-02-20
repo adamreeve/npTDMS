@@ -140,6 +140,11 @@ class TdmsFile(object):
 
         return list(self._groups.values())
 
+    def items(self):
+        """ Returns an iterable view of pairs of group name and group object for all groups in this file
+        """
+        return self._groups.items()
+
     @property
     def properties(self):
         """ Return the properties of this file as a dictionary
@@ -356,6 +361,11 @@ class TdmsGroup(object):
         :rtype: A list of TdmsChannel
         """
         return list(self._channels.values())
+
+    def items(self):
+        """ Returns an iterable view of pairs of channel name and channel object for all channels in this group
+        """
+        return self._channels.items()
 
     def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
         """
