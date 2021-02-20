@@ -76,18 +76,20 @@ def get_buffer_dimensions(ordered_objects):
     """ Returns DAQmx buffer dimensions as list of tuples of (number of values, width in bytes)
     """
     dimensions = None
+    raw_data_widths = None
     for o in ordered_objects:
         if not o.has_data:
             continue
         daqmx_metadata = o.daqmx_metadata
         if dimensions is None:
+            raw_data_widths = daqmx_metadata.raw_data_widths
             # Set width for each buffer
-            dimensions = [(0, w) for w in daqmx_metadata.raw_data_widths]
+            dimensions = [(0, w) for w in raw_data_widths]
         else:
-            # Verify raw data widths matches previous channels
-            assert len(daqmx_metadata.raw_data_widths) == len(dimensions)
-            for i, dim in enumerate(dimensions):
-                assert daqmx_metadata.raw_data_widths[i] == dimensions[i][1]
+            if not _lists_are_equal(daqmx_metadata.raw_data_widths, raw_data_widths):
+                raise ValueError(
+                    "Raw data widths for object %r (%s) do not match previous widths (%s)" %
+                    (o, daqmx_metadata.raw_data_widths, raw_data_widths))
         # Now set the buffer number of values based on the object chunk size
         for scaler in daqmx_metadata.scalers:
             buffer_index = scaler.raw_buffer_index
@@ -174,8 +176,12 @@ class DaqMxMetadata(object):
             for _ in range(scaler_vector_length)]
 
         if channel_data_type != types.DaqMxRawData:
-            assert scaler_vector_length == 1
-            assert self.scalers[0].data_type == channel_data_type
+            if scaler_vector_length != 1:
+                raise ValueError("Expected only one scaler for channel with type %s" % channel_data_type.__name__)
+            if self.scalers[0].data_type != channel_data_type:
+                raise ValueError(
+                    "Expected scaler data type to be %s but got %s" %
+                    (channel_data_type.__name__, self.scalers[0].data_type.__name__))
 
         # Read raw data widths.
         # This is an array of widths in bytes, which should be the same
@@ -279,6 +285,10 @@ def _get_attr_repr(obj, attr_name):
     if isinstance(val, type):
         return val.__name__
     return repr(val)
+
+
+def _lists_are_equal(a, b):
+    return len(a) == len(b) and all(ai == bi for (ai, bi) in zip(a, b))
 
 
 # Type codes for DAQmx scalers don't match the normal TDMS type codes:

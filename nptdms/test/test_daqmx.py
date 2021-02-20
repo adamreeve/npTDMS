@@ -246,6 +246,43 @@ def test_daqmx_metadata_without_daqmx_raw_data():
     np.testing.assert_array_equal(data_3, [1.0, 2.0, 3.0, 4.0])
 
 
+def test_exception_on_mismatch_of_types_for_non_raw_daqmx():
+    scaler = daqmx_scaler_metadata(0, 3, 0, 0)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 2, [2], [scaler], data_type=types.Uint16.enum_value))
+    data = "01 00 02 00"
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc_non_daqmx(), metadata, data)
+
+    with pytest.raises(ValueError) as exception:
+        _ = test_file.load()
+    error_message = str(exception.value)
+
+    assert error_message == "Expected scaler data type to be Uint16 but got Int16"
+
+
+def test_exception_on_multiple_scalers_for_non_raw_daqmx():
+    scaler_1 = daqmx_scaler_metadata(0, 3, 0, 0)
+    scaler_2 = daqmx_scaler_metadata(0, 3, 2, 0)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 2, [4], [scaler_1, scaler_2], data_type=types.Int32.enum_value))
+    data = "01 00 00 00"
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc_non_daqmx(), metadata, data)
+
+    with pytest.raises(ValueError) as exception:
+        _ = test_file.load()
+    error_message = str(exception.value)
+
+    assert error_message == "Expected only one scaler for channel with type Int32"
+
+
 def test_mixed_channel_widths():
     """ Test loading a DAQmx file with channels with different widths
     """
@@ -632,6 +669,27 @@ def test_digital_line_scaler_with_multiple_channels(byte_offset):
 
         assert data.dtype == np.uint8
         np.testing.assert_array_equal(data, expected_data, "Incorrect data for channel '%s'" % channel_name)
+
+
+def test_exception_on_mismatch_of_raw_data_widths():
+    scaler_1 = daqmx_scaler_metadata(0, 3, 0, 0)
+    scaler_2 = daqmx_scaler_metadata(0, 3, 2, 0)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 1, [2], [scaler_1]),
+        daqmx_channel_metadata("Channel2", 1, [4], [scaler_2]))
+    data = "01 00 02 00"
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc(), metadata, data)
+
+    with pytest.raises(ValueError) as exception:
+        _ = test_file.load()
+    error_message = str(exception.value)
+
+    assert (error_message == "Raw data widths for object DaqmxSegmentObject(/'Group'/'Channel2') ([4]) "
+            "do not match previous widths ([2])")
 
 
 def test_lazily_reading_channel():
