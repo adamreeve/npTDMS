@@ -437,6 +437,34 @@ def test_thermistor_scaling_with_invalid_excitation_type():
     assert "Invalid excitation type: 12345" in str(exc_info.value)
 
 
+def test_strain_scaling_full_bridge_type_i():
+    data = StubTdmsData(np.array([
+        0.00068827, 0.00068036, 0.000688, 0.00068545, 0.00069104,
+        0.00068033, 0.00068023, 0.00068316, 0.00067672, 0.000679]))
+    expected_data = np.array([
+        -0.0001311, -0.00012959, -0.00013105, -0.00013056, -0.00013163,
+        -0.00012959, -0.00012957, -0.00013013, -0.0001289, -0.00012933])
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Strain",
+        "NI_Scale[0]_Strain_Configuration": 10183,
+        "NI_Scale[0]_Strain_Poisson_Ratio": 0.3,
+        "NI_Scale[0]_Strain_Gage_Resistance": 350.0,
+        "NI_Scale[0]_Strain_Lead_Wire_Resistance": 0.0,
+        "NI_Scale[0]_Strain_Initial_Bridge_Voltage": 0.0,
+        "NI_Scale[0]_Strain_Gage_Factor": 2.1,
+        "NI_Scale[0]_Strain_Bridge_Shunt_Calibration_Gain_Adjustment": 1.0,
+        "NI_Scale[0]_Strain_Voltage_Excitation": 2.5,
+        "NI_Scale[0]_Strain_Input_Source": 0xFFFFFFFF,
+    }
+
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(data)
+
+    np.testing.assert_almost_equal(scaled_data, expected_data)
+
+
 def test_multiple_scalings_applied_in_order():
     """Test all scalings applied from multiple scalings
     """
