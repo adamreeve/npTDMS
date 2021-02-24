@@ -437,6 +437,80 @@ def test_thermistor_scaling_with_invalid_excitation_type():
     assert "Invalid excitation type: 12345" in str(exc_info.value)
 
 
+def test_strain_scaling_full_bridge_type_i():
+    _strain_scaling_test(
+        [0.00068827, 0.00068036, 0.000688, 0.00068545, 0.00069104,
+         0.00068033, 0.00068023, 0.00068316, 0.00067672, 0.000679],
+        [-0.0001311, -0.00012959, -0.00013105, -0.00013056, -0.00013163,
+         -0.00012959, -0.00012957, -0.00013013, -0.0001289, -0.00012933])
+
+
+def test_strain_scaling_full_bridge_type_i_with_adjustment():
+    _strain_scaling_test(
+        [0.00068827, 0.00068036, 0.000688, 0.00068545, 0.00069104,
+         0.00068033, 0.00068023, 0.00068316, 0.00067672, 0.000679],
+        [-0.00014722, -0.00014553, -0.00014717, -0.00014662, -0.00014782,
+         -0.00014553, -0.0001455, -0.00014613, -0.00014475, -0.00014524],
+        calibration_adjustment=1.123)
+
+
+def test_strain_scaling_full_bridge_type_i_with_initial_voltage():
+    _strain_scaling_test(
+        [0.00068827, 0.00068036, 0.000688, 0.00068545, 0.00069104,
+         0.00068033, 0.00068023, 0.00068316, 0.00067672, 0.000679],
+        [0.00012604, 0.00012755, 0.0001261, 0.00012658, 0.00012552,
+         0.00012756, 0.00012758, 0.00012702, 0.00012824, 0.00012781],
+        initial_bridge_voltage=0.00135)
+
+
+def _strain_scaling_test(input_data, expected_data, initial_bridge_voltage=0.0, calibration_adjustment=1.0):
+    data = StubTdmsData(np.array(input_data))
+    expected_data = np.array(expected_data)
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Strain",
+        "NI_Scale[0]_Strain_Configuration": 10183,
+        "NI_Scale[0]_Strain_Poisson_Ratio": 0.3,
+        "NI_Scale[0]_Strain_Gage_Resistance": 350.0,
+        "NI_Scale[0]_Strain_Lead_Wire_Resistance": 0.0,
+        "NI_Scale[0]_Strain_Initial_Bridge_Voltage": initial_bridge_voltage,
+        "NI_Scale[0]_Strain_Gage_Factor": 2.1,
+        "NI_Scale[0]_Strain_Bridge_Shunt_Calibration_Gain_Adjustment": calibration_adjustment,
+        "NI_Scale[0]_Strain_Voltage_Excitation": 2.5,
+        "NI_Scale[0]_Strain_Input_Source": 0xFFFFFFFF,
+    }
+
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(data)
+
+    np.testing.assert_almost_equal(scaled_data, expected_data)
+
+
+def test_unsupported_strain_configuration():
+    data = StubTdmsData(np.array([0.0, 0.0, 0.0]))
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Strain",
+        "NI_Scale[0]_Strain_Configuration": 10184,
+        "NI_Scale[0]_Strain_Poisson_Ratio": 0.3,
+        "NI_Scale[0]_Strain_Gage_Resistance": 350.0,
+        "NI_Scale[0]_Strain_Lead_Wire_Resistance": 0.0,
+        "NI_Scale[0]_Strain_Initial_Bridge_Voltage": 0.0,
+        "NI_Scale[0]_Strain_Gage_Factor": 2.1,
+        "NI_Scale[0]_Strain_Bridge_Shunt_Calibration_Gain_Adjustment": 1.0,
+        "NI_Scale[0]_Strain_Voltage_Excitation": 2.5,
+        "NI_Scale[0]_Strain_Input_Source": 0xFFFFFFFF,
+    }
+
+    scaling = get_scaling(properties, {}, {})
+
+    with pytest.raises(Exception) as exc_info:
+        _ = scaling.scale(data)
+    assert str(exc_info.value) == "Strain gauge configuration 10184 is not supported"
+
+
 def test_multiple_scalings_applied_in_order():
     """Test all scalings applied from multiple scalings
     """

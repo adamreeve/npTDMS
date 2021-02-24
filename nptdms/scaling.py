@@ -143,6 +143,59 @@ class RtdScaling(object):
         return filtered[0].real
 
 
+class StrainScaling(object):
+    """ Converts a voltage measurement from a strain gauge bridge to strain
+    """
+    def __init__(
+            self, configuration, poisson_ratio, gage_resistance, lead_wire_resistance, initial_bridge_voltage,
+            gage_factor, gain_adjustment, voltage_excitation, input_source):
+        self.configuration = configuration
+        self.poisson_ratio = poisson_ratio
+        self.gage_resistance = gage_resistance
+        self.lead_wire_resistance = lead_wire_resistance
+        self.initial_bridge_voltage = initial_bridge_voltage
+        self.gage_factor = gage_factor
+        self.gain_adjustment = gain_adjustment
+        self.voltage_excitation = voltage_excitation
+        self.input_source = input_source
+
+    @staticmethod
+    def from_properties(properties, scale_index):
+        prefix = "NI_Scale[%d]_Strain" % scale_index
+        configuration = properties["%s_Configuration" % prefix]
+        poisson_ratio = properties["%s_Poisson_Ratio" % prefix]
+        gage_resistance = properties["%s_Gage_Resistance" % prefix]
+        lead_wire_resistance = properties["%s_Lead_Wire_Resistance" % prefix]
+        initial_bridge_voltage = properties["%s_Initial_Bridge_Voltage" % prefix]
+        gage_factor = properties["%s_Gage_Factor" % prefix]
+        gain_adjustment = properties["%s_Bridge_Shunt_Calibration_Gain_Adjustment" % prefix]
+        voltage_excitation = properties["%s_Voltage_Excitation" % prefix]
+        input_source = properties["%s_Input_Source" % prefix]
+        return StrainScaling(
+            configuration, poisson_ratio, gage_resistance, lead_wire_resistance, initial_bridge_voltage, gage_factor,
+            gain_adjustment, voltage_excitation, input_source)
+
+    def scale(self, data):
+        """ Convert voltage data to strain
+        """
+        if self.configuration == StrainScaling.FULL_BRIDGE_1:
+            if self.initial_bridge_voltage != 0.0:
+                voltage_diff = data - self.initial_bridge_voltage
+            else:
+                voltage_diff = data
+            return voltage_diff * (-self.gain_adjustment / (self.voltage_excitation * self.gage_factor))
+
+        raise Exception("Strain gauge configuration %d is not supported" % self.configuration)
+
+    FULL_BRIDGE_1 = 10183
+    FULL_BRIDGE_2 = 10184
+    FULL_BRIDGE_3 = 10185
+    HALF_BRIDGE_1 = 10188
+    HALF_BRIDGE_2 = 10189
+    QUARTER_BRIDGE_1 = 10271
+    QUARTER_BRIDGE_2 = 10272
+
+
 class TableScaling(object):
     """ Scales data using a map from input to output values with
         linear interpolation for points in between inputs.
@@ -459,6 +512,9 @@ def _get_channel_scaling(properties):
                 properties, scale_index)
         elif scale_type == 'RTD':
             scalings[scale_index] = RtdScaling.from_properties(
+                properties, scale_index)
+        elif scale_type == 'Strain':
+            scalings[scale_index] = StrainScaling.from_properties(
                 properties, scale_index)
         elif scale_type == 'Table':
             scalings[scale_index] = TableScaling.from_properties(
