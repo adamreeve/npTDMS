@@ -179,7 +179,11 @@ class StrainScaling(object):
         """ Convert voltage data to strain
         """
         if self.configuration == StrainScaling.FULL_BRIDGE_1:
-            return data * (-1.0 / (self.voltage_excitation * self.gage_factor))
+            if self.initial_bridge_voltage != 0.0:
+                voltage_diff = data - self.initial_bridge_voltage
+            else:
+                voltage_diff = data
+            return voltage_diff * (-self.gain_adjustment / (self.voltage_excitation * self.gage_factor))
 
         raise Exception("Strain gauge configuration %d is not supported" % self.configuration)
 
