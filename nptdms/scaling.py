@@ -13,6 +13,25 @@ VOLTAGE_EXCITATION = 10322
 CURRENT_EXCITATION = 10134
 
 
+class NoOpScaling(object):
+    """ Does not apply any scaling
+    """
+    def __init__(self, input_source):
+        self.input_source = input_source
+
+    @staticmethod
+    def from_properties(properties, scale_index, scale_name):
+        try:
+            input_source = properties[
+                "NI_Scale[%d]_%s_Input_Source" % (scale_index, scale_name)]
+        except KeyError:
+            input_source = RAW_DATA_INPUT_SOURCE
+        return NoOpScaling(input_source)
+
+    def scale(self, data):
+        return data
+
+
 class LinearScaling(object):
     """ Linear scaling with slope and intercept
     """
@@ -438,6 +457,8 @@ class MultiScaling(object):
             return np.result_type(
                 self._compute_scale_dtype(scaling.left_input_source, raw_data_type, scaler_data_types),
                 self._compute_scale_dtype(scaling.right_input_source, raw_data_type, scaler_data_types))
+        elif isinstance(scaling, NoOpScaling):
+            return raw_data_type.nptype
         else:
             # Any other scaling type should produce double data
             return np.dtype('float64')
@@ -531,6 +552,9 @@ def _get_channel_scaling(properties):
         elif scale_type == 'Subtract':
             scalings[scale_index] = SubtractScaling.from_properties(
                 properties, scale_index)
+        elif scale_type == 'AdvancedAPI':
+            scalings[scale_index] = NoOpScaling.from_properties(
+                properties, scale_index, 'AdvancedAPI')
         else:
             log.warning("Unsupported scale type: %s", scale_type)
             return None

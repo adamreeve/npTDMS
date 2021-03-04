@@ -3,63 +3,41 @@ import numpy as np
 
 from nptdms import types
 from nptdms.base_segment import (
-    BaseSegment, BaseSegmentObject, RawDataChunk, read_interleaved_segment_bytes)
+    BaseSegmentObject, BaseDataReader, RawDataChunk, RawChannelDataChunk, read_interleaved_segment_bytes)
 from nptdms.log import log_manager
 
 
 log = log_manager.get_logger(__name__)
 
-
 FORMAT_CHANGING_SCALER = 0x00001269
 DIGITAL_LINE_SCALER = 0x0000126A
 
 
-class DaqmxSegment(BaseSegment):
+class DaqmxDataReader(BaseDataReader):
     """ A TDMS segment with DAQmx data
     """
-
-    def _new_segment_object(self, object_path):
-        return DaqmxSegmentObject(object_path, self.endianness)
-
-    def _get_chunk_size(self):
-        # For DAQmxRawData, each channel in a segment has the same number
-        # of values and contains the same raw data widths, so use
-        # the first valid channel metadata to calculate the data size.
-        try:
-            return next(
-                o.number_values * o.total_raw_data_width
-                for o in self.ordered_objects
-                if o.has_data and
-                o.number_values * o.total_raw_data_width > 0)
-        except StopIteration:
-            return 0
-
     def _read_data_chunk(self, file, data_objects, chunk_index):
         """Read data from DAQmx data segment"""
 
         log.debug("Reading DAQmx data segment")
 
         all_daqmx = all(
-            o.data_type == types.DaqMxRawData for o in data_objects)
+            isinstance(o, DaqmxSegmentObject) for o in data_objects)
         if not all_daqmx:
             raise Exception("Cannot read a mix of DAQmx and "
                             "non-DAQmx interleaved data")
 
-        # If we have DAQmx data, we expect all objects to have matching
-        # raw data widths, so just use the first object:
-        raw_data_widths = data_objects[0].daqmx_metadata.raw_data_widths
-        chunk_size = data_objects[0].number_values
+        data = {}
         scaler_data = defaultdict(dict)
 
-        # Data for each set of raw data (corresponding to one card) is
-        # interleaved separately, so read one after another
-        for (raw_buffer_index, raw_data_width) in enumerate(raw_data_widths):
+        # Data for each raw data buffer is interleaved separately, so read one after another
+        for (raw_buffer_index, buffer_shape) in enumerate(get_buffer_dimensions(data_objects)):
+            (chunk_size, raw_data_width) = buffer_shape
             # Read all data into 1 byte unsigned ints first
-            combined_data = read_interleaved_segment_bytes(
-                file, raw_data_width, chunk_size)
+            combined_data = read_interleaved_segment_bytes(file, raw_data_width, chunk_size)
 
-            # Now set arrays for each scaler of each channel where the scaler
-            # data comes from this set of raw data
+            # Now get arrays for each scaler of each channel where the scaler
+            # data comes from this raw buffer
             for (i, obj) in enumerate(data_objects):
                 scalers_for_raw_buffer_index = [
                     scaler for scaler in obj.daqmx_metadata.scalers
@@ -70,18 +48,56 @@ class DaqmxSegment(BaseSegment):
                     byte_columns = tuple(
                         range(byte_offset, byte_offset + scaler_size))
                     # Select columns for this scaler, so that number of values
-                    # will be number of bytes per point * number of data
-                    # points. Then use ravel to flatten the results into a
-                    # vector.
+                    # will be number of bytes per point * number of data points.
+                    # Then use ravel to flatten the results into a vector.
                     this_scaler_data = combined_data[:, byte_columns].ravel()
-                    # Now set correct data type, so that the array length
-                    # should be correct
-                    this_scaler_data.dtype = (
-                        scaler.data_type.nptype.newbyteorder(self.endianness))
+                    this_scaler_data = scaler.data_type.from_bytes(this_scaler_data, self.endianness)
                     processed_data = scaler.postprocess_data(this_scaler_data)
-                    scaler_data[obj.path][scaler.scale_id] = processed_data
+                    if obj.data_type == types.DaqMxRawData:
+                        scaler_data[obj.path][scaler.scale_id] = processed_data
+                    else:
+                        data[obj.path] = processed_data
 
-        return RawDataChunk.scaler_data(scaler_data)
+        combined_data = {}
+        for path, data in data.items():
+            combined_data[path] = RawChannelDataChunk.channel_data(data)
+        for path, data in scaler_data.items():
+            combined_data[path] = RawChannelDataChunk.scaler_data(data)
+        return RawDataChunk(combined_data)
+
+
+def get_daqmx_chunk_size(ordered_objects):
+    # For DAQmx data, each channel should specify the same raw data widths,
+    # but different buffers may have different numbers of values.
+    return sum((num_values * width) for (num_values, width) in get_buffer_dimensions(ordered_objects))
+
+
+def get_buffer_dimensions(ordered_objects):
+    """ Returns DAQmx buffer dimensions as list of tuples of (number of values, width in bytes)
+    """
+    dimensions = None
+    raw_data_widths = None
+    for o in ordered_objects:
+        if not o.has_data:
+            continue
+        daqmx_metadata = o.daqmx_metadata
+        if dimensions is None:
+            raw_data_widths = daqmx_metadata.raw_data_widths
+            # Set width for each buffer
+            dimensions = [(0, w) for w in raw_data_widths]
+        else:
+            if not _lists_are_equal(daqmx_metadata.raw_data_widths, raw_data_widths):
+                raise ValueError(
+                    "Raw data widths for object %r (%s) do not match previous widths (%s)" %
+                    (o, daqmx_metadata.raw_data_widths, raw_data_widths))
+        # Now set the buffer number of values based on the object chunk size
+        for scaler in daqmx_metadata.scalers:
+            buffer_index = scaler.raw_buffer_index
+            current_buffer_shape = dimensions[buffer_index]
+            updated_num_values = max(current_buffer_shape[0], o.number_values)
+            dimensions[buffer_index] = (updated_num_values, current_buffer_shape[1])
+
+    return [] if dimensions is None else dimensions
 
 
 class DaqmxSegmentObject(BaseSegmentObject):
@@ -112,18 +128,12 @@ class DaqmxSegmentObject(BaseSegmentObject):
         except KeyError:
             raise KeyError("Unrecognised data type: %s" % data_type_val)
 
-        daqmx_metadata = DaqMxMetadata(f, self.endianness, raw_data_index_header)
+        daqmx_metadata = DaqMxMetadata(f, self.endianness, raw_data_index_header, self.data_type)
         log.debug("DAQmx metadata: %r", daqmx_metadata)
 
-        self.data_type = daqmx_metadata.data_type
         # DAQmx format has special chunking
-        self.data_size = daqmx_metadata.chunk_size * sum(daqmx_metadata.raw_data_widths)
         self.number_values = daqmx_metadata.chunk_size
         self.daqmx_metadata = daqmx_metadata
-
-    @property
-    def total_raw_data_width(self):
-        return sum(self.daqmx_metadata.raw_data_widths)
 
     @property
     def scaler_data_types(self):
@@ -139,7 +149,6 @@ class DaqMxMetadata(object):
     """
 
     __slots__ = [
-        'data_type',
         'scaler_type',
         'dimension',
         'chunk_size',
@@ -147,13 +156,12 @@ class DaqMxMetadata(object):
         'scalers',
         ]
 
-    def __init__(self, f, endianness, scaler_type):
+    def __init__(self, f, endianness, scaler_type, channel_data_type):
         """
         Read the metadata for a DAQmx raw segment.  This is the raw
         DAQmx-specific portion of the raw data index.
         """
         self.scaler_type = scaler_type
-        self.data_type = types.tds_data_types[0xFFFFFFFF]
         self.dimension = types.Uint32.read(f, endianness)
         # In TDMS format version 2.0, 1 is the only valid value for dimension
         if self.dimension != 1:
@@ -166,6 +174,14 @@ class DaqMxMetadata(object):
         self.scalers = [
             scaler_class(f, endianness)
             for _ in range(scaler_vector_length)]
+
+        if channel_data_type != types.DaqMxRawData:
+            if scaler_vector_length != 1:
+                raise ValueError("Expected only one scaler for channel with type %s" % channel_data_type.__name__)
+            if self.scalers[0].data_type != channel_data_type:
+                raise ValueError(
+                    "Expected scaler data type to be %s but got %s" %
+                    (channel_data_type.__name__, self.scalers[0].data_type.__name__))
 
         # Read raw data widths.
         # This is an array of widths in bytes, which should be the same
@@ -241,7 +257,7 @@ class DigitalLineScaler(object):
         data_type_code = types.Uint32.read(open_file, endianness)
         self.data_type = DAQMX_TYPES[data_type_code]
 
-        # more info for format changing scaler
+        # more info for digital line scaler
         self.raw_buffer_index = types.Uint32.read(open_file, endianness)
         self.raw_bit_offset = types.Uint32.read(open_file, endianness)
         self.sample_format_bitmap = types.Uint8.read(open_file, endianness)
@@ -271,6 +287,10 @@ def _get_attr_repr(obj, attr_name):
     return repr(val)
 
 
+def _lists_are_equal(a, b):
+    return len(a) == len(b) and all(ai == bi for (ai, bi) in zip(a, b))
+
+
 # Type codes for DAQmx scalers don't match the normal TDMS type codes:
 DAQMX_TYPES = {
     0: types.Uint8,
@@ -279,6 +299,11 @@ DAQMX_TYPES = {
     3: types.Int16,
     4: types.Uint32,
     5: types.Int32,
+    6: types.Uint64,
+    7: types.Int64,
+    8: types.SingleFloat,
+    9: types.DoubleFloat,
+    0xFFFFFFFF: types.TimeStamp,
 }
 
 

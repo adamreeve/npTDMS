@@ -970,24 +970,17 @@ def extra_padding_after_metadata():
 
 
 def timestamp_data_chunk(times):
+    return "".join(timestamp_hexlify(time) for time in times)
+
+
+def timestamp_hexlify(time):
     epoch = np.datetime64('1904-01-01T00:00:00')
 
-    def total_seconds(td):
-        return int(td / np.timedelta64(1, 's'))
+    relative_time = time - epoch
+    total_seconds = int(relative_time / np.timedelta64(1, 's'))
 
-    def microseconds(dt):
-        diff = dt - epoch
-        secs = total_seconds(diff)
-        remainder = diff - np.timedelta64(secs, 's')
-        return int(remainder / np.timedelta64(1, 'us'))
+    remainder = relative_time - np.timedelta64(total_seconds, 's')
+    microseconds = int(remainder / np.timedelta64(1, 'us'))
+    fraction = int(float(microseconds) * 2 ** 58 / 5 ** 6)
 
-    seconds = [total_seconds(t - epoch) for t in times]
-    fractions = [
-        int(float(microseconds(t)) * 2 ** 58 / 5 ** 6)
-        for t in times]
-
-    data = ""
-    for f, s in zip(fractions, seconds):
-        data += hexlify_value("<Q", f)
-        data += hexlify_value("<q", s)
-    return data
+    return hexlify_value("<Q", fraction) + hexlify_value("<q", total_seconds)

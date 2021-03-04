@@ -86,6 +86,7 @@ class Bytes(TdmsType):
 
 class StructType(TdmsType):
     struct_declaration = None
+    nptype = None
 
     def __init__(self, value):
         self.value = value
@@ -95,6 +96,14 @@ class StructType(TdmsType):
     def read(cls, file, endianness="<"):
         read_bytes = file.read(cls.size)
         return _struct_unpack(endianness + cls.struct_declaration, read_bytes)[0]
+
+    @classmethod
+    def from_bytes(cls, byte_array, endianness="<"):
+        """ Convert an array of bytes into a numpy array of data
+        """
+        array = byte_array.view()
+        array.dtype = cls.nptype.newbyteorder(endianness)
+        return array
 
 
 @tds_data_type(0, None)

@@ -619,6 +619,24 @@ def test_scaling_status_scaled():
     assert scaling is None
 
 
+def test_advanced_api_scaling():
+    """Test AdvancedAPI scaling (no-op)"""
+
+    data = StubTdmsData(np.array([1, 2, 3], dtype=np.dtype('int32')))
+    expected_scaled_data = np.array([1, 2, 3])
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "AdvancedAPI",
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(data)
+
+    assert scaling.get_dtype(types.Int32, None) == np.dtype('int32')
+    assert scaled_data.dtype == np.dtype('int32')
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
+
+
 class StubTdmsData(object):
     def __init__(self, data):
         self.data = data
