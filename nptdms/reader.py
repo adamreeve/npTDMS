@@ -9,7 +9,7 @@ from nptdms import types
 from nptdms.common import ObjectPath, toc_properties
 from nptdms.utils import Timer, OrderedDict
 from nptdms.base_segment import RawChannelDataChunk
-from nptdms.tdms_segment import TdmsSegment
+from nptdms.tdms_segment import TdmsSegment, SegmentIndexCache
 from nptdms.log import log_manager
 
 
@@ -35,7 +35,6 @@ class TdmsReader(object):
         self._index_file_path = None
 
         self._segment_channel_offsets = None
-        self._segment_chunk_sizes = None
 
         if hasattr(tdms_file, "read"):
             # Is a file
@@ -78,11 +77,12 @@ class TdmsReader(object):
             with Timer(log, "Read metadata"):
                 # Read metadata first to work out how much space we need
                 previous_segment = None
+                index_cache = SegmentIndexCache()
                 while True:
                     start_position = file.tell()
                     try:
                         segment = self._read_segment_metadata(
-                            file, segment_position, previous_segment, reading_index_file)
+                            file, segment_position, index_cache, previous_segment, reading_index_file)
                     except EOFError:
                         # We've finished reading the file
                         break
@@ -134,7 +134,6 @@ class TdmsReader(object):
             with Timer(log, "Build data index"):
                 self._build_index()
         segment_offsets = self._segment_channel_offsets[channel_path]
-        chunk_sizes = self._segment_chunk_sizes[channel_path]
 
         object_metadata = self.object_metadata[channel_path]
         if length is None:
@@ -152,7 +151,8 @@ class TdmsReader(object):
             # By default, read all chunks in a segment
             chunk_offset = 0
             num_chunks = segment.num_chunks
-            chunk_size = chunk_sizes[segment_index]
+            segment_obj = segment.get_segment_object(channel_path)
+            chunk_size = 0 if segment_obj is None else segment_obj.number_values
             segment_start_index = 0 if segment_index == 0 else segment_offsets[segment_index - 1]
             remaining_values_to_skip = 0
 
@@ -204,7 +204,8 @@ class TdmsReader(object):
         # Binary search to find the segment to read
         segment_index = np.searchsorted(segment_offsets, index, side='right')
         segment = self._segments[segment_index]
-        chunk_size = self._segment_chunk_sizes[channel_path][segment_index]
+        segment_obj = segment.get_segment_object(channel_path)
+        chunk_size = 0 if segment_obj is None else segment_obj.number_values
         segment_start_index = segment_offsets[segment_index - 1] if segment_index > 0 else 0
 
         index_in_segment = index - segment_start_index
@@ -216,7 +217,7 @@ class TdmsReader(object):
         return chunk_data, chunk_offset
 
     def _read_segment_metadata(
-            self, file, segment_position, previous_segment=None, is_index_file=False):
+            self, file, segment_position, index_cache, previous_segment=None, is_index_file=False):
         (position, toc_mask, endianness, data_position, raw_data_offset,
          next_segment_offset, next_segment_pos) = self._read_lead_in(file, segment_position, is_index_file)
 
@@ -225,7 +226,7 @@ class TdmsReader(object):
             next_segment_pos, raw_data_offset, data_position)
 
         segment.read_segment_objects(
-            file, self._prev_segment_objects, previous_segment)
+            file, self._prev_segment_objects, index_cache, previous_segment)
         return segment
 
     def _read_lead_in(self, file, segment_position, is_index_file=False):
@@ -336,7 +337,6 @@ class TdmsReader(object):
         """ Builds an index into the segment data for faster lookup of values
 
             _segment_channel_offsets provides data offset at the end of each segment per channel
-            _segment_chunk_sizes provides chunk sizes in each segment per channel
         """
         data_objects = [
             path
@@ -346,17 +346,13 @@ class TdmsReader(object):
 
         segment_num_values = {
             path: np.zeros(num_segments, dtype=np.int64) for path in data_objects}
-        segment_chunk_sizes = {
-            path: np.zeros(num_segments, dtype=np.int64) for path in data_objects}
 
         for i, segment in enumerate(self._segments):
             for obj in segment.ordered_objects:
                 if not obj.has_data:
                     continue
-                segment_chunk_sizes[obj.path][i] = obj.number_values if obj.has_data else 0
                 segment_num_values[obj.path][i] = _number_of_segment_values(obj, segment)
 
-        self._segment_chunk_sizes = segment_chunk_sizes
         self._segment_channel_offsets = {
             path: np.cumsum(segment_count) for (path, segment_count) in segment_num_values.items()}
 
