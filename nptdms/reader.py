@@ -344,17 +344,16 @@ class TdmsReader(object):
             if ObjectPath.from_string(path).is_channel]
         num_segments = len(self._segments)
 
-        segment_num_values = {
-            path: np.zeros(num_segments, dtype=np.int64) for path in data_objects}
-
-        for i, segment in enumerate(self._segments):
-            for obj in segment.ordered_objects:
-                if not obj.has_data:
-                    continue
-                segment_num_values[obj.path][i] = _number_of_segment_values(obj, segment)
-
-        self._segment_channel_offsets = {
-            path: np.cumsum(segment_count) for (path, segment_count) in segment_num_values.items()}
+        self._segment_channel_offsets = {}
+        for obj_path in data_objects:
+            segment_num_values = np.zeros(num_segments, dtype=np.int64)
+            for i, segment in enumerate(self._segments):
+                segment_obj = segment.get_segment_object(obj_path)
+                if segment_obj is not None:
+                    segment_num_values[i] = _number_of_segment_values(segment_obj, segment)
+            channel_offsets = np.cumsum(segment_num_values)
+            self._segment_channel_offsets[obj_path] = _dedup_array(
+                channel_offsets, self._segment_channel_offsets.values())
 
     def _ensure_open(self):
         if self._file is None:
@@ -421,3 +420,12 @@ def _trim_channel_chunk(chunk, skip=0, trim=0):
             scale_id: d[skip:len(d) - trim]
             for (scale_id, d) in chunk.scaler_data.items()}
     return RawChannelDataChunk(data, scaler_data)
+
+
+def _dedup_array(xs, candidates):
+    """ Reduce memory usage by replacing an array with a reference to an existing array if equal
+    """
+    for candidate in candidates:
+        if np.array_equal(xs, candidate):
+            return candidate
+    return xs
