@@ -426,6 +426,21 @@ def _dedup_array(xs, candidates):
     """ Reduce memory usage by replacing an array with a reference to an existing array if equal
     """
     for candidate in candidates:
-        if np.array_equal(xs, candidate):
+        if _array_equal(xs, candidate):
             return candidate
     return xs
+
+
+def _array_equal(a, b, chunk_size=100):
+    # Numpy array_equal doesn't short circuit as soon as there's a difference so it's not particularly efficient.
+    # Break up the comparison into chunks to make this faster. Adapted from:
+    # https://stackoverflow.com/questions/26260848/numpy-fast-check-for-complete-array-equality-like-matlabs-isequal
+    if len(a) < chunk_size:
+        return (a == b).all()
+
+    num_chunks = 1 + (len(a) - 1) // chunk_size
+    for i in range(num_chunks):
+        offset = i * chunk_size
+        if not (a[offset:offset+chunk_size] == b[offset:offset+chunk_size]).all():
+            return False
+    return True
