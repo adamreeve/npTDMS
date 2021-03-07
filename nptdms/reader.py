@@ -4,6 +4,7 @@
 import logging
 import os
 import numpy as np
+import struct
 
 from nptdms import types
 from nptdms.common import ObjectPath, toc_properties
@@ -14,6 +15,7 @@ from nptdms.log import log_manager
 
 
 log = log_manager.get_logger(__name__)
+_struct_unpack = struct.unpack
 
 
 class TdmsReader(object):
@@ -241,8 +243,10 @@ class TdmsReader(object):
         return segment
 
     def _read_lead_in(self, file, segment_position, is_index_file=False):
+        lead_in_bytes = file.read(28)
+
         expected_tag = b'TDSh' if is_index_file else b'TDSm'
-        tag = file.read(4)
+        tag = lead_in_bytes[:4]
         if tag == b'':
             raise EOFError
         if tag != expected_tag:
@@ -250,7 +254,7 @@ class TdmsReader(object):
                 "Segment does not start with %r, but with %r" % (expected_tag, tag))
 
         # Next four bytes are table of contents mask
-        toc_mask = types.Int32.read(file)
+        toc_mask = _struct_unpack('<l', lead_in_bytes[4:8])[0]
 
         if log.isEnabledFor(logging.DEBUG):
             log.debug("Reading segment at %d", segment_position)
@@ -260,14 +264,11 @@ class TdmsReader(object):
 
         endianness = '>' if (toc_mask & toc_properties['kTocBigEndian']) else '<'
 
-        # Next four bytes are version number
-        version = types.Int32.read(file, endianness)
+        # Next four bytes are version number, then 8 bytes each for the offset values
+        (version, next_segment_offset, raw_data_offset) = _struct_unpack(endianness + 'lQQ', lead_in_bytes[8:28])
+
         if version not in (4712, 4713):
             log.warning("Unrecognised version number.")
-
-        # Now 8 bytes each for the offset values
-        next_segment_offset = types.Uint64.read(file, endianness)
-        raw_data_offset = types.Uint64.read(file, endianness)
 
         # Calculate data and next segment position
         lead_size = 7 * 4

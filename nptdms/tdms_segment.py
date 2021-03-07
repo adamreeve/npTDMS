@@ -474,36 +474,35 @@ class TdmsSegmentObject(BaseSegmentObject):
         # Metadata format is standard (non-DAQmx) TDMS format.
         # raw_data_index_header gives the length of the index information.
 
-        # Read the data type
+        # Read type, dimension and chunk size at once for performance
+        index_bytes = f.read(16)
+        (data_type, dimension, number_values) = _struct_unpack(self.endianness + 'LLQ', index_bytes)
+        self.number_values = number_values
+
+        # Get data type
         try:
-            self.data_type = types.tds_data_types[
-                types.Uint32.read(f, self.endianness)]
+            self.data_type = types.tds_data_types[data_type]
         except KeyError:
             raise KeyError("Unrecognised data type")
-        log.debug("Object data type: %s", self.data_type.__name__)
+
+        log.debug(
+            "Object data type: %s\nObject number of values in segment: %d",
+            self.data_type.__name__, self.number_values)
 
         if (self.data_type.size is None and
                 self.data_type != types.String):
             raise ValueError(
                 "Unsupported data type: %r" % self.data_type)
 
-        # Read data dimension
-        dimension = types.Uint32.read(f, self.endianness)
         # In TDMS version 2.0, 1 is the only valid value for dimension
         if dimension != 1:
             raise ValueError("Data dimension is not 1")
 
-        # Read number of values
-        self.number_values = types.Uint64.read(f, self.endianness)
-
         # Variable length data types have total size
-        if self.data_type in (types.String,):
+        if self.data_type == types.String:
             self.data_size = types.Uint64.read(f, self.endianness)
         else:
             self.data_size = self.number_values * self.data_type.size
-
-        log.debug(
-            "Object number of values in segment: %d", self.number_values)
 
     def read_value(self, file):
         """Read a single value from the given file"""
