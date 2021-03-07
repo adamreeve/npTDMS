@@ -556,6 +556,8 @@ class ObjectListKey(object):
     """ Wraps a list of objects for using as a cache key, where we are only concerned with the object paths
     """
 
+    __slots__ = ['objects', '_hash']
+
     def __init__(self, objects):
         self.objects = objects
         hash_result = 0

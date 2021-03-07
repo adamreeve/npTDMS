@@ -346,13 +346,16 @@ class TdmsReader(object):
 
         self._segment_channel_offsets = {}
         for obj_path in data_objects:
+            # Get number of values for this channel in each segment
             segment_num_values = np.zeros(num_segments, dtype=np.int64)
             for i, segment in enumerate(self._segments):
                 segment_obj = segment.get_segment_object(obj_path)
                 if segment_obj is not None:
                     segment_num_values[i] = _number_of_segment_values(segment_obj, segment)
+            # Now use the cumulative sum to get the total channel value count
+            # at the end of each segment.
             channel_offsets = np.cumsum(segment_num_values)
-            self._segment_channel_offsets[obj_path] = _dedup_array(
+            self._segment_channel_offsets[obj_path] = _deduplicate_array(
                 channel_offsets, self._segment_channel_offsets.values())
 
     def _ensure_open(self):
@@ -422,7 +425,7 @@ def _trim_channel_chunk(chunk, skip=0, trim=0):
     return RawChannelDataChunk(data, scaler_data)
 
 
-def _dedup_array(xs, candidates):
+def _deduplicate_array(xs, candidates):
     """ Reduce memory usage by replacing an array with a reference to an existing array if equal
     """
     for candidate in candidates:
@@ -432,13 +435,12 @@ def _dedup_array(xs, candidates):
 
 
 def _array_equal(a, b, chunk_size=100):
-    # Numpy array_equal doesn't short circuit as soon as there's a difference so it's not particularly efficient.
-    # Break up the comparison into chunks to make this faster. Adapted from:
+    """ Compare two arrays for equality, assuming they are the same length
+    """
+    # Numpy array_equal compares all elements rather than comparing one at a time and short-circuiting when it
+    # finds a difference. Break up the comparison into chunks to make this faster. Adapted from:
     # https://stackoverflow.com/questions/26260848/numpy-fast-check-for-complete-array-equality-like-matlabs-isequal
-    if len(a) < chunk_size:
-        return (a == b).all()
-
-    num_chunks = 1 + (len(a) - 1) // chunk_size
+    num_chunks = (len(a) + chunk_size - 1) // chunk_size
     for i in range(num_chunks):
         offset = i * chunk_size
         if not (a[offset:offset+chunk_size] == b[offset:offset+chunk_size]).all():
