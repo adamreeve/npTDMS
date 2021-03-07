@@ -241,12 +241,11 @@ class TdmsReader(object):
             raise ValueError(
                 "Segment does not start with %r, but with %r" % (expected_tag, tag))
 
-        log.debug("Reading segment at %d", segment_position)
-
         # Next four bytes are table of contents mask
         toc_mask = types.Int32.read(file)
 
         if log.isEnabledFor(logging.DEBUG):
+            log.debug("Reading segment at %d", segment_position)
             for prop_name, prop_mask in toc_properties.items():
                 prop_is_set = (toc_mask & prop_mask) != 0
                 log.debug("Property %s is %s", prop_name, prop_is_set)
@@ -274,10 +273,8 @@ class TdmsReader(object):
             next_segment_pos = self._get_data_file_size()
             next_segment_offset = next_segment_pos - segment_position - lead_size
         else:
-            log.debug("Next segment offset = %d, raw data offset = %d",
-                      next_segment_offset, raw_data_offset)
-            log.debug("Data size = %d b",
-                      next_segment_offset - raw_data_offset)
+            log.debug("Next segment offset = %d, raw data offset = %d, data size = %d b",
+                      next_segment_offset, raw_data_offset, next_segment_offset - raw_data_offset)
             next_segment_pos = (
                     segment_position + next_segment_offset + lead_size)
 

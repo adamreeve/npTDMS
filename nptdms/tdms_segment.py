@@ -379,10 +379,8 @@ class InterleavedDataReader(BaseDataReader):
     def _read_interleaved_sized(self, file, data_objects, num_chunks):
         """Read interleaved data where all channels have a sized data type and the same length
         """
-        log.debug("Reading interleaved data all at once")
-
         total_data_width = sum(o.data_type.size for o in data_objects)
-        log.debug("total_data_width: %d", total_data_width)
+        log.debug("Reading interleaved data all at once. total_data_width: %d", total_data_width)
 
         # Read all data into 1 byte unsigned ints first
         combined_data = read_interleaved_segment_bytes(
