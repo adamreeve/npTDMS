@@ -315,7 +315,8 @@ class TdmsReader(object):
             object_metadata = self._get_or_create_object(path)
             object_metadata.num_values += _number_of_segment_values(segment_object, segment)
             _update_object_data_type(path, object_metadata, segment_object)
-            _update_object_scaler_data_types(path, object_metadata, segment_object)
+            if segment_object.scaler_data_types is not None:
+                _update_object_scaler_data_types(path, object_metadata, segment_object)
 
     def _update_object_properties(self, segment):
         """ Update object properties using any properties in a segment
@@ -393,13 +394,12 @@ def _update_object_data_type(path, obj, segment_object):
 def _update_object_scaler_data_types(path, obj, segment_object):
     """ Update the DAQmx scaler data types for an object using its segment metadata
     """
-    if segment_object.scaler_data_types is not None:
-        if obj.scaler_data_types is not None and obj.scaler_data_types != segment_object.scaler_data_types:
-            raise ValueError(
-                "Segment data doesn't have the same scaler data types as previous "
-                "segments for objects %s. Expected types %s but got %s" %
-                (path, obj.scaler_data_types, segment_object.scaler_data_types))
-        obj.scaler_data_types = segment_object.scaler_data_types
+    if obj.scaler_data_types is not None and obj.scaler_data_types != segment_object.scaler_data_types:
+        raise ValueError(
+            "Segment data doesn't have the same scaler data types as previous "
+            "segments for objects %s. Expected types %s but got %s" %
+            (path, obj.scaler_data_types, segment_object.scaler_data_types))
+    obj.scaler_data_types = segment_object.scaler_data_types
 
 
 class ObjectMetadata(object):
