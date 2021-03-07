@@ -349,8 +349,9 @@ class TdmsReader(object):
             # Get number of values for this channel in each segment
             segment_num_values = np.zeros(num_segments, dtype=np.int64)
             for i, segment in enumerate(self._segments):
-                segment_obj = segment.get_segment_object(obj_path)
-                if segment_obj is not None:
+                obj_index = segment.object_index.get(obj_path)
+                if obj_index is not None:
+                    segment_obj = segment.ordered_objects[obj_index]
                     segment_num_values[i] = _number_of_segment_values(segment_obj, segment)
             # Now use the cumulative sum to get the total channel value count
             # at the end of each segment.
