@@ -58,8 +58,10 @@ class TdmsReader(object):
         # Otherwise always remove reference to the file
         self._file = None
 
-    def read_metadata(self):
+    def read_metadata(self, require_segment_indexes=False):
         """ Read all metadata and structure information from a TdmsFile
+
+        :param require_segment_indexes: Whether to create segment object indexes to allow lookup of objects by path.
         """
         self._ensure_open()
 
@@ -76,7 +78,7 @@ class TdmsReader(object):
             with Timer(log, "Read metadata"):
                 # Read metadata first to work out how much space we need
                 previous_segment = None
-                index_cache = SegmentIndexCache()
+                index_cache = SegmentIndexCache() if require_segment_indexes else None
                 while True:
                     start_position = file.tell()
                     try:

@@ -65,7 +65,7 @@ class TdmsSegment(object):
         :param file: Open TDMS file
         :param previous_segment_objects: Dictionary of path to the most
             recently read segment object for a TDMS object.
-        :param index_cache: A SegmentIndexCache instance
+        :param index_cache: A SegmentIndexCache instance, or None if segment indexes are not required.
         :param previous_segment: Previous segment in the file.
         """
 
@@ -126,7 +126,8 @@ class TdmsSegment(object):
                     segment_obj.read_raw_data_index(file, raw_data_index_header)
 
             self._read_object_properties(file, object_path)
-        self.object_index = index_cache.get_index(self.ordered_objects)
+        if index_cache is not None:
+            self.object_index = index_cache.get_index(self.ordered_objects)
         self._calculate_chunks()
 
     def get_segment_object(self, object_path):
