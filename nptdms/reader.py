@@ -33,8 +33,7 @@ class TdmsReader(object):
         self.object_metadata = OrderedDict()
         self._file_path = None
         self._index_file_path = None
-
-        self._segment_channel_offsets = None
+        self._segment_channel_offsets = {}
 
         if hasattr(tdms_file, "read"):
             # Is a file
@@ -130,10 +129,12 @@ class TdmsReader(object):
         if self._segments is None:
             raise RuntimeError("Cannot read data unless metadata has first been read")
 
-        if self._segment_channel_offsets is None:
-            with Timer(log, "Build data index"):
-                self._build_index()
-        segment_offsets = self._segment_channel_offsets[channel_path]
+        try:
+            segment_offsets = self._segment_channel_offsets[channel_path]
+        except KeyError:
+            with Timer(log, "Build data index for channel"):
+                self._build_index(channel_path)
+            segment_offsets = self._segment_channel_offsets[channel_path]
 
         object_metadata = self.object_metadata[channel_path]
         if length is None:
@@ -196,10 +197,12 @@ class TdmsReader(object):
         if self._segments is None:
             raise RuntimeError("Cannot read data unless metadata has first been read")
 
-        if self._segment_channel_offsets is None:
-            with Timer(log, "Build data index"):
-                self._build_index()
-        segment_offsets = self._segment_channel_offsets[channel_path]
+        try:
+            segment_offsets = self._segment_channel_offsets[channel_path]
+        except KeyError:
+            with Timer(log, "Build data index for channel"):
+                self._build_index(channel_path)
+            segment_offsets = self._segment_channel_offsets[channel_path]
 
         # Binary search to find the segment to read
         segment_index = np.searchsorted(segment_offsets, index, side='right')
@@ -333,31 +336,28 @@ class TdmsReader(object):
             self.object_metadata[path] = obj
             return obj
 
-    def _build_index(self):
+    def _build_index(self, channel_path):
         """ Builds an index into the segment data for faster lookup of values
 
             _segment_channel_offsets provides data offset at the end of each segment per channel
         """
-        data_objects = [
-            path
-            for (path, obj) in self.object_metadata.items()
-            if ObjectPath.from_string(path).is_channel]
         num_segments = len(self._segments)
 
-        self._segment_channel_offsets = {}
-        for obj_path in data_objects:
-            # Get number of values for this channel in each segment
-            segment_num_values = np.zeros(num_segments, dtype=np.int64)
-            for i, segment in enumerate(self._segments):
-                obj_index = segment.object_index.get(obj_path)
-                if obj_index is not None:
-                    segment_obj = segment.ordered_objects[obj_index]
-                    segment_num_values[i] = _number_of_segment_values(segment_obj, segment)
-            # Now use the cumulative sum to get the total channel value count
-            # at the end of each segment.
-            channel_offsets = np.cumsum(segment_num_values)
-            self._segment_channel_offsets[obj_path] = _deduplicate_array(
-                channel_offsets, self._segment_channel_offsets.values())
+        # Get number of values for this channel in each segment
+        segment_num_values = np.zeros(num_segments, dtype=np.int64)
+        for i, segment in enumerate(self._segments):
+            obj_index = segment.object_index.get(channel_path)
+            if obj_index is not None:
+                segment_obj = segment.ordered_objects[obj_index]
+                segment_num_values[i] = _number_of_segment_values(segment_obj, segment)
+        # Now use the cumulative sum to get the total channel value count
+        # at the end of each segment.
+        channel_offsets = np.cumsum(segment_num_values)
+
+        # It's likely that many channels will have the same shaped data,
+        # so de-duplicate these arrays to reduce memory usage.
+        self._segment_channel_offsets[channel_path] = _deduplicate_array(
+            channel_offsets, self._segment_channel_offsets.values())
 
     def _ensure_open(self):
         if self._file is None:
