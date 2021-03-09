@@ -132,20 +132,24 @@ class TdmsReader(object):
             raise RuntimeError("Cannot read data unless metadata has first been read")
 
         try:
-            segment_offsets = self._segment_channel_offsets[channel_path]
+            (first_segment, segment_offsets) = self._segment_channel_offsets[channel_path]
         except KeyError:
             with Timer(log, "Build data index for channel"):
                 self._build_index(channel_path)
-            segment_offsets = self._segment_channel_offsets[channel_path]
+            (first_segment, segment_offsets) = self._segment_channel_offsets[channel_path]
 
         object_metadata = self.object_metadata[channel_path]
+        max_length_from_offset = object_metadata.num_values - offset
         if length is None:
-            length = object_metadata.num_values - offset
+            length = max_length_from_offset
+        else:
+            # Make sure we're not trying to read more data than is actually available
+            length = min(length, max_length_from_offset)
         end_index = offset + length
 
         # Binary search to find first and last segments to read
-        start_segment = np.searchsorted(segment_offsets, offset, side='right')
-        end_segment = np.searchsorted(segment_offsets, end_index, side='left')
+        start_segment = first_segment + np.searchsorted(segment_offsets, offset, side='right')
+        end_segment = first_segment + np.searchsorted(segment_offsets, end_index, side='left')
 
         segment_index = start_segment
         values_read = 0
@@ -156,7 +160,8 @@ class TdmsReader(object):
             num_chunks = segment.num_chunks
             segment_obj = segment.get_segment_object(channel_path)
             chunk_size = 0 if segment_obj is None else segment_obj.number_values
-            segment_start_index = 0 if segment_index == 0 else segment_offsets[segment_index - 1]
+            segment_start_index = (
+                0 if segment_index == first_segment else segment_offsets[segment_index - first_segment - 1])
             remaining_values_to_skip = 0
 
             # For the first and last segments, we may not need to read all chunks,
@@ -168,7 +173,7 @@ class TdmsReader(object):
                 num_chunks -= chunk_offset
             if segment_index == end_segment:
                 # Note: segment_index may be both start and end
-                segment_end_index = segment_offsets[segment_index]
+                segment_end_index = segment_offsets[segment_index - first_segment]
                 num_values_to_trim = segment_end_index - end_index
 
                 # Account for segments where the final chunk is truncated
@@ -200,18 +205,19 @@ class TdmsReader(object):
             raise RuntimeError("Cannot read data unless metadata has first been read")
 
         try:
-            segment_offsets = self._segment_channel_offsets[channel_path]
+            (first_segment, segment_offsets) = self._segment_channel_offsets[channel_path]
         except KeyError:
             with Timer(log, "Build data index for channel"):
                 self._build_index(channel_path)
-            segment_offsets = self._segment_channel_offsets[channel_path]
+            (first_segment, segment_offsets) = self._segment_channel_offsets[channel_path]
 
         # Binary search to find the segment to read
-        segment_index = np.searchsorted(segment_offsets, index, side='right')
+        segment_index = first_segment + np.searchsorted(segment_offsets, index, side='right')
         segment = self._segments[segment_index]
         segment_obj = segment.get_segment_object(channel_path)
         chunk_size = 0 if segment_obj is None else segment_obj.number_values
-        segment_start_index = segment_offsets[segment_index - 1] if segment_index > 0 else 0
+        segment_start_index = (
+            0 if segment_index == first_segment else segment_offsets[segment_index - first_segment - 1])
 
         index_in_segment = index - segment_start_index
         chunk_index = index_in_segment // chunk_size
@@ -345,19 +351,32 @@ class TdmsReader(object):
 
         # Get number of values for this channel in each segment
         segment_num_values = np.zeros(num_segments, dtype=np.int64)
+        first_segment = -1
+        last_segment = -1
+
         for i, segment in enumerate(self._segments):
             obj_index = segment.object_index.get(channel_path)
             if obj_index is not None:
                 segment_obj = segment.ordered_objects[obj_index]
-                segment_num_values[i] = _number_of_segment_values(segment_obj, segment)
+                num_values = _number_of_segment_values(segment_obj, segment)
+                if num_values > 0:
+                    segment_num_values[i] = num_values
+                    last_segment = i
+                    if first_segment == -1:
+                        first_segment = i
+
         # Now use the cumulative sum to get the total channel value count
         # at the end of each segment.
-        channel_offsets = np.cumsum(segment_num_values)
+        if first_segment == -1:
+            first_segment = num_segments
+            last_segment = num_segments
+        channel_offsets = np.cumsum(segment_num_values[first_segment:last_segment + 1])
 
         # It's likely that many channels will have the same shaped data,
         # so de-duplicate these arrays to reduce memory usage.
-        self._segment_channel_offsets[channel_path] = _deduplicate_array(
-            channel_offsets, self._segment_channel_offsets.values())
+        existing_arrays = (xs for (_, xs) in self._segment_channel_offsets.values())
+        channel_offsets = _deduplicate_array(channel_offsets, existing_arrays)
+        self._segment_channel_offsets[channel_path] = (first_segment, channel_offsets)
 
     def _ensure_open(self):
         if self._file is None:
@@ -435,11 +454,14 @@ def _deduplicate_array(xs, candidates):
 
 
 def _array_equal(a, b, chunk_size=100):
-    """ Compare two arrays for equality, assuming they are the same length
+    """ Compare two arrays for equality
     """
     # Numpy array_equal compares all elements rather than comparing one at a time and short-circuiting when it
     # finds a difference. Break up the comparison into chunks to make this faster. Adapted from:
     # https://stackoverflow.com/questions/26260848/numpy-fast-check-for-complete-array-equality-like-matlabs-isequal
+    if len(a) != len(b):
+        return False
+
     num_chunks = (len(a) + chunk_size - 1) // chunk_size
     for i in range(num_chunks):
         offset = i * chunk_size

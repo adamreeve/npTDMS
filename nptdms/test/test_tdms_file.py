@@ -296,10 +296,10 @@ def test_indexing_channel_with_negative_integer(index):
                 assert channel_object[index] == expected_channel_data[index]
 
 
-def test_indexing_channel_with_integer_and_caching():
+@pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
+def test_indexing_channel_with_integer_and_caching(test_file, expected_data):
     """ Test indexing into a channel with an integer index, reusing the same file to test caching
     """
-    test_file, expected_data = scenarios.chunked_segment().values
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             for ((group, channel), expected_channel_data) in expected_data.items():
