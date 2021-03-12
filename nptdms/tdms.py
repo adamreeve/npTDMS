@@ -127,7 +127,7 @@ class TdmsFile(object):
 
         self._reader = TdmsReader(file)
         try:
-            self._read_file(self._reader, read_metadata_only)
+            self._read_file(self._reader, read_metadata_only, keep_open)
         finally:
             if not keep_open:
                 self._reader.close()
@@ -222,8 +222,8 @@ class TdmsFile(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
-    def _read_file(self, tdms_reader, read_metadata_only):
-        tdms_reader.read_metadata()
+    def _read_file(self, tdms_reader, read_metadata_only, keep_open):
+        tdms_reader.read_metadata(require_segment_indexes=keep_open)
 
         # Use object metadata to build group and channel objects
         group_properties = OrderedDict()

@@ -38,7 +38,7 @@ class TdmsSegment(object):
         'position', 'num_chunks', 'ordered_objects', 'toc_mask',
         'next_segment_offset', 'next_segment_pos',
         'raw_data_offset', 'data_position', 'final_chunk_proportion',
-        'endianness', 'object_properties']
+        'endianness', 'object_properties', 'object_index']
 
     def __init__(
             self, position, toc_mask, endianness, next_segment_offset,
@@ -52,18 +52,20 @@ class TdmsSegment(object):
         self.data_position = data_position
         self.num_chunks = 0
         self.final_chunk_proportion = 1.0
-        self.ordered_objects = []
+        self.ordered_objects = None
+        self.object_index = None
         self.object_properties = None
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
 
-    def read_segment_objects(self, file, previous_segment_objects, previous_segment=None):
+    def read_segment_objects(self, file, previous_segment_objects, index_cache, previous_segment=None):
         """Read segment metadata section and update object information
 
         :param file: Open TDMS file
         :param previous_segment_objects: Dictionary of path to the most
             recently read segment object for a TDMS object.
+        :param index_cache: A SegmentIndexCache instance, or None if segment indexes are not required.
         :param previous_segment: Previous segment in the file.
         """
 
@@ -74,7 +76,10 @@ class TdmsSegment(object):
         endianness = self.endianness
 
         new_obj_list = self.toc_mask & toc_properties['kTocNewObjList']
-        if not new_obj_list:
+        if new_obj_list:
+            self.ordered_objects = []
+            existing_objects = None
+        else:
             # In this case, there can be a list of new objects that
             # are appended, or previous objects can also be repeated
             # if their properties change.
@@ -83,8 +88,6 @@ class TdmsSegment(object):
             self.ordered_objects = [
                 o for o in previous_segment.ordered_objects]
             existing_objects = {o.path: (i, o) for (i, o) in enumerate(self.ordered_objects)}
-        else:
-            existing_objects = None
 
         log.debug("Reading segment object metadata at %d", file.tell())
 
@@ -123,7 +126,16 @@ class TdmsSegment(object):
                     segment_obj.read_raw_data_index(file, raw_data_index_header)
 
             self._read_object_properties(file, object_path)
+        if index_cache is not None:
+            self.object_index = index_cache.get_index(self.ordered_objects)
         self._calculate_chunks()
+
+    def get_segment_object(self, object_path):
+        try:
+            obj_index = self.object_index[object_path]
+            return self.ordered_objects[obj_index]
+        except KeyError:
+            return None
 
     def _update_existing_object(
             self, object_path, existing_object_index, existing_object, raw_data_index_header, file):
@@ -176,6 +188,7 @@ class TdmsSegment(object):
     def _reuse_previous_segment_metadata(self, previous_segment):
         try:
             self.ordered_objects = previous_segment.ordered_objects
+            self.object_index = previous_segment.object_index
             self._calculate_chunks()
         except AttributeError:
             raise ValueError(
@@ -367,10 +380,8 @@ class InterleavedDataReader(BaseDataReader):
     def _read_interleaved_sized(self, file, data_objects, num_chunks):
         """Read interleaved data where all channels have a sized data type and the same length
         """
-        log.debug("Reading interleaved data all at once")
-
         total_data_width = sum(o.data_type.size for o in data_objects)
-        log.debug("total_data_width: %d", total_data_width)
+        log.debug("Reading interleaved data all at once. total_data_width: %d", total_data_width)
 
         # Read all data into 1 byte unsigned ints first
         combined_data = read_interleaved_segment_bytes(
@@ -521,6 +532,46 @@ class TdmsSegmentObject(BaseSegmentObject):
             return np.zeros(self.number_values, dtype=self.data_type.nptype)
         else:
             return [None] * self.number_values
+
+
+class SegmentIndexCache(object):
+    """ Caches dictionaries for indexing segment object lists using object paths
+    """
+
+    def __init__(self):
+        self._indexes = {}
+
+    def get_index(self, object_list):
+        key = ObjectListKey(object_list)
+        try:
+            return self._indexes[key]
+        except KeyError:
+            index = dict((o.path, i) for (i, o) in enumerate(object_list))
+            self._indexes[key] = index
+            return index
+
+
+class ObjectListKey(object):
+    """ Wraps a list of objects for using as a cache key, where we are only concerned with the object paths
+    """
+
+    __slots__ = ['objects', '_hash']
+
+    def __init__(self, objects):
+        self.objects = objects
+        hash_result = 0
+        for obj in objects:
+            # This is order independent, but it's unlikely that different segments
+            # would have the same objects but in a different order.
+            hash_result = hash_result ^ hash(obj.path)
+        self._hash = hash_result
+
+    def __eq__(self, other):
+        return len(self.objects) == len(other.objects) and all(
+            oa.path == ob.path for (oa, ob) in zip(self.objects, other.objects))
+
+    def __hash__(self):
+        return self._hash
 
 
 def read_property(f, endianness="<"):
