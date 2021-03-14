@@ -336,12 +336,18 @@ class TdmsSegment(object):
             return ContiguousDataReader(self.num_chunks, self.final_chunk_proportion, self.endianness)
 
     def _have_daqmx_objects(self):
-        is_daqmx = [isinstance(o, DaqmxSegmentObject) for o in self.ordered_objects if o.has_data]
-        if len(is_daqmx) == 0:
+        data_obj_count = 0
+        daqmx_count = 0
+        for o in self.ordered_objects:
+            if o.has_data:
+                data_obj_count += 1
+                if isinstance(o, DaqmxSegmentObject):
+                    daqmx_count += 1
+        if daqmx_count == 0:
             return False
-        if all(is_daqmx):
+        if daqmx_count == data_obj_count:
             return True
-        if any(is_daqmx):
+        if daqmx_count > 0:
             raise Exception("Cannot read mixed DAQmx and non-DAQmx data")
         return False
 
