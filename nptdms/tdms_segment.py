@@ -84,8 +84,7 @@ class TdmsSegment(object):
             # if their properties change.
             # Copy the list of objects for now, but any objects that have
             # metadata changed will need to be copied before being modified.
-            self.ordered_objects = [
-                o for o in previous_segment.ordered_objects]
+            self.ordered_objects = previous_segment.ordered_objects[:]
             existing_objects = {o.path: (i, o) for (i, o) in enumerate(self.ordered_objects)}
 
         log.debug("Reading segment object metadata at %d", file.tell())
