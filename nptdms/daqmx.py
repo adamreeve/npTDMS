@@ -108,11 +108,11 @@ class DaqmxSegmentObject(BaseSegmentObject):
 
     __slots__ = ['daqmx_metadata']
 
-    def __init__(self, path, endianness):
-        super(DaqmxSegmentObject, self).__init__(path, endianness)
+    def __init__(self, path):
+        super(DaqmxSegmentObject, self).__init__(path)
         self.daqmx_metadata = None
 
-    def read_raw_data_index(self, f, raw_data_index_header):
+    def read_raw_data_index(self, f, raw_data_index_header, endianness):
         if raw_data_index_header not in (FORMAT_CHANGING_SCALER, DIGITAL_LINE_SCALER):
             raise ValueError(
                 "Unexpected raw data index for DAQmx data: 0x%08X" %
@@ -124,13 +124,13 @@ class DaqmxSegmentObject(BaseSegmentObject):
         # has 0x00001369, which appears to be incorrect
 
         # Read the data type
-        data_type_val = types.Uint32.read(f, self.endianness)
+        data_type_val = types.Uint32.read(f, endianness)
         try:
             self.data_type = types.tds_data_types[data_type_val]
         except KeyError:
             raise KeyError("Unrecognised data type: %s" % data_type_val)
 
-        daqmx_metadata = DaqMxMetadata(f, self.endianness, raw_data_index_header, self.data_type)
+        daqmx_metadata = DaqMxMetadata(f, endianness, raw_data_index_header, self.data_type)
         log.debug("DAQmx metadata: %r", daqmx_metadata)
 
         # DAQmx format has special chunking

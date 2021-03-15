@@ -115,14 +115,14 @@ class TdmsSegment(object):
                 self._reuse_previous_object(
                     previous_segment_obj, raw_data_index_header, file, endianness)
             else:
-                segment_obj = self._new_segment_object(object_path, raw_data_index_header, endianness)
+                segment_obj = self._new_segment_object(object_path, raw_data_index_header)
                 self.ordered_objects.append(segment_obj)
                 if raw_data_index_header == RAW_DATA_INDEX_MATCHES_PREVIOUS:
                     raise ValueError("Raw data index for %s says to reuse previous structure, "
                                      "but we have not seen this object before" % object_path)
                 elif raw_data_index_header != RAW_DATA_INDEX_NO_DATA:
                     segment_obj.has_data = True
-                    segment_obj.read_raw_data_index(file, raw_data_index_header)
+                    segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
 
             object_properties = self._read_object_properties(file, endianness)
             if object_properties is not None:
@@ -161,9 +161,9 @@ class TdmsSegment(object):
                 self.ordered_objects[existing_object_index] = new_obj
         else:
             # New segment metadata, or updates to existing data
-            segment_obj = self._new_segment_object(object_path, raw_data_index_header, endianness)
+            segment_obj = self._new_segment_object(object_path, raw_data_index_header)
             segment_obj.has_data = True
-            segment_obj.read_raw_data_index(file, raw_data_index_header)
+            segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
             self.ordered_objects[existing_object_index] = segment_obj
 
     def _reuse_previous_object(
@@ -187,9 +187,9 @@ class TdmsSegment(object):
                 segment_obj = previous_segment_obj
         else:
             # Changed metadata in this segment
-            segment_obj = self._new_segment_object(object_path, raw_data_index_header, endianness)
+            segment_obj = self._new_segment_object(object_path, raw_data_index_header)
             segment_obj.has_data = True
-            segment_obj.read_raw_data_index(file, raw_data_index_header)
+            segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
         self.ordered_objects.append(segment_obj)
 
     def _reuse_previous_segment_metadata(self, previous_segment):
@@ -299,15 +299,15 @@ class TdmsSegment(object):
             self.final_chunk_proportion = (
                     float(chunk_remainder) / float(data_size))
 
-    def _new_segment_object(self, object_path, raw_data_index_header, endianness):
+    def _new_segment_object(self, object_path, raw_data_index_header):
         """ Create a new segment object for a segment
 
         :param object_path: Path for the object
         :param raw_data_index_header: Integer raw data index header value
         """
         if raw_data_index_header in (FORMAT_CHANGING_SCALER, DIGITAL_LINE_SCALER):
-            return DaqmxSegmentObject(object_path, endianness)
-        return TdmsSegmentObject(object_path, endianness)
+            return DaqmxSegmentObject(object_path)
+        return TdmsSegmentObject(object_path)
 
     def _get_chunk_size(self):
         if self._have_daqmx_objects():
@@ -430,7 +430,7 @@ class InterleavedDataReader(BaseDataReader):
             for obj in data_objects:
                 if points_added[obj.path] < obj.number_values:
                     object_data[obj.path][points_added[obj.path]] = (
-                        obj.read_value(file))
+                        obj.read_value(file, self.endianness))
                     points_added[obj.path] += 1
 
         return RawDataChunk.channel_data(object_data)
@@ -445,7 +445,7 @@ class ContiguousDataReader(BaseDataReader):
         object_data = {}
         for obj in data_objects:
             number_values = self._get_channel_number_values(obj, chunk_index)
-            object_data[obj.path] = obj.read_values(file, number_values)
+            object_data[obj.path] = obj.read_values(file, number_values, self.endianness)
         return RawDataChunk.channel_data(object_data)
 
     def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
@@ -455,7 +455,7 @@ class ContiguousDataReader(BaseDataReader):
         for obj in data_objects:
             number_values = self._get_channel_number_values(obj, chunk_index)
             if obj.path == channel_path:
-                channel_data = RawChannelDataChunk.channel_data(obj.read_values(file, number_values))
+                channel_data = RawChannelDataChunk.channel_data(obj.read_values(file, number_values, self.endianness))
             elif number_values == obj.number_values:
                 # Seek over data for other channel data
                 file.seek(obj.data_size, os.SEEK_CUR)
@@ -463,7 +463,7 @@ class ContiguousDataReader(BaseDataReader):
                 # In last chunk with reduced chunk size
                 if obj.data_type.size is None:
                     # Type is unsized (eg. string), try reading number of values
-                    obj.read_values(file, number_values)
+                    obj.read_values(file, number_values, self.endianness)
                 else:
                     file.seek(obj.data_type.size * number_values, os.SEEK_CUR)
         return channel_data
@@ -482,13 +482,13 @@ class TdmsSegmentObject(BaseSegmentObject):
 
     __slots__ = []
 
-    def read_raw_data_index(self, f, raw_data_index_header):
+    def read_raw_data_index(self, f, raw_data_index_header, endianness):
         # Metadata format is standard (non-DAQmx) TDMS format.
         # raw_data_index_header gives the length of the index information.
 
         # Read type, dimension and chunk size at once for performance
         index_bytes = f.read(16)
-        (data_type, dimension, number_values) = _struct_unpack(self.endianness + 'LLQ', index_bytes)
+        (data_type, dimension, number_values) = _struct_unpack(endianness + 'LLQ', index_bytes)
         self.number_values = number_values
 
         # Get data type
@@ -512,29 +512,29 @@ class TdmsSegmentObject(BaseSegmentObject):
 
         # Variable length data types have total size
         if self.data_type == types.String:
-            self.data_size = types.Uint64.read(f, self.endianness)
+            self.data_size = types.Uint64.read(f, endianness)
         else:
             self.data_size = self.number_values * self.data_type.size
 
-    def read_value(self, file):
+    def read_value(self, file, endianness):
         """Read a single value from the given file"""
 
         if self.data_type.nptype is not None:
-            dtype = self.data_type.nptype.newbyteorder(self.endianness)
+            dtype = self.data_type.nptype.newbyteorder(endianness)
             return fromfile(file, dtype=dtype, count=1)[0]
-        return self.data_type.read(file, self.endianness)
+        return self.data_type.read(file, endianness)
 
-    def read_values(self, file, number_values):
+    def read_values(self, file, number_values, endianness):
         """Read all values for this object from a contiguous segment"""
 
         if self.data_type.nptype is not None:
-            dtype = self.data_type.nptype.newbyteorder(self.endianness)
+            dtype = self.data_type.nptype.newbyteorder(endianness)
             return fromfile(file, dtype=dtype, count=number_values)
         elif self.data_type.size is not None:
             byte_data = fromfile(file, dtype=np.dtype('uint8'), count=number_values * self.data_type.size)
-            return self.data_type.from_bytes(byte_data, self.endianness)
+            return self.data_type.from_bytes(byte_data, endianness)
         else:
-            return self.data_type.read_values(file, number_values, self.endianness)
+            return self.data_type.read_values(file, number_values, endianness)
 
     def new_segment_data(self):
         """Return a new array to read the data of the current section into"""
