@@ -1,5 +1,6 @@
 from collections import defaultdict
 import numpy as np
+import struct
 
 from nptdms import types
 from nptdms.base_segment import (
@@ -8,6 +9,7 @@ from nptdms.log import log_manager
 
 
 log = log_manager.get_logger(__name__)
+_struct_unpack = struct.unpack
 
 FORMAT_CHANGING_SCALER = 0x00001269
 DIGITAL_LINE_SCALER = 0x0000126A
@@ -106,11 +108,11 @@ class DaqmxSegmentObject(BaseSegmentObject):
 
     __slots__ = ['daqmx_metadata']
 
-    def __init__(self, path, endianness):
-        super(DaqmxSegmentObject, self).__init__(path, endianness)
+    def __init__(self, path):
+        super(DaqmxSegmentObject, self).__init__(path)
         self.daqmx_metadata = None
 
-    def read_raw_data_index(self, f, raw_data_index_header):
+    def read_raw_data_index(self, f, raw_data_index_header, endianness):
         if raw_data_index_header not in (FORMAT_CHANGING_SCALER, DIGITAL_LINE_SCALER):
             raise ValueError(
                 "Unexpected raw data index for DAQmx data: 0x%08X" %
@@ -122,13 +124,13 @@ class DaqmxSegmentObject(BaseSegmentObject):
         # has 0x00001369, which appears to be incorrect
 
         # Read the data type
-        data_type_val = types.Uint32.read(f, self.endianness)
+        data_type_val = types.Uint32.read(f, endianness)
         try:
             self.data_type = types.tds_data_types[data_type_val]
         except KeyError:
             raise KeyError("Unrecognised data type: %s" % data_type_val)
 
-        daqmx_metadata = DaqMxMetadata(f, self.endianness, raw_data_index_header, self.data_type)
+        daqmx_metadata = DaqMxMetadata(f, endianness, raw_data_index_header, self.data_type)
         log.debug("DAQmx metadata: %r", daqmx_metadata)
 
         # DAQmx format has special chunking
@@ -149,8 +151,6 @@ class DaqMxMetadata(object):
     """
 
     __slots__ = [
-        'scaler_type',
-        'dimension',
         'chunk_size',
         'raw_data_widths',
         'scalers',
@@ -161,15 +161,15 @@ class DaqMxMetadata(object):
         Read the metadata for a DAQmx raw segment.  This is the raw
         DAQmx-specific portion of the raw data index.
         """
-        self.scaler_type = scaler_type
-        self.dimension = types.Uint32.read(f, endianness)
-        # In TDMS format version 2.0, 1 is the only valid value for dimension
-        if self.dimension != 1:
-            raise ValueError("Data dimension is not 1")
-        self.chunk_size = types.Uint64.read(f, endianness)
+        metadata_bytes = f.read(16)
+        (dimension,
+         self.chunk_size,
+         scaler_vector_length) = _struct_unpack(endianness + 'LQL', metadata_bytes)
 
-        # size of vector of format changing scalers
-        scaler_vector_length = types.Uint32.read(f, endianness)
+        # In TDMS format version 2.0, 1 is the only valid value for dimension
+        if dimension != 1:
+            raise ValueError("Data dimension is not 1")
+
         scaler_class = _scaler_classes[scaler_type]
         self.scalers = [
             scaler_class(f, endianness)
@@ -217,14 +217,15 @@ class DaqMxScaler(object):
         ]
 
     def __init__(self, open_file, endianness):
-        data_type_code = types.Uint32.read(open_file, endianness)
-        self.data_type = DAQMX_TYPES[data_type_code]
+        scaler_bytes = open_file.read(20)
 
-        # more info for format changing scaler
-        self.raw_buffer_index = types.Uint32.read(open_file, endianness)
-        self.raw_byte_offset = types.Uint32.read(open_file, endianness)
-        self.sample_format_bitmap = types.Uint32.read(open_file, endianness)
-        self.scale_id = types.Uint32.read(open_file, endianness)
+        (data_type_code,
+         self.raw_buffer_index,
+         self.raw_byte_offset,
+         self.sample_format_bitmap,
+         self.scale_id) = _struct_unpack(endianness + 'LLLLL', scaler_bytes)
+
+        self.data_type = DAQMX_TYPES[data_type_code]
 
     def byte_offset(self):
         return self.raw_byte_offset
@@ -254,14 +255,15 @@ class DigitalLineScaler(object):
         ]
 
     def __init__(self, open_file, endianness):
-        data_type_code = types.Uint32.read(open_file, endianness)
-        self.data_type = DAQMX_TYPES[data_type_code]
+        scaler_bytes = open_file.read(17)
 
-        # more info for digital line scaler
-        self.raw_buffer_index = types.Uint32.read(open_file, endianness)
-        self.raw_bit_offset = types.Uint32.read(open_file, endianness)
-        self.sample_format_bitmap = types.Uint8.read(open_file, endianness)
-        self.scale_id = types.Uint32.read(open_file, endianness)
+        (data_type_code,
+         self.raw_buffer_index,
+         self.raw_bit_offset,
+         self.sample_format_bitmap,
+         self.scale_id) = _struct_unpack(endianness + 'LLLBL', scaler_bytes)
+
+        self.data_type = DAQMX_TYPES[data_type_code]
 
     def byte_offset(self):
         return self.raw_bit_offset // 8

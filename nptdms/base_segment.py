@@ -13,17 +13,16 @@ class BaseSegmentObject(object):
 
     __slots__ = [
         'path', 'number_values', 'data_size',
-        'has_data', 'data_type', 'endianness']
+        'has_data', 'data_type']
 
-    def __init__(self, path, endianness):
+    def __init__(self, path):
         self.path = path
         self.number_values = 0
         self.data_size = 0
         self.has_data = False
         self.data_type = None
-        self.endianness = endianness
 
-    def read_raw_data_index(self, file, raw_data_index_header):
+    def read_raw_data_index(self, file, raw_data_index_header, endianness):
         """ Read the raw data index for a single object in a segment
         """
         raise NotImplementedError("Segment metadata reading must be implemented in base classes")

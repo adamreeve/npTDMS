@@ -930,7 +930,6 @@ def test_daqmx_debug_logging(caplog):
     _ = test_file.load()
 
     assert "Reading metadata for object /'Group'/'Channel1' with index header 0x00001269" in caplog.text
-    assert "scaler_type=4713" in caplog.text
     assert "scale_id=0" in caplog.text
     assert "data_type=Int16" in caplog.text
 
