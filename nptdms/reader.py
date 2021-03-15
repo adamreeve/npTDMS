@@ -84,21 +84,20 @@ class TdmsReader(object):
                 while True:
                     start_position = file.tell()
                     try:
-                        segment = self._read_segment_metadata(
+                        segment, properties = self._read_segment_metadata(
                             file, segment_position, index_cache, previous_segment, reading_index_file)
                     except EOFError:
                         # We've finished reading the file
                         break
 
                     self._update_object_metadata(segment)
-                    self._update_object_properties(segment)
+                    self._update_object_properties(properties)
                     self._segments.append(segment)
                     previous_segment = segment
 
                     segment_position = segment.next_segment_pos
                     if reading_index_file:
-                        lead_size = 7 * 4
-                        file.seek(start_position + lead_size + segment.raw_data_offset, os.SEEK_SET)
+                        file.seek(start_position + segment.data_position - segment.position, os.SEEK_SET)
                     else:
                         file.seek(segment.next_segment_pos, os.SEEK_SET)
         finally:
@@ -231,16 +230,15 @@ class TdmsReader(object):
 
     def _read_segment_metadata(
             self, file, segment_position, index_cache, previous_segment=None, is_index_file=False):
-        (position, toc_mask, endianness, data_position, raw_data_offset,
-         next_segment_offset, next_segment_pos) = self._read_lead_in(file, segment_position, is_index_file)
+        (position, toc_mask, endianness, data_position, next_segment_pos) = self._read_lead_in(
+            file, segment_position, is_index_file)
 
         segment = TdmsSegment(
-            position, toc_mask, endianness, next_segment_offset,
-            next_segment_pos, raw_data_offset, data_position)
+            position, toc_mask, endianness, next_segment_pos, data_position)
 
-        segment.read_segment_objects(
+        properties = segment.read_segment_objects(
             file, self._prev_segment_objects, index_cache, previous_segment)
-        return segment
+        return segment, properties
 
     def _read_lead_in(self, file, segment_position, is_index_file=False):
         lead_in_bytes = file.read(28)
@@ -280,15 +278,13 @@ class TdmsReader(object):
                 "Last segment of file has unknown size, "
                 "will attempt to read to the end of the file")
             next_segment_pos = self._get_data_file_size()
-            next_segment_offset = next_segment_pos - segment_position - lead_size
         else:
             log.debug("Next segment offset = %d, raw data offset = %d, data size = %d b",
                       next_segment_offset, raw_data_offset, next_segment_offset - raw_data_offset)
             next_segment_pos = (
                     segment_position + next_segment_offset + lead_size)
 
-        return (segment_position, toc_mask, endianness, data_position, raw_data_offset,
-                next_segment_offset, next_segment_pos)
+        return segment_position, toc_mask, endianness, data_position, next_segment_pos
 
     def _verify_segment_start(self, segment):
         """ When reading data for a segment, check for the TDSm tag at the start of the segment in an attempt
@@ -324,11 +320,11 @@ class TdmsReader(object):
             if segment_object.scaler_data_types is not None:
                 _update_object_scaler_data_types(path, object_metadata, segment_object)
 
-    def _update_object_properties(self, segment):
+    def _update_object_properties(self, segment_object_properties):
         """ Update object properties using any properties in a segment
         """
-        if segment.object_properties is not None:
-            for path, properties in segment.object_properties.items():
+        if segment_object_properties is not None:
+            for path, properties in segment_object_properties.items():
                 object_metadata = self._get_or_create_object(path)
                 for prop, val in properties:
                     object_metadata.properties[prop] = val

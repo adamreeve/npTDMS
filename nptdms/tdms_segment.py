@@ -36,25 +36,22 @@ class TdmsSegment(object):
 
     __slots__ = [
         'position', 'num_chunks', 'ordered_objects', 'toc_mask',
-        'next_segment_offset', 'next_segment_pos',
-        'raw_data_offset', 'data_position', 'final_chunk_proportion',
-        'endianness', 'object_properties', 'object_index']
+        'next_segment_pos',
+        'data_position', 'final_chunk_proportion',
+        'endianness', 'object_index']
 
     def __init__(
-            self, position, toc_mask, endianness, next_segment_offset,
-            next_segment_pos, raw_data_offset, data_position):
+            self, position, toc_mask, endianness,
+            next_segment_pos, data_position):
         self.position = position
         self.toc_mask = toc_mask
         self.endianness = endianness
-        self.next_segment_offset = next_segment_offset
         self.next_segment_pos = next_segment_pos
-        self.raw_data_offset = raw_data_offset
         self.data_position = data_position
         self.num_chunks = 0
         self.final_chunk_proportion = 1.0
         self.ordered_objects = None
         self.object_index = None
-        self.object_properties = None
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
@@ -94,6 +91,7 @@ class TdmsSegment(object):
         # First four bytes have number of objects in metadata
         num_objects_bytes = file.read(4)
         num_objects = _struct_unpack(endianness + 'L', num_objects_bytes)[0]
+        properties = None
 
         for _ in range(num_objects):
             # Read the object path
@@ -125,10 +123,16 @@ class TdmsSegment(object):
                     segment_obj.has_data = True
                     segment_obj.read_raw_data_index(file, raw_data_index_header)
 
-            self._read_object_properties(file, object_path)
+            object_properties = self._read_object_properties(file)
+            if object_properties is not None:
+                if properties is None:
+                    properties = {}
+                properties[object_path] = object_properties
+
         if index_cache is not None:
             self.object_index = index_cache.get_index(self.ordered_objects)
         self._calculate_chunks()
+        return properties
 
     def get_segment_object(self, object_path):
         try:
@@ -203,18 +207,16 @@ class TdmsSegment(object):
         except KeyError:
             return None, None
 
-    def _read_object_properties(self, file, object_path):
+    def _read_object_properties(self, file):
         """Read properties for an object in the segment
         """
         num_properties_bytes = file.read(4)
         num_properties = _struct_unpack(self.endianness + 'L', num_properties_bytes)[0]
         if num_properties > 0:
             log.debug("Reading %d properties", num_properties)
-            if self.object_properties is None:
-                self.object_properties = {}
-            self.object_properties[object_path] = [
-                read_property(file, self.endianness)
-                for _ in range(num_properties)]
+            return [read_property(file, self.endianness) for _ in range(num_properties)]
+        else:
+            return None
 
     def read_raw_data(self, f):
         """Read raw data from a TDMS segment
@@ -228,7 +230,7 @@ class TdmsSegment(object):
 
         f.seek(self.data_position)
 
-        total_data_size = self.next_segment_offset - self.raw_data_offset
+        total_data_size = self.next_segment_pos - self.data_position
         log.debug(
             "Reading %d bytes of data at %d in %d chunks",
             total_data_size, f.tell(), self.num_chunks)
@@ -271,7 +273,7 @@ class TdmsSegment(object):
 
         data_size = self._get_chunk_size()
 
-        total_data_size = self.next_segment_offset - self.raw_data_offset
+        total_data_size = self.next_segment_pos - self.data_position
         if data_size < 0 or total_data_size < 0:
             raise ValueError("Negative data size")
         elif data_size == 0:
