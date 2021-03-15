@@ -35,17 +35,19 @@ class TdmsSegment(object):
     """
 
     __slots__ = [
-        'position', 'num_chunks', 'ordered_objects', 'toc_mask',
+        'position',
+        'num_chunks',
+        'ordered_objects',
+        'toc_mask',
         'next_segment_pos',
-        'data_position', 'final_chunk_proportion',
-        'endianness', 'object_index']
+        'data_position',
+        'final_chunk_proportion',
+        'object_index',
+    ]
 
-    def __init__(
-            self, position, toc_mask, endianness,
-            next_segment_pos, data_position):
+    def __init__(self, position, toc_mask, next_segment_pos, data_position):
         self.position = position
         self.toc_mask = toc_mask
-        self.endianness = endianness
         self.next_segment_pos = next_segment_pos
         self.data_position = data_position
         self.num_chunks = 0
@@ -70,7 +72,7 @@ class TdmsSegment(object):
             self._reuse_previous_segment_metadata(previous_segment)
             return
 
-        endianness = self.endianness
+        endianness = '>' if (self.toc_mask & toc_properties['kTocBigEndian']) else '<'
 
         new_obj_list = self.toc_mask & toc_properties['kTocNewObjList']
         if new_obj_list:
@@ -108,13 +110,13 @@ class TdmsSegment(object):
                 else (None, None))
             if existing_object_index is not None:
                 self._update_existing_object(
-                    object_path, existing_object_index, existing_object, raw_data_index_header, file)
+                    object_path, existing_object_index, existing_object, raw_data_index_header, file, endianness)
             elif object_path in previous_segment_objects:
                 previous_segment_obj = previous_segment_objects[object_path]
                 self._reuse_previous_object(
-                    object_path, previous_segment_obj, raw_data_index_header, file)
+                    object_path, previous_segment_obj, raw_data_index_header, file, endianness)
             else:
-                segment_obj = self._new_segment_object(object_path, raw_data_index_header)
+                segment_obj = self._new_segment_object(object_path, raw_data_index_header, endianness)
                 self.ordered_objects.append(segment_obj)
                 if raw_data_index_header == RAW_DATA_INDEX_MATCHES_PREVIOUS:
                     raise ValueError("Raw data index for %s says to reuse previous structure, "
@@ -123,7 +125,7 @@ class TdmsSegment(object):
                     segment_obj.has_data = True
                     segment_obj.read_raw_data_index(file, raw_data_index_header)
 
-            object_properties = self._read_object_properties(file)
+            object_properties = self._read_object_properties(file, endianness)
             if object_properties is not None:
                 if properties is None:
                     properties = {}
@@ -142,7 +144,7 @@ class TdmsSegment(object):
             return None
 
     def _update_existing_object(
-            self, object_path, existing_object_index, existing_object, raw_data_index_header, file):
+            self, object_path, existing_object_index, existing_object, raw_data_index_header, file, endianness):
         """ Update raw data index information for an object already in the list of segment objects
         """
         if raw_data_index_header == RAW_DATA_INDEX_NO_DATA:
@@ -159,13 +161,13 @@ class TdmsSegment(object):
                 self.ordered_objects[existing_object_index] = new_obj
         else:
             # New segment metadata, or updates to existing data
-            segment_obj = self._new_segment_object(object_path, raw_data_index_header)
+            segment_obj = self._new_segment_object(object_path, raw_data_index_header, endianness)
             segment_obj.has_data = True
             segment_obj.read_raw_data_index(file, raw_data_index_header)
             self.ordered_objects[existing_object_index] = segment_obj
 
     def _reuse_previous_object(
-            self, object_path, previous_segment_obj, raw_data_index_header, file):
+            self, object_path, previous_segment_obj, raw_data_index_header, file, endianness):
         """ Attempt to reuse raw data index information from a previous segment
         """
         if raw_data_index_header == RAW_DATA_INDEX_NO_DATA:
@@ -184,7 +186,7 @@ class TdmsSegment(object):
                 segment_obj = previous_segment_obj
         else:
             # Changed metadata in this segment
-            segment_obj = self._new_segment_object(object_path, raw_data_index_header)
+            segment_obj = self._new_segment_object(object_path, raw_data_index_header, endianness)
             segment_obj.has_data = True
             segment_obj.read_raw_data_index(file, raw_data_index_header)
         self.ordered_objects.append(segment_obj)
@@ -207,14 +209,14 @@ class TdmsSegment(object):
         except KeyError:
             return None, None
 
-    def _read_object_properties(self, file):
+    def _read_object_properties(self, file, endianness):
         """Read properties for an object in the segment
         """
         num_properties_bytes = file.read(4)
-        num_properties = _struct_unpack(self.endianness + 'L', num_properties_bytes)[0]
+        num_properties = _struct_unpack(endianness + 'L', num_properties_bytes)[0]
         if num_properties > 0:
             log.debug("Reading %d properties", num_properties)
-            return [read_property(file, self.endianness) for _ in range(num_properties)]
+            return [read_property(file, endianness) for _ in range(num_properties)]
         else:
             return None
 
@@ -296,15 +298,15 @@ class TdmsSegment(object):
             self.final_chunk_proportion = (
                     float(chunk_remainder) / float(data_size))
 
-    def _new_segment_object(self, object_path, raw_data_index_header):
+    def _new_segment_object(self, object_path, raw_data_index_header, endianness):
         """ Create a new segment object for a segment
 
         :param object_path: Path for the object
         :param raw_data_index_header: Integer raw data index header value
         """
         if raw_data_index_header in (FORMAT_CHANGING_SCALER, DIGITAL_LINE_SCALER):
-            return DaqmxSegmentObject(object_path, self.endianness)
-        return TdmsSegmentObject(object_path, self.endianness)
+            return DaqmxSegmentObject(object_path, endianness)
+        return TdmsSegmentObject(object_path, endianness)
 
     def _get_chunk_size(self):
         if self._have_daqmx_objects():
@@ -330,12 +332,13 @@ class TdmsSegment(object):
             yield chunk
 
     def _get_data_reader(self):
+        endianness = '>' if (self.toc_mask & toc_properties['kTocBigEndian']) else '<'
         if self._have_daqmx_objects():
-            return DaqmxDataReader(self.num_chunks, self.final_chunk_proportion, self.endianness)
+            return DaqmxDataReader(self.num_chunks, self.final_chunk_proportion, endianness)
         elif self.toc_mask & toc_properties['kTocInterleavedData']:
-            return InterleavedDataReader(self.num_chunks, self.final_chunk_proportion, self.endianness)
+            return InterleavedDataReader(self.num_chunks, self.final_chunk_proportion, endianness)
         else:
-            return ContiguousDataReader(self.num_chunks, self.final_chunk_proportion, self.endianness)
+            return ContiguousDataReader(self.num_chunks, self.final_chunk_proportion, endianness)
 
     def _have_daqmx_objects(self):
         data_obj_count = 0

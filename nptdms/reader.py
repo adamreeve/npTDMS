@@ -230,11 +230,11 @@ class TdmsReader(object):
 
     def _read_segment_metadata(
             self, file, segment_position, index_cache, previous_segment=None, is_index_file=False):
-        (position, toc_mask, endianness, data_position, next_segment_pos) = self._read_lead_in(
+        (position, toc_mask, data_position, next_segment_pos) = self._read_lead_in(
             file, segment_position, is_index_file)
 
         segment = TdmsSegment(
-            position, toc_mask, endianness, next_segment_pos, data_position)
+            position, toc_mask, next_segment_pos, data_position)
 
         properties = segment.read_segment_objects(
             file, self._prev_segment_objects, index_cache, previous_segment)
@@ -284,7 +284,7 @@ class TdmsReader(object):
             next_segment_pos = (
                     segment_position + next_segment_offset + lead_size)
 
-        return segment_position, toc_mask, endianness, data_position, next_segment_pos
+        return segment_position, toc_mask, data_position, next_segment_pos
 
     def _verify_segment_start(self, segment):
         """ When reading data for a segment, check for the TDSm tag at the start of the segment in an attempt
