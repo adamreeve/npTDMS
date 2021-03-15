@@ -229,7 +229,7 @@ class TdmsReader(object):
         return chunk_data, chunk_offset
 
     def _read_segment_metadata(
-            self, file, segment_position, index_cache, previous_segment=None, is_index_file=False):
+            self, file, segment_position, index_cache, previous_segment, is_index_file):
         (position, toc_mask, data_position, next_segment_pos) = self._read_lead_in(
             file, segment_position, is_index_file)
 

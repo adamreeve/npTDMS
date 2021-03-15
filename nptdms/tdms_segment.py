@@ -58,7 +58,7 @@ class TdmsSegment(object):
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
 
-    def read_segment_objects(self, file, previous_segment_objects, index_cache, previous_segment=None):
+    def read_segment_objects(self, file, previous_segment_objects, index_cache, previous_segment):
         """Read segment metadata section and update object information
 
         :param file: Open TDMS file
@@ -110,11 +110,11 @@ class TdmsSegment(object):
                 else (None, None))
             if existing_object_index is not None:
                 self._update_existing_object(
-                    object_path, existing_object_index, existing_object, raw_data_index_header, file, endianness)
+                    existing_object_index, existing_object, raw_data_index_header, file, endianness)
             elif object_path in previous_segment_objects:
                 previous_segment_obj = previous_segment_objects[object_path]
                 self._reuse_previous_object(
-                    object_path, previous_segment_obj, raw_data_index_header, file, endianness)
+                    previous_segment_obj, raw_data_index_header, file, endianness)
             else:
                 segment_obj = self._new_segment_object(object_path, raw_data_index_header, endianness)
                 self.ordered_objects.append(segment_obj)
@@ -144,9 +144,10 @@ class TdmsSegment(object):
             return None
 
     def _update_existing_object(
-            self, object_path, existing_object_index, existing_object, raw_data_index_header, file, endianness):
+            self, existing_object_index, existing_object, raw_data_index_header, file, endianness):
         """ Update raw data index information for an object already in the list of segment objects
         """
+        object_path = existing_object.path
         if raw_data_index_header == RAW_DATA_INDEX_NO_DATA:
             # Re-use object but leave data index information as set previously
             if existing_object.has_data:
@@ -167,9 +168,10 @@ class TdmsSegment(object):
             self.ordered_objects[existing_object_index] = segment_obj
 
     def _reuse_previous_object(
-            self, object_path, previous_segment_obj, raw_data_index_header, file, endianness):
+            self, previous_segment_obj, raw_data_index_header, file, endianness):
         """ Attempt to reuse raw data index information from a previous segment
         """
+        object_path = previous_segment_obj.path
         if raw_data_index_header == RAW_DATA_INDEX_NO_DATA:
             # Re-use object but leave data index information as set previously
             if previous_segment_obj.has_data:
