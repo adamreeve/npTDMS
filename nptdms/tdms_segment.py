@@ -313,9 +313,9 @@ class TdmsSegment(object):
     def _get_chunk_size(self):
         if self._have_daqmx_objects():
             return get_daqmx_chunk_size(self.ordered_objects)
-        return sum([
+        return sum(
             o.data_size
-            for o in self.ordered_objects if o.has_data])
+            for o in self.ordered_objects if o.has_data)
 
     def _read_data_chunks(self, file, data_objects, num_chunks):
         """ Read multiple data chunks at once
