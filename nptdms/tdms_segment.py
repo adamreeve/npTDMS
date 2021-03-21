@@ -365,17 +365,13 @@ class InterleavedDataReader(BaseDataReader):
     def read_data_chunks(self, file, data_objects, num_chunks):
         """ Read multiple data chunks at once
         """
-        # If all data types are sized and all the lengths are
-        # the same, then we can read all data at once with numpy,
-        # which is much faster
-        all_sized = all(
-            o.data_type.size is not None for o in data_objects)
+        if len(data_objects) == 0:
+            return []
         same_length = (len(
             set((o.number_values for o in data_objects))) == 1)
-        if all_sized and same_length:
-            return [self._read_interleaved_sized(file, data_objects, num_chunks)]
-        else:
-            return [self._read_interleaved(file, data_objects, num_chunks)]
+        if not same_length:
+            raise ValueError("Cannot read interleaved data with different chunk sizes")
+        return [self._read_interleaved_chunks(file, data_objects, num_chunks)]
 
     def read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk):
         """ Read multiple data chunks for a single channel at once
@@ -389,7 +385,7 @@ class InterleavedDataReader(BaseDataReader):
         """
         raise NotImplementedError("Reading a single chunk is not implemented for interleaved data")
 
-    def _read_interleaved_sized(self, file, data_objects, num_chunks):
+    def _read_interleaved_chunks(self, file, data_objects, num_chunks):
         """Read interleaved data where all channels have a sized data type and the same length
         """
         total_data_width = sum(o.data_type.size for o in data_objects)
@@ -415,25 +411,6 @@ class InterleavedDataReader(BaseDataReader):
             data_pos += obj.data_type.size
 
         return RawDataChunk.channel_data(channel_data)
-
-    def _read_interleaved(self, file, data_objects, num_chunks):
-        """Read interleaved data that doesn't have a numpy type"""
-
-        log.debug("Reading interleaved data point by point")
-        object_data = {}
-        points_added = {}
-        for obj in data_objects:
-            object_data[obj.path] = obj.new_segment_data()
-            points_added[obj.path] = 0
-        while any([points_added[o.path] < (o.number_values * num_chunks)
-                   for o in data_objects]):
-            for obj in data_objects:
-                if points_added[obj.path] < obj.number_values:
-                    object_data[obj.path][points_added[obj.path]] = (
-                        obj.read_value(file, self.endianness))
-                    points_added[obj.path] += 1
-
-        return RawDataChunk.channel_data(object_data)
 
 
 class ContiguousDataReader(BaseDataReader):
@@ -515,14 +492,6 @@ class TdmsSegmentObject(BaseSegmentObject):
             self.data_size = types.Uint64.read(f, endianness)
         else:
             self.data_size = self.number_values * self.data_type.size
-
-    def read_value(self, file, endianness):
-        """Read a single value from the given file"""
-
-        if self.data_type.nptype is not None:
-            dtype = self.data_type.nptype.newbyteorder(endianness)
-            return fromfile(file, dtype=dtype, count=1)[0]
-        return self.data_type.read(file, endianness)
 
     def read_values(self, file, number_values, endianness):
         """Read all values for this object from a contiguous segment"""
