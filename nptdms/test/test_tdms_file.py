@@ -863,3 +863,55 @@ def test_multiple_close_after_open():
         tdms_data.close()
     finally:
         os.remove(temp_file.name)
+
+
+def test_interleaved_segment_different_length():
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 3),
+            channel_metadata("/'group'/'channel2'", 3, 2),
+        ),
+        "01 00 00 00" "02 00 00 00"
+        "01 00 00 00" "02 00 00 00"
+        "01 00 00 00"
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        _ = test_file.load()
+    assert str(exc_info.value) == "Cannot read interleaved data with different chunk sizes"
+
+
+def test_interleaved_segment_unsized():
+    test_file = GeneratedFile()
+    string_channel_metadata = (
+        # Length of the object path
+        "18 00 00 00" +
+        string_hexlify("/'group'/'StringChannel'") +
+        # Length of index information
+        "1C 00 00 00"
+        # Raw data data type
+        "20 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of bytes in data
+        "19 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 2),
+            string_channel_metadata,
+        ),
+        "01 00 00 00" "02 00 00 00"
+        "01 00 00 00" "02 00 00 00"
+    )
+
+    with pytest.raises(TypeError):
+        _ = test_file.load()
