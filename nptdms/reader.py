@@ -160,7 +160,9 @@ class TdmsReader(object):
             chunk_offset = 0
             num_chunks = segment.num_chunks
             segment_obj = segment.get_segment_object(channel_path)
-            chunk_size = 0 if segment_obj is None else segment_obj.number_values
+            chunk_size = 0 if (segment_obj is None or not segment_obj.has_data) else segment_obj.number_values
+            if chunk_size == 0:
+                continue
             segment_start_index = (
                 0 if segment_index == first_segment else segment_offsets[segment_index - first_segment - 1])
             remaining_values_to_skip = 0
