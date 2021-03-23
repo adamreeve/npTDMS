@@ -559,6 +559,72 @@ def test_multiple_raw_data_buffers_with_different_lengths():
     np.testing.assert_array_equal(data_6, [6] * 2)
 
 
+def test_incomplete_segment_with_different_length_buffers():
+    """ DAQmx with raw data buffers with different lengths
+    """
+
+    scaler_1 = daqmx_scaler_metadata(0xFFFFFFFF, 2, 0, 0)
+    scaler_2 = daqmx_scaler_metadata(0xFFFFFFFF, 2, 2, 0)
+    scaler_3 = daqmx_scaler_metadata(0xFFFFFFFF, 2, 0, 1)
+    scaler_4 = daqmx_scaler_metadata(0xFFFFFFFF, 2, 2, 1)
+    scaler_5 = daqmx_scaler_metadata(0xFFFFFFFF, 2, 0, 2)
+    scaler_6 = daqmx_scaler_metadata(0xFFFFFFFF, 2, 2, 2)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", 4, [4, 4, 4], [scaler_1], data_type=types.Uint16.enum_value),
+        daqmx_channel_metadata("Channel2", 4, [4, 4, 4], [scaler_2], data_type=types.Uint16.enum_value),
+        daqmx_channel_metadata("Channel3", 2, [4, 4, 4], [scaler_3], data_type=types.Uint16.enum_value),
+        daqmx_channel_metadata("Channel4", 2, [4, 4, 4], [scaler_4], data_type=types.Uint16.enum_value),
+        daqmx_channel_metadata("Channel5", 1, [4, 4, 4], [scaler_5], data_type=types.Uint16.enum_value),
+        daqmx_channel_metadata("Channel6", 1, [4, 4, 4], [scaler_6], data_type=types.Uint16.enum_value))
+    data = (
+        # Chunk 1
+        # Buffer 0
+        "01 00" "02 00"
+        "01 00" "02 00"
+        "01 00" "02 00"
+        "01 00" "02 00"
+        # Buffer 1
+        "03 00" "04 00"
+        "03 00" "04 00"
+        # Buffer 2
+        "05 00" "06 00"
+        # Chunk 2
+        # Buffer 0
+        "01 00" "02 00"
+        "01 00" "02 00"
+        "01 00" "02 00"
+        "01 00" "02 00"
+        # Buffer 1
+        "03 00" "04 00"
+        "03 00" "04 00"
+        # Buffer 2
+        "05 00" "06 00"
+        # Incomplete third chunk
+        # Buffer 0
+        "01 00" "02 00"
+        "01 00" "02 00"
+        "01 00" "02 00"
+        "01 00" "02 00"
+        # Buffer 1
+        "03 00" "04 00"
+    )
+
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc_non_daqmx(), metadata, data, incomplete=True)
+    tdms_data = test_file.load()
+
+    group = tdms_data["Group"]
+
+    np.testing.assert_array_equal(group["Channel1"][:], [1] * 12)
+    np.testing.assert_array_equal(group["Channel2"][:], [2] * 12)
+    np.testing.assert_array_equal(group["Channel3"][:], [3] * 5)
+    np.testing.assert_array_equal(group["Channel4"][:], [4] * 5)
+    np.testing.assert_array_equal(group["Channel5"][:], [5] * 2)
+    np.testing.assert_array_equal(group["Channel6"][:], [6] * 2)
+
+
 def test_multiple_raw_data_buffers_with_scalers_split_across_buffers():
     """ DAQmx with scalers split across different raw data buffers
     """
