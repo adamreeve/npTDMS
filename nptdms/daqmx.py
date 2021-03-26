@@ -74,6 +74,31 @@ def get_daqmx_chunk_size(ordered_objects):
     return sum((num_values * width) for (num_values, width) in get_buffer_dimensions(ordered_objects))
 
 
+def get_daqmx_final_chunk_lengths(ordered_objects, chunk_size_bytes):
+    """Compute object data lengths for a final chunk that has less data than expected
+    """
+    object_lengths = {}
+    buffer_dims = get_buffer_dimensions(ordered_objects)
+    updated_buffer_lengths = [0] * len(buffer_dims)
+    bytes_remaining = chunk_size_bytes
+    for i, (orig_length, width) in enumerate(buffer_dims):
+        buffer_total_bytes = orig_length * width
+        if bytes_remaining > buffer_total_bytes:
+            updated_buffer_lengths[i] = orig_length
+            bytes_remaining -= buffer_total_bytes
+        else:
+            updated_buffer_lengths[i] = bytes_remaining // width
+            break
+    for obj in ordered_objects:
+        if not obj.has_data:
+            continue
+        buffer_indices = list(set(s.raw_buffer_index for s in obj.daqmx_metadata.scalers))
+        if len(buffer_indices) == 1:
+            object_lengths[obj.path] = updated_buffer_lengths[buffer_indices[0]]
+        # Else scalers are in different buffers, not sure this is even valid
+    return object_lengths
+
+
 def get_buffer_dimensions(ordered_objects):
     """ Returns DAQmx buffer dimensions as list of tuples of (number of values, width in bytes)
     """

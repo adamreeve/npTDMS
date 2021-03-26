@@ -19,7 +19,8 @@ from nptdms.daqmx import (
     DIGITAL_LINE_SCALER,
     DaqmxSegmentObject,
     DaqmxDataReader,
-    get_daqmx_chunk_size)
+    get_daqmx_chunk_size,
+    get_daqmx_final_chunk_lengths)
 
 
 _struct_unpack = struct.unpack
@@ -301,6 +302,11 @@ class TdmsSegment(object):
                 data_size, chunk_remainder, segment_incomplete)
 
     def _compute_final_chunk_lengths(self, chunk_size, chunk_remainder, segment_incomplete):
+        """Compute object data lengths for a final chunk that has less data than expected
+        """
+        if self._have_daqmx_objects():
+            return get_daqmx_final_chunk_lengths(self.ordered_objects, chunk_remainder)
+
         obj_chunk_sizes = {}
         for obj in self.ordered_objects:
             if not obj.has_data:
