@@ -19,7 +19,8 @@ from nptdms.daqmx import (
     DIGITAL_LINE_SCALER,
     DaqmxSegmentObject,
     DaqmxDataReader,
-    get_daqmx_chunk_size)
+    get_daqmx_chunk_size,
+    get_daqmx_final_chunk_lengths)
 
 
 _struct_unpack = struct.unpack
@@ -41,7 +42,7 @@ class TdmsSegment(object):
         'toc_mask',
         'next_segment_pos',
         'data_position',
-        'final_chunk_proportion',
+        'final_chunk_lengths_override',
         'object_index',
     ]
 
@@ -51,14 +52,14 @@ class TdmsSegment(object):
         self.next_segment_pos = next_segment_pos
         self.data_position = data_position
         self.num_chunks = 0
-        self.final_chunk_proportion = 1.0
+        self.final_chunk_lengths_override = None
         self.ordered_objects = None
         self.object_index = None
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
 
-    def read_segment_objects(self, file, previous_segment_objects, index_cache, previous_segment):
+    def read_segment_objects(self, file, previous_segment_objects, index_cache, previous_segment, segment_incomplete):
         """Read segment metadata section and update object information
 
         :param file: Open TDMS file
@@ -66,10 +67,11 @@ class TdmsSegment(object):
             recently read segment object for a TDMS object.
         :param index_cache: A SegmentIndexCache instance, or None if segment indexes are not required.
         :param previous_segment: Previous segment in the file.
+        :param segment_incomplete: Whether the next segment offset was not set.
         """
 
         if not self.toc_mask & toc_properties['kTocMetaData']:
-            self._reuse_previous_segment_metadata(previous_segment)
+            self._reuse_previous_segment_metadata(previous_segment, segment_incomplete)
             return
 
         endianness = '>' if (self.toc_mask & toc_properties['kTocBigEndian']) else '<'
@@ -132,7 +134,7 @@ class TdmsSegment(object):
 
         if index_cache is not None:
             self.object_index = index_cache.get_index(self.ordered_objects)
-        self._calculate_chunks()
+        self._calculate_chunks(segment_incomplete)
         return properties
 
     def get_segment_object(self, object_path):
@@ -192,11 +194,11 @@ class TdmsSegment(object):
             segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
         self.ordered_objects.append(segment_obj)
 
-    def _reuse_previous_segment_metadata(self, previous_segment):
+    def _reuse_previous_segment_metadata(self, previous_segment, segment_incomplete):
         try:
             self.ordered_objects = previous_segment.ordered_objects
             self.object_index = previous_segment.object_index
-            self._calculate_chunks()
+            self._calculate_chunks(segment_incomplete)
         except AttributeError:
             raise ValueError(
                 "kTocMetaData is not set for segment but "
@@ -267,7 +269,7 @@ class TdmsSegment(object):
         for chunk in self._read_channel_data_chunks(f, data_objects, channel_path, chunk_offset, stop_chunk):
             yield chunk
 
-    def _calculate_chunks(self):
+    def _calculate_chunks(self, segment_incomplete):
         """
         Work out the number of chunks the data is in, for cases
         where the meta data doesn't change at all so there is no
@@ -296,8 +298,41 @@ class TdmsSegment(object):
                 "chunk size %d. Will attempt to read last chunk",
                 total_data_size, data_size)
             self.num_chunks = 1 + int(total_data_size // data_size)
-            self.final_chunk_proportion = (
-                    float(chunk_remainder) / float(data_size))
+            self.final_chunk_lengths_override = self._compute_final_chunk_lengths(
+                data_size, chunk_remainder, segment_incomplete)
+
+    def _compute_final_chunk_lengths(self, chunk_size, chunk_remainder, segment_incomplete):
+        """Compute object data lengths for a final chunk that has less data than expected
+        """
+        if self._have_daqmx_objects():
+            return get_daqmx_final_chunk_lengths(self.ordered_objects, chunk_remainder)
+
+        obj_chunk_sizes = {}
+
+        if any(o for o in self.ordered_objects if o.has_data and o.data_type.size is None):
+            # Don't try to handle truncated segments with unsized data
+            return obj_chunk_sizes
+
+        interleaved_data = self.toc_mask & toc_properties['kTocInterleavedData']
+        if interleaved_data or not segment_incomplete:
+            for obj in self.ordered_objects:
+                if not obj.has_data:
+                    continue
+                obj_chunk_sizes[obj.path] = (obj.number_values * chunk_remainder) // chunk_size
+        else:
+            # Have contiguous truncated data
+            for obj in self.ordered_objects:
+                if not obj.has_data:
+                    continue
+                data_size = obj.number_values * obj.data_type.size
+                if chunk_remainder > data_size:
+                    obj_chunk_sizes[obj.path] = obj.number_values
+                    chunk_remainder -= data_size
+                else:
+                    obj_chunk_sizes[obj.path] = chunk_remainder // obj.data_type.size
+                    break
+
+        return obj_chunk_sizes
 
     def _new_segment_object(self, object_path, raw_data_index_header):
         """ Create a new segment object for a segment
@@ -335,11 +370,11 @@ class TdmsSegment(object):
     def _get_data_reader(self):
         endianness = '>' if (self.toc_mask & toc_properties['kTocBigEndian']) else '<'
         if self._have_daqmx_objects():
-            return DaqmxDataReader(self.num_chunks, self.final_chunk_proportion, endianness)
+            return DaqmxDataReader(self.num_chunks, self.final_chunk_lengths_override, endianness)
         elif self.toc_mask & toc_properties['kTocInterleavedData']:
-            return InterleavedDataReader(self.num_chunks, self.final_chunk_proportion, endianness)
+            return InterleavedDataReader(self.num_chunks, self.final_chunk_lengths_override, endianness)
         else:
-            return ContiguousDataReader(self.num_chunks, self.final_chunk_proportion, endianness)
+            return ContiguousDataReader(self.num_chunks, self.final_chunk_lengths_override, endianness)
 
     def _have_daqmx_objects(self):
         data_obj_count = 0
@@ -446,9 +481,8 @@ class ContiguousDataReader(BaseDataReader):
         return channel_data
 
     def _get_channel_number_values(self, obj, chunk_index):
-        if (chunk_index == (self.num_chunks - 1) and
-                self.final_chunk_proportion != 1.0):
-            return int(obj.number_values * self.final_chunk_proportion)
+        if chunk_index == (self.num_chunks - 1) and self.final_chunk_lengths_override is not None:
+            return self.final_chunk_lengths_override.get(obj.path, 0)
         else:
             return obj.number_values
 
