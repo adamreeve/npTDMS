@@ -11,7 +11,8 @@ from nptdms import types
 from nptdms.log import log_manager
 from nptdms.test.scenarios import timestamp_hexlify
 from nptdms.test.util import (
-    GeneratedFile, hexlify_value, string_hexlify, segment_objects_metadata, hex_properties)
+    GeneratedFile, hexlify_value, string_hexlify, segment_objects_metadata, hex_properties,
+    root_metadata, group_metadata)
 
 
 def test_single_channel_i16():
@@ -1008,31 +1009,6 @@ def segment_toc():
 def segment_toc_non_daqmx():
     return (
         "kTocMetaData", "kTocRawData", "kTocNewObjList")
-
-
-def root_metadata():
-    return (
-        # Length of the object path
-        "01 00 00 00"
-        # Object path (/)
-        "2F"
-        # Raw data index
-        "FF FF FF FF"
-        # Num properties
-        "00 00 00 00")
-
-
-def group_metadata():
-    return (
-        # Length of the object path
-        "08 00 00 00"
-        # Object path (/'Group')
-        "2F 27 47 72"
-        "6F 75 70 27"
-        # Raw data index
-        "FF FF FF FF"
-        # Num properties
-        "00 00 00 00")
 
 
 def daqmx_scaler_metadata(scale_id, type_id, byte_offset, raw_buffer_index=0):

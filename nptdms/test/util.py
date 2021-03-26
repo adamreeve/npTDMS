@@ -36,6 +36,31 @@ def segment_objects_metadata(*args):
     return num_objects_hex + "".join(args)
 
 
+def root_metadata():
+    return (
+        # Length of the object path
+        "01 00 00 00"
+        # Object path (/)
+        "2F"
+        # Raw data index
+        "FF FF FF FF"
+        # Num properties
+        "00 00 00 00")
+
+
+def group_metadata():
+    return (
+        # Length of the object path
+        "08 00 00 00"
+        # Object path (/'Group')
+        "2F 27 47 72"
+        "6F 75 70 27"
+        # Raw data index
+        "FF FF FF FF"
+        # Num properties
+        "00 00 00 00")
+
+
 def channel_metadata(channel_name, data_type, num_values, properties=None):
     return (
         # Length of the object path

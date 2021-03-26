@@ -691,6 +691,41 @@ def test_string_data():
         assert expected == read
 
 
+def test_incomplete_segment_with_string_data():
+    """ Test incomplete last segment, eg. if LabView crashed, with string data
+    """
+    test_file = GeneratedFile()
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+    metadata = (
+        # Number of objects
+        "01 00 00 00"
+        # Length of the object path
+        "18 00 00 00")
+    metadata += string_hexlify("/'Group'/'StringChannel'")
+    metadata += (
+        # Length of index information
+        "1C 00 00 00"
+        # Raw data data type
+        "20 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of bytes in data
+        "19 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+    data = "00 00 00 00"
+    test_file.add_segment(toc, metadata, data, incomplete=True)
+
+    tdms_data = test_file.load()
+
+    channel = tdms_data["Group"]["StringChannel"]
+    assert len(channel) == 0
+
+
 def test_slash_and_space_in_name():
     """Test name like '01/02/03 something'"""
 

@@ -10,7 +10,9 @@ from nptdms.test.util import (
     segment_objects_metadata,
     channel_metadata,
     channel_metadata_with_no_data,
-    channel_metadata_with_repeated_structure)
+    channel_metadata_with_repeated_structure,
+    root_metadata,
+    group_metadata)
 
 
 TDS_TYPE_INT8 = 1
@@ -538,24 +540,30 @@ def incomplete_last_segment():
     test_file.add_segment(
         ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
         segment_objects_metadata(
+            root_metadata(),
+            group_metadata(),
             channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
             channel_metadata("/'group'/'channel2'", TDS_TYPE_INT32, 2),
+            channel_metadata("/'group'/'channel3'", TDS_TYPE_INT32, 2),
         ),
         "01 00 00 00" "02 00 00 00"
         "03 00 00 00" "04 00 00 00"
         "05 00 00 00" "06 00 00 00"
         "07 00 00 00" "08 00 00 00"
+        "09 00 00 00" "0A 00 00 00"
+        "0B 00 00 00" "0C 00 00 00"
     )
     test_file.add_segment(
         ("kTocRawData", ),
         "",
-        "09 00 00 00" "0A 00 00 00"
-        "0B 00 00 00" "0C 00 00 00",
+        "01 00 00 00" "02 00 00 00"
+        "03 00 00 00",
         incomplete=True
     )
     expected_data = {
-        ('group', 'channel1'): np.array([1, 2, 5, 6, 9, 10], dtype=np.int32),
-        ('group', 'channel2'): np.array([3, 4, 7, 8, 11, 12], dtype=np.int32),
+        ('group', 'channel1'): np.array([1, 2, 7, 8, 1, 2], dtype=np.int32),
+        ('group', 'channel2'): np.array([3, 4, 9, 10, 3], dtype=np.int32),
+        ('group', 'channel3'): np.array([5, 6, 11, 12], dtype=np.int32),
     }
     return test_file, expected_data
 
@@ -568,6 +576,8 @@ def incomplete_last_row_of_interleaved_data():
     test_file.add_segment(
         ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData"),
         segment_objects_metadata(
+            root_metadata(),
+            group_metadata(),
             channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2),
             channel_metadata("/'group'/'channel2'", TDS_TYPE_INT32, 2),
         ),

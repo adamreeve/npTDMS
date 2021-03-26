@@ -308,10 +308,30 @@ class TdmsSegment(object):
             return get_daqmx_final_chunk_lengths(self.ordered_objects, chunk_remainder)
 
         obj_chunk_sizes = {}
-        for obj in self.ordered_objects:
-            if not obj.has_data:
-                continue
-            obj_chunk_sizes[obj.path] = (obj.number_values * chunk_remainder) // chunk_size
+
+        if any(o for o in self.ordered_objects if o.has_data and o.data_type.size is None):
+            # Don't try to handle truncated segments with unsized data
+            return obj_chunk_sizes
+
+        interleaved_data = self.toc_mask & toc_properties['kTocInterleavedData']
+        if interleaved_data or not segment_incomplete:
+            for obj in self.ordered_objects:
+                if not obj.has_data:
+                    continue
+                obj_chunk_sizes[obj.path] = (obj.number_values * chunk_remainder) // chunk_size
+        else:
+            # Have contiguous truncated data
+            for obj in self.ordered_objects:
+                if not obj.has_data:
+                    continue
+                data_size = obj.number_values * obj.data_type.size
+                if chunk_remainder > data_size:
+                    obj_chunk_sizes[obj.path] = obj.number_values
+                    chunk_remainder -= data_size
+                else:
+                    obj_chunk_sizes[obj.path] = chunk_remainder // obj.data_type.size
+                    break
+
         return obj_chunk_sizes
 
     def _new_segment_object(self, object_path, raw_data_index_header):
