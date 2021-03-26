@@ -39,9 +39,9 @@ class BaseDataReader(object):
     """ Abstract base class for reading data in a segment
     """
 
-    def __init__(self, num_chunks, final_chunk_proportion, endianness):
+    def __init__(self, num_chunks, final_chunk_lengths_override, endianness):
         self.num_chunks = num_chunks
-        self.final_chunk_proportion = final_chunk_proportion
+        self.final_chunk_lengths_override = final_chunk_lengths_override
         self.endianness = endianness
 
     def read_data_chunks(self, file, data_objects, num_chunks):

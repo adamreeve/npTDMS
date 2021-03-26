@@ -230,14 +230,14 @@ class TdmsReader(object):
 
     def _read_segment_metadata(
             self, file, segment_position, index_cache, previous_segment, is_index_file):
-        (position, toc_mask, data_position, next_segment_pos) = self._read_lead_in(
+        (position, toc_mask, data_position, next_segment_pos, segment_incomplete) = self._read_lead_in(
             file, segment_position, is_index_file)
 
         segment = TdmsSegment(
             position, toc_mask, next_segment_pos, data_position)
 
         properties = segment.read_segment_objects(
-            file, self._prev_segment_objects, index_cache, previous_segment)
+            file, self._prev_segment_objects, index_cache, previous_segment, segment_incomplete)
         return segment, properties
 
     def _read_lead_in(self, file, segment_position, is_index_file=False):
@@ -271,7 +271,8 @@ class TdmsReader(object):
         # Calculate data and next segment position
         lead_size = 7 * 4
         data_position = segment_position + lead_size + raw_data_offset
-        if next_segment_offset == 0xFFFFFFFFFFFFFFFF:
+        segment_incomplete = next_segment_offset == 0xFFFFFFFFFFFFFFFF
+        if segment_incomplete:
             # Segment size is unknown. This can happen if LabVIEW crashes.
             # Try to read until the end of the file.
             log.warning(
@@ -284,7 +285,7 @@ class TdmsReader(object):
             next_segment_pos = (
                     segment_position + next_segment_offset + lead_size)
 
-        return segment_position, toc_mask, data_position, next_segment_pos
+        return segment_position, toc_mask, data_position, next_segment_pos, segment_incomplete
 
     def _verify_segment_start(self, segment):
         """ When reading data for a segment, check for the TDSm tag at the start of the segment in an attempt
@@ -386,13 +387,11 @@ def _number_of_segment_values(segment_object, segment):
     """
     if not segment_object.has_data:
         return 0
-    num_chunks = segment.num_chunks
-    final_chunk_proportion = segment.final_chunk_proportion
-    if final_chunk_proportion == 1.0:
-        return segment_object.number_values * num_chunks
+    if segment.final_chunk_lengths_override is None:
+        return segment_object.number_values * segment.num_chunks
     else:
-        return (segment_object.number_values * (num_chunks - 1) +
-                int(segment_object.number_values * final_chunk_proportion))
+        return (segment_object.number_values * (segment.num_chunks - 1) +
+                segment.final_chunk_lengths_override.get(segment_object.path, 0))
 
 
 def _update_object_data_type(path, obj, segment_object):
