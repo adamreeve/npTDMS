@@ -7,7 +7,7 @@ import sys
 from shutil import copyfile
 import tempfile
 import weakref
-from hypothesis import (assume, given, example, settings, strategies)
+from hypothesis import (assume, given, example, settings, strategies, HealthCheck)
 import numpy as np
 import pytest
 from nptdms import TdmsFile
@@ -153,6 +153,7 @@ def test_reading_subset_of_data(offset, length):
             np.testing.assert_equal(channel_subset, expected_data)
 
 
+@settings(suppress_health_check=[HealthCheck.filter_too_much])
 @pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
 @given(offset=strategies.integers(0, 10), length=strategies.integers(0, 10))
 def test_reading_subset_of_data_for_scenario(test_file, expected_data, offset, length):
