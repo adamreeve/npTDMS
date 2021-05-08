@@ -692,6 +692,53 @@ def test_string_data():
         assert expected == read
 
 
+def test_string_data_in_interleaved_segment():
+    """ Test reading a file with string data where a segment
+        has the interleaved data flag set but only one channel.
+        (See issue #239)
+    """
+
+    strings = ["abcdefg", "qwertyuiop"]
+
+    test_file = GeneratedFile()
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData")
+    metadata = (
+        # Number of objects
+        "01 00 00 00"
+        # Length of the object path
+        "18 00 00 00")
+    metadata += string_hexlify("/'Group'/'StringChannel'")
+    metadata += (
+        # Length of index information
+        "1C 00 00 00"
+        # Raw data data type
+        "20 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of bytes in data
+        "19 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+    data = (
+        "07 00 00 00"  # index to after first string
+        "11 00 00 00"  # index to after second string
+    )
+    for string in strings:
+        data += string_hexlify(string)
+    test_file.add_segment(toc, metadata, data)
+    tdms_data = test_file.load()
+
+    channel = tdms_data["Group"]["StringChannel"]
+    assert len(channel.data) == len(strings)
+    assert channel.data.dtype == channel.dtype
+    for expected, read in zip(strings, channel.data):
+        assert expected == read
+
+
 def test_incomplete_segment_with_string_data():
     """ Test incomplete last segment, eg. if LabView crashed, with string data
     """

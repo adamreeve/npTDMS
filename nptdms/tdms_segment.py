@@ -371,7 +371,7 @@ class TdmsSegment(object):
         endianness = '>' if (self.toc_mask & toc_properties['kTocBigEndian']) else '<'
         if self._have_daqmx_objects():
             return DaqmxDataReader(self.num_chunks, self.final_chunk_lengths_override, endianness)
-        elif self.toc_mask & toc_properties['kTocInterleavedData']:
+        elif (self.toc_mask & toc_properties['kTocInterleavedData']) and not self._have_single_unsized_channel():
             return InterleavedDataReader(self.num_chunks, self.final_chunk_lengths_override, endianness)
         else:
             return ContiguousDataReader(self.num_chunks, self.final_chunk_lengths_override, endianness)
@@ -391,6 +391,21 @@ class TdmsSegment(object):
         if daqmx_count > 0:
             raise Exception("Cannot read mixed DAQmx and non-DAQmx data")
         return False
+
+    def _have_single_unsized_channel(self):
+        """ Some files may have segments with an interleaved data flag set but contain a single
+            channel of string data which must be read as a contiguous data chunk.
+        """
+        data_obj_count = 0
+        unsized_data = False
+        for o in self.ordered_objects:
+            if o.has_data:
+                data_obj_count += 1
+                if data_obj_count > 1:
+                    return False
+                if o.data_type.size is None:
+                    unsized_data = True
+        return unsized_data and data_obj_count == 1
 
 
 class InterleavedDataReader(BaseDataReader):
