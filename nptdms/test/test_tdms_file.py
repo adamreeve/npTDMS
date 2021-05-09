@@ -692,6 +692,43 @@ def test_string_data():
         assert expected == read
 
 
+def test_string_data_in_interleaved_segment():
+    """ Test reading a file with string data where a segment
+        has the interleaved data flag set but only one channel.
+        (See issue #239)
+    """
+
+    strings = ["abcdefg", "qwertyuiop"]
+
+    test_file = GeneratedFile()
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData")
+    metadata = (
+        "01 00 00 00"  # Number of objects
+        "18 00 00 00")  # Length of the object path
+    metadata += string_hexlify("/'Group'/'StringChannel'")
+    metadata += (
+        "1C 00 00 00"  # Length of index information
+        "20 00 00 00"  # Raw data data type
+        "01 00 00 00"  # Dimension
+        "02 00 00 00 00 00 00 00"  # Number of raw data values
+        "19 00 00 00 00 00 00 00"  # Number of bytes in data
+        "00 00 00 00")  # Number of properties (0)
+    data = (
+        "07 00 00 00"  # index to after first string
+        "11 00 00 00"  # index to after second string
+    )
+    for string in strings:
+        data += string_hexlify(string)
+    test_file.add_segment(toc, metadata, data)
+    tdms_data = test_file.load()
+
+    channel = tdms_data["Group"]["StringChannel"]
+    assert len(channel.data) == len(strings)
+    assert channel.data.dtype == channel.dtype
+    for expected, read in zip(strings, channel.data):
+        assert expected == read
+
+
 def test_incomplete_segment_with_string_data():
     """ Test incomplete last segment, eg. if LabView crashed, with string data
     """
@@ -919,26 +956,42 @@ def test_interleaved_segment_different_length():
     assert str(exc_info.value) == "Cannot read interleaved data with different chunk sizes"
 
 
-def test_interleaved_segment_unsized():
+def test_multiple_string_channels_with_interleaved_flag():
+    """ Test reading a segment with the interleaved data flag set but multiple string channels throws an exception
+    """
+
+    test_file = GeneratedFile()
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData")
+    metadata = "02 00 00 00"  # Number of objects
+    for channel in ["Channel1", "Channel2"]:
+        channel_path = "/'Group'/'%s'" % channel
+        metadata += hexlify_value('<L', len(channel_path))
+        metadata += string_hexlify(channel_path)
+        metadata += (
+            "1C 00 00 00"  # Length of index information
+            "20 00 00 00"  # Raw data data type
+            "01 00 00 00"  # Dimension
+            "02 00 00 00 00 00 00 00"  # Number of raw data values
+            "02 00 00 00 00 00 00 00"  # Number of bytes in data
+            "00 00 00 00")  # Number of properties
+    data = "01 00 00 00 02 00 00 00 03 00 00 00 04 00 00 00"
+    test_file.add_segment(toc, metadata, data)
+    with pytest.raises(ValueError) as exc_info:
+        _ = test_file.load()
+    assert str(exc_info.value) == "Cannot read interleaved segment containing channels with unsized types"
+
+
+def test_interleaved_segment_with_sized_and_unsized_types():
     test_file = GeneratedFile()
     string_channel_metadata = (
-        # Length of the object path
-        "18 00 00 00" +
+        "18 00 00 00" +  # Length of the object path
         string_hexlify("/'group'/'StringChannel'") +
-        # Length of index information
-        "1C 00 00 00"
-        # Raw data data type
-        "20 00 00 00"
-        # Dimension
-        "01 00 00 00"
-        # Number of raw data values
-        "02 00 00 00"
-        "00 00 00 00"
-        # Number of bytes in data
-        "19 00 00 00"
-        "00 00 00 00"
-        # Number of properties (0)
-        "00 00 00 00")
+        "1C 00 00 00"  # Length of index information
+        "20 00 00 00"  # Raw data data type
+        "01 00 00 00"  # Dimension
+        "02 00 00 00 00 00 00 00"  # Number of raw data values
+        "02 00 00 00 00 00 00 00"  # Number of bytes in data
+        "00 00 00 00")  # Number of properties (0)
     test_file.add_segment(
         ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData"),
         segment_objects_metadata(
@@ -949,5 +1002,6 @@ def test_interleaved_segment_unsized():
         "01 00 00 00" "02 00 00 00"
     )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError) as exc_info:
         _ = test_file.load()
+    assert str(exc_info.value) == "Cannot read interleaved segment containing channels with unsized types"
