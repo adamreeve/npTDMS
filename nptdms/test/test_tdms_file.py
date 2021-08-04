@@ -1005,3 +1005,28 @@ def test_interleaved_segment_with_sized_and_unsized_types():
     with pytest.raises(ValueError) as exc_info:
         _ = test_file.load()
     assert str(exc_info.value) == "Cannot read interleaved segment containing channels with unsized types"
+
+
+def test_no_new_obj_list_for_first_segment():
+    """ Test when kTocNewObjList is not set in the first segment
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 4),
+        ),
+        "01 00 00 00" "02 00 00 00" "03 00 00 00" "04 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 4),
+        ),
+        "05 00 00 00" "06 00 00 00" "07 00 00 00" "08 00 00 00"
+    )
+
+    with test_file.get_tempfile() as temp_file:
+        tdms_data = TdmsFile.read(temp_file.file)
+    channel_data = tdms_data['group']['channel1']
+    compare_arrays(channel_data[:], [1, 2, 3, 4, 5, 6, 7, 8])

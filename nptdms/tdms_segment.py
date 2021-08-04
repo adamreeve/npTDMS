@@ -77,7 +77,7 @@ class TdmsSegment(object):
         endianness = '>' if (self.toc_mask & toc_properties['kTocBigEndian']) else '<'
 
         new_obj_list = self.toc_mask & toc_properties['kTocNewObjList']
-        if new_obj_list:
+        if new_obj_list or not previous_segment:
             self.ordered_objects = []
             existing_objects = None
         else:
