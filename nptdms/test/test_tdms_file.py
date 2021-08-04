@@ -1008,7 +1008,7 @@ def test_interleaved_segment_with_sized_and_unsized_types():
 
 
 def test_no_new_obj_list_for_first_segment():
-    """ Test when kTocNewObjList is not set in the first segment
+    """ Test when the first segment does not have kTocNewObjList set
     """
     test_file = GeneratedFile()
     test_file.add_segment(
