@@ -1,5 +1,7 @@
 [report]
-omit = nptdms/test/*
+omit =
+    nptdms/test/*
+    .tox/*
 exclude_lines =
     # Ignore repr methods only used for debugging
     def __repr__

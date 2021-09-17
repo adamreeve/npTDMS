@@ -1,0 +1,79 @@
+name: CI/CD
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    name: Lint
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Install tox
+        run: pip install tox
+      - name: Run pycodestyle
+        run: tox
+        env:
+          TOXENV: pycodestyle
+
+  test:
+    name: Test Python ${{ matrix.python }} on ${{ matrix.os }}
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.id != github.event.pull_request.base.repo.id
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ['2.7', '3.5', '3.6', '3.7', '3.8', '3.9']
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install tox
+        run: pip install tox
+      - name: Compute TOXENV
+        id: toxenv
+        run: echo "::set-output name=toxenv::py$(tr -d . <<< ${{ matrix.python }})"
+        shell: bash
+      - name: Run tests
+        run: tox
+        env:
+          TOXENV: ${{ steps.toxenv.outputs.toxenv }}
+      - name: Upload coverage to Codecov
+        if: ${{ !(github.event_name == 'push' && github.event.repository.fork) }}
+        uses: codecov/codecov-action@v2
+        with:
+          env_vars: OS,PYTHON
+        env:
+          OS: ${{ matrix.os }}
+          PYTHON: ${{ matrix.python }}
+
+  publish:
+    name: Publish
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/') && !github.event.repository.fork
+    needs: [lint, test]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: '3.9'
+      - name: Create package
+        run: python setup.py sdist
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
