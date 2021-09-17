@@ -4,9 +4,9 @@ npTDMS
 .. image:: https://img.shields.io/pypi/v/npTDMS.svg
     :alt: PyPI Version
     :target: https://pypi.org/project/npTDMS/
-.. image:: https://travis-ci.com/adamreeve/npTDMS.svg?branch=master
+.. image:: https://app.travis-ci.com/adamreeve/npTDMS.svg?branch=master
     :alt: Build status
-    :target: https://travis-ci.com/adamreeve/npTDMS
+    :target: https://app.travis-ci.com/github/adamreeve/npTDMS/branches
 .. image:: https://readthedocs.org/projects/nptdms/badge/?version=latest
     :target: https://nptdms.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
