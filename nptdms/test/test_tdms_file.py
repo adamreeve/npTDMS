@@ -25,10 +25,10 @@ from nptdms.test.util import (
 from nptdms.test import scenarios
 
 
-if sys.platform == "darwin":
-    # MacOS tests often take longer to run initially on GitHub actions
-    settings.register_profile('macos', deadline=5000)
-    settings.load_profile('macos')
+# When running tests on GitHub actions, the first iteration can be quite
+# slow and cause failures, so disable deadlines:
+settings.register_profile('ci', deadline=None)
+settings.load_profile('ci')
 
 
 @pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
