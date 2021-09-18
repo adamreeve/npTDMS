@@ -318,8 +318,7 @@ def to_file(file, array):
     try:
         array.tofile(file)
     except (TypeError, IOError, UnsupportedOperation):
-        # tostring actually returns bytes
-        file.write(array.tostring())
+        file.write(array.tobytes())
 
 
 def write_values(file, array):
