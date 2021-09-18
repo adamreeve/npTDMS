@@ -3,6 +3,7 @@
 /*.egg-info
 /coverage
 /.coverage
+coverage.xml
 /MANIFEST
 *.pyc
 *.swp
