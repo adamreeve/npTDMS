@@ -4,9 +4,9 @@ npTDMS
 .. image:: https://img.shields.io/pypi/v/npTDMS.svg
     :alt: PyPI Version
     :target: https://pypi.org/project/npTDMS/
-.. image:: https://github.com/adamreeve/npTDMS/actions/workflows/ci.yml/badge.svg?branch=master&event=push
+.. image:: https://github.com/adamreeve/npTDMS/actions/workflows/ci-cd.yml/badge.svg?branch=master&event=push
     :alt: Build status
-    :target: https://github.com/adamreeve/npTDMS/actions/workflows/ci.yml?query=event%3Apush+branch%3Amaster
+    :target: https://github.com/adamreeve/npTDMS/actions/workflows/ci-cd.yml?query=event%3Apush+branch%3Amaster
 .. image:: https://readthedocs.org/projects/nptdms/badge/?version=latest
     :target: https://nptdms.readthedocs.io/en/latest/?badge=latest
     :alt: Documentation Status
