@@ -25,6 +25,12 @@ from nptdms.test.util import (
 from nptdms.test import scenarios
 
 
+if sys.platform == "darwin":
+    # MacOS tests often take longer to run initially on GitHub actions
+    settings.register_profile('macos', deadline=5000)
+    settings.load_profile('macos')
+
+
 @pytest.mark.parametrize("test_file,expected_data", scenarios.get_scenarios())
 def test_read_channel_data(test_file, expected_data):
     """Test reading data"""
