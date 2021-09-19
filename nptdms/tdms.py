@@ -637,6 +637,8 @@ class TdmsChannel(object):
         except KeyError:
             raise KeyError(
                 "Object does not have start time property available.")
+        if isinstance(start_time, TdmsTimestamp):
+            start_time = start_time.as_datetime64(accuracy)
 
         try:
             unit_correction = {
@@ -651,7 +653,7 @@ class TdmsChannel(object):
         # Because numpy only knows ints as its date datatype,
         # convert to accuracy.
         time_type = "timedelta64[{0}]".format(accuracy)
-        return (np.datetime64(start_time) +
+        return (start_time +
                 (relative_time * unit_correction).astype(time_type))
 
     def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
