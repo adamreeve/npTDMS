@@ -90,6 +90,38 @@ def test_read_raw_timestamp_data():
         np.testing.assert_equal(data.second_fractions, expected_second_fractions)
 
 
+def test_time_track_with_raw_timestamps():
+    """ Test getting a channel's time track when using raw timestamps
+    """
+    test_file = GeneratedFile()
+    second_fractions = 1234567890 * 10 ** 10
+    seconds = 3524551547
+    properties = {
+        "wf_start_time": (0x44, hexlify_value("<Q", second_fractions) + hexlify_value("<q", seconds)),
+        "wf_increment": (10, hexlify_value("<d", 0.1)),
+        "wf_start_offset": (10, hexlify_value("<d", 0.0)),
+    }
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 4, properties),
+        ),
+        "00 00 00 00" "01 00 00 00" "02 00 00 00" "03 00 00 00"
+    )
+    expected_times = np.array([
+        np.datetime64('2015-09-08T10:05:47.669260594', 'ns'),
+        np.datetime64('2015-09-08T10:05:47.769260594', 'ns'),
+        np.datetime64('2015-09-08T10:05:47.869260594', 'ns'),
+        np.datetime64('2015-09-08T10:05:47.969260594', 'ns'),
+    ])
+
+    with test_file.get_tempfile() as temp_file:
+        tdms_data = TdmsFile.read(temp_file.file, raw_timestamps=True)
+        channel = tdms_data["group"]["channel1"]
+        time_track = channel.time_track(absolute_time=True, accuracy='ns')
+        np.testing.assert_array_equal(time_track, expected_times)
+
+
 def test_read_big_endian_timestamp_data():
     seconds = 3672033330
     second_fractions = 1234567890 * 10 ** 10
