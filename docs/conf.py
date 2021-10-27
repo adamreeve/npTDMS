@@ -28,7 +28,7 @@ sys.path.insert(0, os.path.abspath('..'))
 extensions = ["sphinx.ext.autodoc"]
 
 # Autodoc options
-autoclass_content = "doc"
+autoclass_content = "class"
 
 # Add any paths that contain templates here, relative to this directory.
 templates_path = []
