@@ -216,6 +216,11 @@ class TdmsFile(object):
         except KeyError:
             raise KeyError("There is no group named '%s' in the TDMS file" % group_name)
 
+    def _ipython_key_completions_(self):
+        """ Return possible group names for tab-completion when indexing
+        """
+        return list(self._groups.keys())
+
     def __enter__(self):
         return self
 
@@ -392,6 +397,11 @@ class TdmsGroup(object):
             raise KeyError(
                 "There is no channel named '%s' in group '%s' of the TDMS file" %
                 (channel_name, self.name))
+
+    def _ipython_key_completions_(self):
+        """ Return possible channel names for tab-completion when indexing
+        """
+        return list(self._channels.keys())
 
 
 class TdmsChannel(object):

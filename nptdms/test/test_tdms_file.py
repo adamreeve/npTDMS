@@ -1036,3 +1036,23 @@ def test_no_new_obj_list_for_first_segment():
         tdms_data = TdmsFile.read(temp_file.file)
     channel_data = tdms_data['group']['channel1']
     compare_arrays(channel_data[:], [1, 2, 3, 4, 5, 6, 7, 8])
+
+
+def test_group_name_autocompletion():
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    completion_options = tdms_data._ipython_key_completions_()
+    assert "Group" in completion_options
+
+
+def test_channel_name_autocompletion():
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    group = tdms_data["Group"]
+    completion_options = group._ipython_key_completions_()
+    assert "Channel1" in completion_options
+    assert "Channel2" in completion_options
