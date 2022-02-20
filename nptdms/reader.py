@@ -36,6 +36,7 @@ class TdmsReader(object):
         self._file_path = None
         self._index_file_path = None
         self._segment_channel_offsets = {}
+        self.tdms_version = None
 
         if hasattr(tdms_file, "read"):
             # Is a file
@@ -267,8 +268,12 @@ class TdmsReader(object):
         # Next four bytes are version number, then 8 bytes each for the offset values
         (version, next_segment_offset, raw_data_offset) = _struct_unpack(endianness + 'lQQ', lead_in_bytes[8:28])
 
-        if version not in (4712, 4713):
-            log.warning("Unrecognised version number.")
+        if self.tdms_version is None:
+            if version not in (4712, 4713):
+                log.warning("Unrecognised version number: %d" % version)
+            self.tdms_version = version
+        elif self.tdms_version != version:
+            log.warning("Segment version mismatch, %d != %d" % (version, self.tdms_version))
 
         # Calculate data and next segment position
         lead_size = 7 * 4

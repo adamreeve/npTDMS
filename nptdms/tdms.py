@@ -123,6 +123,7 @@ class TdmsFile(object):
         self._groups = OrderedDict()
         self._properties = OrderedDict()
         self._channel_data = {}
+        self._tdms_version = 0
         self.data_read = False
 
         self._reader = TdmsReader(file)
@@ -139,6 +140,12 @@ class TdmsFile(object):
         """
 
         return list(self._groups.values())
+
+    @property
+    def tdms_version(self):
+        """ The TDMS format version of this file
+        """
+        return self._tdms_version
 
     @property
     def properties(self):
@@ -229,6 +236,7 @@ class TdmsFile(object):
 
     def _read_file(self, tdms_reader, read_metadata_only, keep_open):
         tdms_reader.read_metadata(require_segment_indexes=keep_open)
+        self._tdms_version = tdms_reader.tdms_version
 
         # Use object metadata to build group and channel objects
         group_properties = OrderedDict()
