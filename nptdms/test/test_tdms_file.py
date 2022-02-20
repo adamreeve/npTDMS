@@ -1056,3 +1056,26 @@ def test_channel_name_autocompletion():
     completion_options = group._ipython_key_completions_()
     assert "Channel1" in completion_options
     assert "Channel2" in completion_options
+
+
+def test_warning_on_unrecognized_version(caplog):
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment(), version=4714)
+
+    _ = test_file.load()
+
+    assert "WARNING" in caplog.text
+    assert "Unrecognised version number" in caplog.text
+    assert "4714" in caplog.text
+
+
+def test_warning_on_version_mismatch(caplog):
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment(), version=4713)
+    test_file.add_segment(*basic_segment(), version=4712)
+
+    _ = test_file.load()
+
+    assert "WARNING" in caplog.text
+    assert "Segment version mismatch" in caplog.text
+    assert "4712 != 4713" in caplog.text
