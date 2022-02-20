@@ -28,7 +28,7 @@ class TdmsWriter(object):
             tdms_writer.write_segment(segment_data)
     """
 
-    def __init__(self, file, mode='w'):
+    def __init__(self, file, mode='w', version=4712):
         """Initialise a new TDMS writer
 
         :param file: Either the path to the tdms file to open or an already
@@ -37,10 +37,18 @@ class TdmsWriter(object):
             This will be passed through to Python's ``open`` function with 'b' appended
             to ensure the file is opened in binary mode.
             For example, use 'w' (the default) to open a new file or 'a' to append to an existing TDMS file.
+        :param version: The TDMS format version to write, which must be either 4712 (the default) or 4713.
+            It's important that if you are appending segments to an
+            existing TDMS file, this matches the existing file version (this can be queried with the
+            :py:attr:`~nptdms.TdmsFile.tdms_version` property).
         """
+        valid_versions = (4712, 4713)
+        if version not in valid_versions:
+            raise ValueError("version must be one of %s" % ",".join("%d" % v for v in valid_versions))
         self._file = None
         self._file_path = None
         self._file_mode = mode
+        self._tdms_version = version
 
         if hasattr(file, "read"):
             # Is a file
@@ -62,7 +70,7 @@ class TdmsWriter(object):
 
         :param objects: A list of TdmsObject instances to write
         """
-        segment = TdmsSegment(objects)
+        segment = TdmsSegment(objects, version=self._tdms_version)
         segment.write(self._file)
 
     def __enter__(self):
@@ -77,16 +85,18 @@ class TdmsSegment(object):
     """A segment of data to be written to a file
     """
 
-    def __init__(self, objects):
+    def __init__(self, objects, version=4712):
         """Initialise a new segment of TDMS data
 
         :param objects: A list of TdmsObject instances.
+        :param version: The TDMS format version to write, which must be either 4712 (the default) or 4713.
         """
         paths = set(obj.path for obj in objects)
         if len(paths) != len(objects):
             raise ValueError("Duplicate object paths found")
 
         self.objects = objects
+        self._tdms_version = version
 
     def write(self, file):
         metadata = self.metadata()
@@ -139,8 +149,7 @@ class TdmsSegment(object):
             toc_mask = toc_mask | toc_properties[toc_flag]
         leadin.append(Int32(toc_mask))
 
-        tdms_version = 4712
-        leadin.append(Int32(tdms_version))
+        leadin.append(Int32(self._tdms_version))
 
         next_segment_offset = metadata_size + self._data_size()
         raw_data_offset = metadata_size

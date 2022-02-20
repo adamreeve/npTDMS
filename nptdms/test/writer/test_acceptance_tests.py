@@ -4,6 +4,7 @@ from datetime import datetime
 from io import BytesIO
 import numpy as np
 import os
+import pytest
 import tempfile
 
 from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject, types
@@ -26,6 +27,7 @@ def test_can_read_tdms_file_after_writing():
     a_output = tdms_file["group"]["a"]
     b_output = tdms_file["group"]["b"]
 
+    assert tdms_file.tdms_version == 4712
     assert a_output.data_type == types.SingleFloat
     assert b_output.data_type == types.DoubleFloat
     assert a_output.dtype == np.dtype('float32')
@@ -377,3 +379,27 @@ def test_can_write_complex():
     assert len(output_data) == 2
     assert output_data[0] == input_complex128_data[0]
     assert output_data[1] == input_complex128_data[1]
+
+
+def test_specifying_version():
+    data = np.linspace(0.0, 1.0, 100, dtype='float32')
+    channel = ChannelObject("group", "a", data)
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file, version=4713) as tdms_writer:
+        tdms_writer.write_segment([channel])
+
+    output_file.seek(0)
+    tdms_file = TdmsFile(output_file)
+
+    assert tdms_file.tdms_version == 4713
+
+
+def test_specifying_invalid_version():
+    output_file = BytesIO()
+
+    with pytest.raises(ValueError) as exception:
+        _ = TdmsWriter(output_file, version=4714)
+    error_message = str(exception.value)
+
+    assert "4712,4713" in error_message
