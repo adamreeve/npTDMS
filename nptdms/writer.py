@@ -28,7 +28,7 @@ class TdmsWriter(object):
             tdms_writer.write_segment(segment_data)
     """
 
-    def __init__(self, file, mode='w', version=4712):
+    def __init__(self, file, mode='w', version=4713):
         """Initialise a new TDMS writer
 
         :param file: Either the path to the tdms file to open or an already
@@ -37,7 +37,7 @@ class TdmsWriter(object):
             This will be passed through to Python's ``open`` function with 'b' appended
             to ensure the file is opened in binary mode.
             For example, use 'w' (the default) to open a new file or 'a' to append to an existing TDMS file.
-        :param version: The TDMS format version to write, which must be either 4712 (the default) or 4713.
+        :param version: The TDMS format version to write, which must be either 4712 or 4713 (the default).
             It's important that if you are appending segments to an
             existing TDMS file, this matches the existing file version (this can be queried with the
             :py:attr:`~nptdms.TdmsFile.tdms_version` property).

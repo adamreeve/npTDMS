@@ -27,7 +27,7 @@ def test_can_read_tdms_file_after_writing():
     a_output = tdms_file["group"]["a"]
     b_output = tdms_file["group"]["b"]
 
-    assert tdms_file.tdms_version == 4712
+    assert tdms_file.tdms_version == 4713
     assert a_output.data_type == types.SingleFloat
     assert b_output.data_type == types.DoubleFloat
     assert a_output.dtype == np.dtype('float32')
