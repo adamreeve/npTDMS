@@ -33,8 +33,10 @@ class TdmsWriter(object):
 
         :param file: Either the path to the tdms file to open or an already
             opened file.
-        :param mode: Either 'w' to open a new file or 'a' to append to an
-            existing TDMS file.
+        :param mode: The mode to open the file with, used when ``file`` is a file path.
+            This will be passed through to Python's ``open`` function with 'b' appended
+            to ensure the file is opened in binary mode.
+            For example, use 'w' (the default) to open a new file or 'a' to append to an existing TDMS file.
         """
         self._file = None
         self._file_path = None
