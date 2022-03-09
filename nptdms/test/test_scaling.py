@@ -463,14 +463,42 @@ def test_strain_scaling_full_bridge_type_i_with_initial_voltage():
         initial_bridge_voltage=0.00135)
 
 
-def _strain_scaling_test(input_data, expected_data, initial_bridge_voltage=0.0, calibration_adjustment=1.0):
+def test_strain_scaling_half_bridge_type_i():
+    _strain_scaling_test(
+        [0.00068827, 0.00068036, 0.000688, 0.00068545, 0.00069104,
+         0.00068033, 0.00068023, 0.00068316, 0.00067672, 0.000679],
+        [-0.0004033, -0.0003986, -0.0004031, -0.0004016, -0.0004049,
+         -0.0003986, -0.0003986, -0.0004003, -0.0003965, -0.0003978],
+        configuration=10188)
+
+
+def test_strain_scaling_half_bridge_type_i_with_adjustment():
+    _strain_scaling_test(
+        [0.00068827, 0.00068036, 0.000688, 0.00068545, 0.00069104,
+         0.00068033, 0.00068023, 0.00068316, 0.00067672, 0.000679],
+        [-0.0004529, -0.0004477, -0.0004527, -0.000451, -0.0004547,
+         -0.0004476, -0.0004476, -0.0004495, -0.0004453, -0.0004468],
+        configuration=10188, calibration_adjustment=1.123)
+
+
+def test_strain_scaling_half_bridge_type_i_with_initial_voltage():
+    _strain_scaling_test(
+        [0.00068827, 0.00068036, 0.000688, 0.00068545, 0.00069104,
+         0.00068033, 0.00068023, 0.00068316, 0.00067672, 0.000679],
+        [0.0003879, 0.0003926, 0.0003881, 0.0003896, 0.0003863,
+         0.0003926, 0.0003927, 0.0003909, 0.0003947, 0.0003934],
+        configuration=10188, initial_bridge_voltage=0.00135)
+
+
+def _strain_scaling_test(input_data, expected_data, configuration=10183,
+                         initial_bridge_voltage=0.0, calibration_adjustment=1.0):
     data = StubTdmsData(np.array(input_data))
     expected_data = np.array(expected_data)
 
     properties = {
         "NI_Number_Of_Scales": 1,
         "NI_Scale[0]_Scale_Type": "Strain",
-        "NI_Scale[0]_Strain_Configuration": 10183,
+        "NI_Scale[0]_Strain_Configuration": configuration,
         "NI_Scale[0]_Strain_Poisson_Ratio": 0.3,
         "NI_Scale[0]_Strain_Gage_Resistance": 350.0,
         "NI_Scale[0]_Strain_Lead_Wire_Resistance": 0.0,
