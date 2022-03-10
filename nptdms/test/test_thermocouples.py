@@ -118,7 +118,7 @@ def test_type_e_temperature_to_voltage(temperature):
     _test_temperature_to_voltage(reference_thermocouple_e, thermocouples.type_e, temperature)
 
 
-@given(voltage=strategies.floats(-8.825, 76.373))
+@given(voltage=strategies.floats(-8.825, 76.372))
 def test_type_e_voltage_to_temperature(voltage):
     _test_voltage_to_temperature(reference_thermocouple_e, thermocouples.type_e, voltage, max_error=0.03)
 
@@ -148,7 +148,7 @@ def test_type_n_temperature_to_voltage(temperature):
     _test_temperature_to_voltage(reference_thermocouple_n, thermocouples.type_n, temperature)
 
 
-@given(voltage=strategies.floats(-3.990, 47.513))
+@given(voltage=strategies.floats(-3.990, 47.512))
 def test_type_n_voltage_to_temperature(voltage):
     _test_voltage_to_temperature(reference_thermocouple_n, thermocouples.type_n, voltage, max_error=0.04)
 
@@ -158,7 +158,7 @@ def test_type_r_temperature_to_voltage(temperature):
     _test_temperature_to_voltage(reference_thermocouple_r, thermocouples.type_r, temperature)
 
 
-@given(voltage=strategies.floats(-0.226, 21.103))
+@given(voltage=strategies.floats(-0.226, 21.102))
 def test_type_r_voltage_to_temperature(voltage):
     _test_voltage_to_temperature(reference_thermocouple_r, thermocouples.type_r, voltage, max_error=0.02)
 
@@ -178,7 +178,7 @@ def test_type_t_temperature_to_voltage(temperature):
     _test_temperature_to_voltage(reference_thermocouple_t, thermocouples.type_t, temperature)
 
 
-@given(voltage=strategies.floats(-5.603, 20.872))
+@given(voltage=strategies.floats(-5.603, 20.871))
 def test_type_t_voltage_to_temperature(voltage):
     _test_voltage_to_temperature(reference_thermocouple_t, thermocouples.type_t, voltage, max_error=0.04)
 
