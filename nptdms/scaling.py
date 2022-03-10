@@ -1,3 +1,5 @@
+# coding: utf-8
+
 import numpy as np
 import numpy.polynomial.polynomial as poly
 import re
@@ -197,12 +199,84 @@ class StrainScaling(object):
     def scale(self, data):
         """ Convert voltage data to strain
         """
+        # For a Wheatstone bridge, Vo = [R3 / (R3 + R4) - R2 / (R1 + R2)] Vex
+        # The input data for this scaling is the output voltage (Vo) and we
+        # want to compute the strain (ε)
+        voltage_out = data.astype(np.double)
+        if self.initial_bridge_voltage != 0.0:
+            voltage_out -= self.initial_bridge_voltage
         if self.configuration == StrainScaling.FULL_BRIDGE_1:
-            if self.initial_bridge_voltage != 0.0:
-                voltage_diff = data - self.initial_bridge_voltage
-            else:
-                voltage_diff = data
-            return voltage_diff * (-self.gain_adjustment / (self.voltage_excitation * self.gage_factor))
+            # In the full bridge type I configuration:
+            # R1 = R3 = R0 (1 - ε G)
+            # R2 = R4 = R0 (1 + ε G)
+            # where G is the gauge factor and R0 is the base gague resistance.
+            # This gives Vo = -ε G Vex
+            strain = voltage_out
+            strain *= (-self.gain_adjustment / (self.voltage_excitation * self.gage_factor))
+            return strain
+        elif self.configuration == StrainScaling.FULL_BRIDGE_2:
+            # In the full bridge type II configuration:
+            # R1 = R0 (1 - ε ν G)
+            # R2 = R0 (1 + ε ν G)
+            # R3 = R0 (1 - ε G)
+            # R4 = R0 (1 + ε G)
+            # This gives Vo = - (1/2) ε G Vex (1 + ν)
+            strain = voltage_out
+            strain *= (-self.gain_adjustment * 2.0 / (
+                self.voltage_excitation * self.gage_factor * (1.0 + self.poisson_ratio)))
+            return strain
+        elif self.configuration == StrainScaling.FULL_BRIDGE_3:
+            # In the full bridge type III configuration:
+            # R1 = R3 = R0 (1 - ε ν G)
+            # R2 = R4 = R0 (1 + ε G)
+            # This gives Vo = - ε G (1 + ν) Vex / (2 + ε G (1 - ν))
+            # Rearranging for strain:
+            # ε = - 2 Vo / (G Vex (1 + ν + (Vo/Vex) (1 - ν)))
+            common_factor = -0.5 / self.gain_adjustment
+            temp = voltage_out.copy()
+            temp *= common_factor * (1.0 - self.poisson_ratio) * self.gage_factor
+            temp += common_factor * self.voltage_excitation * self.gage_factor * (1.0 + self.poisson_ratio)
+            strain = voltage_out
+            strain /= temp
+            return strain
+        elif self.configuration == StrainScaling.HALF_BRIDGE_1:
+            # In the half bridge type I configuration:
+            # R1 = R2 = R0
+            # R3 = R0 (1 + ε ν G)
+            # R4 = R0 (1 + ε G)
+            # Which gives Vo = [(1 - ε ν G) / (2 + ε G - ε ν G) - 1/2] Vex
+            # Rearranging for strain:
+            # ε = -4 (Vo / Vex) / [G (1 + ν + 2 (Vo / Vex) (1 - ν))]
+            lead_adjustment = 1.0 / (1.0 + self.lead_wire_resistance / self.gage_resistance)
+            common_factor = -self.gage_factor * self.voltage_excitation * lead_adjustment / (
+                    4.0 * self.gain_adjustment)
+            temp = voltage_out.copy()
+            temp *= common_factor * 2.0 * (1.0 - self.poisson_ratio) / self.voltage_excitation
+            temp += common_factor * (1.0 + self.poisson_ratio)
+            strain = voltage_out
+            strain /= temp
+            return strain
+        elif self.configuration == StrainScaling.HALF_BRIDGE_2:
+            lead_adjustment = 1.0 / (1.0 + self.lead_wire_resistance / self.gage_resistance)
+            strain = voltage_out
+            strain *= -2.0 * self.gain_adjustment / (
+                    self.gage_factor * self.voltage_excitation * lead_adjustment)
+            return strain
+        elif self.configuration in (StrainScaling.QUARTER_BRIDGE_1, StrainScaling.QUARTER_BRIDGE_2):
+            # In the quarter bridge configuration:
+            # R1 = R2 = R3 = R0
+            # R4 = R0 (1 + ε G)
+            # Which gives Vo = [1 / (2 + ε G) - (1 / 2)] Vex
+            # Rearranging for strain:
+            # ε = -2 / G [1 - 1 / (1 + 2 Vo / Vex)]
+            lead_adjustment = 1.0 / (1.0 + self.lead_wire_resistance / self.gage_resistance)
+            strain = voltage_out
+            strain *= 2.0 / self.voltage_excitation
+            strain += 1.0
+            np.reciprocal(strain, out=strain)
+            strain -= 1.0
+            strain *= 2.0 * self.gain_adjustment / (self.gage_factor * lead_adjustment)
+            return strain
 
         raise Exception("Strain gauge configuration %d is not supported" % self.configuration)
 
