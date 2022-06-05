@@ -770,6 +770,53 @@ def test_incomplete_segment_with_string_data():
     assert len(channel) == 0
 
 
+def test_truncated_metadata_in_last_segment():
+    """ Test the scenario where writing the file was aborted with part of the metadata written
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 2),
+            channel_metadata("/'group'/'channel2'", 3, 2),
+        ),
+        "01 00 00 00" "02 00 00 00"
+        "03 00 00 00" "04 00 00 00"
+    )
+    first_segment_size = len(test_file)
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 2),
+            channel_metadata("/'group'/'channel2'", 3, 2),
+        ),
+        "",
+        incomplete=True
+    )
+    total_size = len(test_file)
+    expected_data = {
+        ('group', 'channel1'): np.array([1, 2], dtype=np.int32),
+        ('group', 'channel2'): np.array([3, 4], dtype=np.int32),
+    }
+
+    with test_file.get_tempfile() as temp_file:
+        with tempfile.NamedTemporaryFile(suffix=".tdms") as truncated_file:
+            all_data = temp_file.file.read()
+            for end_point in range(first_segment_size + 1, total_size - 1):
+                truncated_file.file.seek(0)
+                truncated_file.file.write(all_data[:end_point])
+                truncated_file.file.seek(0)
+                try:
+                    tdms_data = TdmsFile.read(truncated_file.file)
+                except Exception as exc:
+                    raise RuntimeError(
+                        "Failed to read file with segment truncated after "
+                        f"{end_point - first_segment_size} bytes") from exc
+                for ((group, channel), expected_values) in expected_data.items():
+                    channel_obj = tdms_data[group][channel]
+                    compare_arrays(channel_obj.data, expected_values)
+
+
 def test_slash_and_space_in_name():
     """Test name like '01/02/03 something'"""
 

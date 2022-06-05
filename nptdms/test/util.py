@@ -300,6 +300,9 @@ class GeneratedFile(object):
         file.seek(0)
         return file
 
+    def __len__(self):
+        return sum(len(s[0]) + len(s[1]) + len(s[2]) for s in self._content)
+
     def _get_contents(self):
         contents = b''
         for segment in self._content:
