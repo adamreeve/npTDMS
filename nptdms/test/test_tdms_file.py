@@ -811,7 +811,7 @@ def test_truncated_metadata_in_last_segment():
                 except Exception as exc:
                     raise RuntimeError(
                         "Failed to read file with segment truncated after "
-                        f"{end_point - first_segment_size} bytes") from exc
+                        "%d bytes: %s" % (end_point - first_segment_size, exc))
                 for ((group, channel), expected_values) in expected_data.items():
                     channel_obj = tdms_data[group][channel]
                     compare_arrays(channel_obj.data, expected_values)
