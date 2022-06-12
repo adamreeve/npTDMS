@@ -245,11 +245,11 @@ class TdmsReader(object):
 
     def _read_lead_in(self, file, segment_position, is_index_file=False):
         lead_in_bytes = file.read(28)
+        if len(lead_in_bytes) < 28:
+            raise EOFError
 
         expected_tag = b'TDSh' if is_index_file else b'TDSm'
         tag = lead_in_bytes[:4]
-        if tag == b'':
-            raise EOFError
         if tag != expected_tag:
             raise ValueError(
                 "Segment does not start with %r, but with %r" % (expected_tag, tag))
@@ -281,11 +281,16 @@ class TdmsReader(object):
         segment_incomplete = next_segment_offset == 0xFFFFFFFFFFFFFFFF
         if segment_incomplete:
             # Segment size is unknown. This can happen if LabVIEW crashes.
-            # Try to read until the end of the file.
+            next_segment_pos = self._get_data_file_size()
+            if next_segment_pos < data_position:
+                # Metadata wasn't completely written and don't have any data in this segment,
+                # don't try to read any metadata
+                log.warning("Last segment metadata is incomplete")
+                raise EOFError
+            # Try to read until the end of the file if we have complete metadata
             log.warning(
                 "Last segment of file has unknown size, "
                 "will attempt to read to the end of the file")
-            next_segment_pos = self._get_data_file_size()
         else:
             log.debug("Next segment offset = %d, raw data offset = %d, data size = %d b",
                       next_segment_offset, raw_data_offset, next_segment_offset - raw_data_offset)
