@@ -2,10 +2,7 @@ import os
 import sys
 from nptdms import tdmsinfo
 from nptdms.test.util import GeneratedFile, basic_segment
-try:
-    from unittest.mock import patch
-except ImportError:
-    from mock import patch
+from unittest.mock import patch
 
 
 def test_tdmsinfo(capsys):
