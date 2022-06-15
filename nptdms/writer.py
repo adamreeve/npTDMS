@@ -1,22 +1,11 @@
 """Module for writing TDMS files"""
 
-try:
-    from collections import OrderedDict
-except ImportError:
-    OrderedDict = dict
+from collections import OrderedDict
 from datetime import datetime
 from io import UnsupportedOperation
 import numpy as np
 from nptdms.common import toc_properties, ObjectPath
 from nptdms.types import *
-
-
-try:
-    long
-except NameError:
-    # Python 3
-    long = int
-    unicode = str
 
 
 class TdmsWriter(object):
@@ -144,7 +133,7 @@ class TdmsSegment(object):
         leadin = []
         leadin.append(Bytes(b'TDSm'))
 
-        toc_mask = long(0)
+        toc_mask = 0
         for toc_flag in toc:
             toc_mask = toc_mask | toc_properties[toc_flag]
         leadin.append(Int32(toc_mask))
@@ -281,7 +270,7 @@ def _to_tdms_value(value):
         return value
     if isinstance(value, bool) or isinstance(value, np.bool_):
         return Boolean(value)
-    if isinstance(value, (int, long)):
+    if isinstance(value, int):
         return to_int_property_value(value)
     if isinstance(value, float):
         return DoubleFloat(value)
@@ -290,8 +279,6 @@ def _to_tdms_value(value):
     if isinstance(value, np.datetime64):
         return TimeStamp(value)
     if isinstance(value, str):
-        return String(value)
-    if isinstance(value, unicode):
         return String(value)
     if isinstance(value, bytes):
         return String(value)
@@ -372,7 +359,7 @@ def _to_np_array(data):
 
 
 def _infer_dtype(data):
-    if data and isinstance(data[0], (int, long)):
+    if data and isinstance(data[0], int):
         max_value = max(data)
         min_value = min(data)
         if max_value >= 2**63 and min_value >= 0:

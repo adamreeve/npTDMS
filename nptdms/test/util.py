@@ -12,13 +12,6 @@ import numpy as np
 from nptdms import tdms
 
 
-try:
-    long
-except NameError:
-    # Python 3
-    long = int
-
-
 def string_hexlify(input_string):
     """Return hex string representation of string"""
     return binascii.hexlify(input_string.encode('utf-8')).decode('utf-8')
@@ -235,20 +228,20 @@ class GeneratedFile(object):
         data_bytes = data if binary_data else _hex_to_bytes(data)
         if toc is not None:
             lead_in = b'TDSm'
-            toc_mask = long(0)
+            toc_mask = 0
             for toc_item in toc:
                 if toc_item == "kTocMetaData":
-                    toc_mask = toc_mask | long(1) << 1
+                    toc_mask = toc_mask | 1 << 1
                 elif toc_item == "kTocRawData":
-                    toc_mask = toc_mask | long(1) << 3
+                    toc_mask = toc_mask | 1 << 3
                 elif toc_item == "kTocDAQmxRawData":
-                    toc_mask = toc_mask | long(1) << 7
+                    toc_mask = toc_mask | 1 << 7
                 elif toc_item == "kTocInterleavedData":
-                    toc_mask = toc_mask | long(1) << 5
+                    toc_mask = toc_mask | 1 << 5
                 elif toc_item == "kTocBigEndian":
-                    toc_mask = toc_mask | long(1) << 6
+                    toc_mask = toc_mask | 1 << 6
                 elif toc_item == "kTocNewObjList":
-                    toc_mask = toc_mask | long(1) << 2
+                    toc_mask = toc_mask | 1 << 2
                 else:
                     raise ValueError("Unrecognised TOC value: %s" % toc_item)
             lead_in += struct.pack('<i', toc_mask)

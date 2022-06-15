@@ -1,23 +1,13 @@
-import itertools
-try:
-    long
-except NameError:
-    # Python 3
-    long = int
-try:
-    zip_longest = itertools.izip_longest
-except AttributeError:
-    # Python 3
-    zip_longest = itertools.zip_longest
+from itertools import zip_longest
 
 
 toc_properties = {
-    'kTocMetaData': (long(1) << 1),
-    'kTocRawData': (long(1) << 3),
-    'kTocDAQmxRawData': (long(1) << 7),
-    'kTocInterleavedData': (long(1) << 5),
-    'kTocBigEndian': (long(1) << 6),
-    'kTocNewObjList': (long(1) << 2)
+    'kTocMetaData': (1 << 1),
+    'kTocRawData': (1 << 3),
+    'kTocDAQmxRawData': (1 << 7),
+    'kTocInterleavedData': (1 << 5),
+    'kTocBigEndian': (1 << 6),
+    'kTocNewObjList': (1 << 2)
 }
 
 

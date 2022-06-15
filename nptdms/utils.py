@@ -2,16 +2,6 @@ from functools import wraps
 import logging
 import time
 
-try:
-    from collections import OrderedDict
-except ImportError:
-    try:
-        # ordereddict available on pypi for Python < 2.7
-        from ordereddict import OrderedDict
-    except ImportError:
-        # Otherwise fall back on normal dict
-        OrderedDict = dict
-
 
 def cached_property(func):
     """ Wraps a method on a class to make it a property and caches the result the first time it is evaluated
@@ -44,21 +34,13 @@ class Timer(object):
     def __enter__(self):
         if not self._enabled:
             return self
-        try:
-            self._start_time = time.perf_counter()
-        except AttributeError:
-            # Python < 3.3
-            self._start_time = time.clock()
+        self._start_time = time.perf_counter()
         return self
 
     def __exit__(self, exc_type, exc_val, exc_tb):
         if not self._enabled:
             return
-        try:
-            end_time = time.perf_counter()
-        except AttributeError:
-            # Python < 3.3
-            end_time = time.clock()
+        end_time = time.perf_counter()
 
         elapsed_time = (end_time - self._start_time) * 1.0e3
         self._log.info("{0}: Took {1} ms".format(self._description, elapsed_time))

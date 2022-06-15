@@ -1,11 +1,8 @@
 """Test TdmsSegment"""
 
+from collections import OrderedDict
 from datetime import datetime
 import pytest
-try:
-    from collections import OrderedDict
-except ImportError:
-    OrderedDict = dict
 import numpy as np
 
 from nptdms.writer import ChannelObject, TdmsSegment, read_properties_dict

@@ -1,5 +1,5 @@
+from collections import OrderedDict
 import numpy as np
-from nptdms.utils import OrderedDict
 
 
 def from_tdms_file(tdms_file, time_index=False, absolute_time=False, scaled_data=True):

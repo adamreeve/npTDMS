@@ -1,14 +1,14 @@
 """ Lower level TDMS reader API that allows finer grained reading of data
 """
 
+from collections import OrderedDict
 import logging
 import os
 import numpy as np
 import struct
 
-from nptdms import types
-from nptdms.common import ObjectPath, toc_properties
-from nptdms.utils import Timer, OrderedDict
+from nptdms.common import toc_properties
+from nptdms.utils import Timer
 from nptdms.base_segment import RawChannelDataChunk
 from nptdms.tdms_segment import TdmsSegment, SegmentIndexCache
 from nptdms.log import log_manager

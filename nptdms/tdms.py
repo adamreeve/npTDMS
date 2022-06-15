@@ -3,11 +3,11 @@
     This module contains the public facing API for reading TDMS files
 """
 
-from collections import defaultdict
+from collections import defaultdict, OrderedDict
 import numpy as np
 
 from nptdms import scaling, types
-from nptdms.utils import Timer, OrderedDict, cached_property
+from nptdms.utils import Timer, cached_property
 from nptdms.log import log_manager
 from nptdms.common import ObjectPath
 from nptdms.reader import TdmsReader
