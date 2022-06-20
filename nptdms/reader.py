@@ -35,12 +35,19 @@ class TdmsReader(object):
         self.object_metadata = OrderedDict()
         self._file_path = None
         self._index_file_path = None
+        self._file_is_tdms_index = None
         self._segment_channel_offsets = {}
         self.tdms_version = None
 
         if hasattr(tdms_file, "read"):
             # Is a file
             self._file = tdms_file
+            
+            tag = self._file.read(4)
+            self._file.seek(0,0)
+            print(tag)
+            if tag == b"TDSh":
+                self._file_is_tdms_index = True
         else:
             # Is path to a file
             self._file_path = str(tdms_file)
@@ -71,6 +78,9 @@ class TdmsReader(object):
         if self._index_file_path is not None:
             reading_index_file = True
             file = open(self._index_file_path, 'rb')
+        elif self._file_is_tdms_index is not None:
+            reading_index_file = True
+            file = self._file
         else:
             reading_index_file = False
             file = self._file
@@ -85,6 +95,7 @@ class TdmsReader(object):
                 while True:
                     start_position = file.tell()
                     try:
+                        print(reading_index_file)
                         segment, properties = self._read_segment_metadata(
                             file, segment_position, index_cache, previous_segment, reading_index_file)
                     except EOFError:
@@ -102,7 +113,7 @@ class TdmsReader(object):
                     else:
                         file.seek(segment.next_segment_pos, os.SEEK_SET)
         finally:
-            if reading_index_file:
+            if reading_index_file and self._index_file_path is not None:
                 file.close()
 
     def read_raw_data(self):
