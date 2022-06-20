@@ -45,7 +45,6 @@ class TdmsReader(object):
             
             tag = self._file.read(4)
             self._file.seek(0,0)
-            print(tag)
             if tag == b"TDSh":
                 self._file_is_tdms_index = True
         else:
@@ -95,7 +94,6 @@ class TdmsReader(object):
                 while True:
                     start_position = file.tell()
                     try:
-                        print(reading_index_file)
                         segment, properties = self._read_segment_metadata(
                             file, segment_position, index_cache, previous_segment, reading_index_file)
                     except EOFError:
