@@ -30,59 +30,83 @@ class TdmsReader(object):
         :param tdms_file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
         """
+        self._file_path = None
+        self._index_file_path = None
+        self._file = None
+        self._index_file = None
+
         self._segments = None
         self._prev_segment_objects = {}
         self.object_metadata = OrderedDict()
-        self._file_path = None
-        self._index_file_path = None
-        self._file_is_tdms_index = None
         self._segment_channel_offsets = {}
         self.tdms_version = None
 
         if hasattr(tdms_file, "read"):
             # Is a file
-            self._file = tdms_file
-            
-            tag = self._file.read(4)
-            self._file.seek(0,0)
+            tag = tdms_file.read(4)
+            tdms_file.seek(0, 0)
+
             if tag == b"TDSh":
-                self._file_is_tdms_index = True
+                self._index_file = tdms_file
+            elif tag == b"TDSm":
+                self._file = tdms_file
+            else:
+                raise ValueError(f"File should either start with 'b`TDSh`' or 'b`TDSm`'. Submitted file starts with '{tag}'.")
+
         else:
             # Is path to a file
-            self._file_path = str(tdms_file)
-            self._file = open(self._file_path, 'rb')
-            index_file_path = self._file_path + '_index'
-            if os.path.isfile(index_file_path):
-                self._index_file_path = index_file_path
+            source_path = str(tdms_file)
+            if source_path.endswith(".tdms_index"):
+                self._index_file_path = source_path
+                self._index_file = open(self._index_file_path, "rb")
+
+                filepath = source_path.split(".")[0] + ".tdms"
+                if os.path.isfile(filepath):
+                    self._file_path = filepath
+                    self._file = open(self._file_path, "rb")
+
+            elif source_path.endswith(".tdms"):
+                self._file_path = source_path
+                self._file = open(self._file_path, "rb")
+
+                filepath = source_path.split(".")[0] + ".tdms_index"
+                if os.path.isfile(filepath):
+                    self._index_file_path = filepath
+                    self._index_file = open(self._index_file_path, "rb")
+
+            else:
+                raise ValueError(f"File should either end with '.tdms' or '.tdms_index'. Submitted path ends with '{source_path.split('.')[-1]}'.")
 
     def close(self):
-        if self._file is None:
+        if self._file is None and self._index_file_path is None:
             # Already closed
             return
 
         if self._file_path is not None:
-            # File path was provided so we opened the file and
-            # should close it.
+            # File path was provided so we opened the file and should close it.
             self._file.close()
-        # Otherwise always remove reference to the file
+            
+        if self._index_file_path is not None:
+            # Index file path was provided so we opened the file and should close it.
+            self._index_file.close()
+
+        # Finally always remove reference to the files
         self._file = None
+        self._index_file = None
 
     def read_metadata(self, require_segment_indexes=False):
         """ Read all metadata and structure information from a TdmsFile
 
         :param require_segment_indexes: Whether to create segment object indexes to allow lookup of objects by path.
         """
-        self._ensure_open()
-
-        if self._index_file_path is not None:
+        if self._index_file is not None: # generally try to read metadata from index file because it is faster
+            file = self._index_file
             reading_index_file = True
-            file = open(self._index_file_path, 'rb')
-        elif self._file_is_tdms_index is not None:
-            reading_index_file = True
+        elif self._file is not None: # fallback if only a data file is supplied
             file = self._file
-        else:
             reading_index_file = False
-            file = self._file
+        else:
+            raise ValueError("Neither tdms_index file nor tdms file ist available.")
 
         self._segments = []
         segment_position = 0
@@ -398,7 +422,7 @@ class TdmsReader(object):
         self._segment_channel_offsets[channel_path] = (first_segment, channel_offsets)
 
     def _ensure_open(self):
-        if self._file is None:
+        if self._file is None and self._index_file is None:
             raise RuntimeError(
                 "Cannot read data after the underlying TDMS reader is closed")
 
