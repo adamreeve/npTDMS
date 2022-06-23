@@ -6,6 +6,7 @@ from io import UnsupportedOperation
 import numpy as np
 from nptdms.common import toc_properties, ObjectPath
 from nptdms.types import *
+from nptdms import TdmsFile
 
 
 class TdmsWriter(object):
@@ -16,6 +17,28 @@ class TdmsWriter(object):
         with TdmsWriter(path) as tdms_writer:
             tdms_writer.write_segment(segment_data)
     """
+
+    @classmethod
+    def resave(cls, source, destination, version=4712):
+        """ Resaves an existing TdmsFile 
+
+        :param source: Either the path to the tdms file to read
+            as a string or pathlib.Path, or an already opened file.
+        :param destination: Either the path to the tdms file 
+        :param version: The TDMS format version to write, which must be either 4712 (the default) or 4713.
+            It's important that if you are appending segments to an
+            existing TDMS file, this matches the existing file version (this can be queried with the
+            :py:attr:`~nptdms.TdmsFile.tdms_version` property).
+        """
+        file = TdmsFile(source)
+        objects = [RootObject(file.properties)]
+        for group in file.groups():
+            objects.append(GroupObject(group.name, group.properties))
+            for channel in group.channels():
+                objects.append(ChannelObject(group.name, channel.name, channel.read_data(), channel.properties))
+
+        with cls(destination, version=version) as new_file:
+            new_file.write_segment(objects)
 
     def __init__(self, file, mode='w', version=4712):
         """Initialise a new TDMS writer
