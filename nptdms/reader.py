@@ -44,7 +44,7 @@ class TdmsReader(object):
         if hasattr(tdms_file, "read"):
             # Is a file
             tag = tdms_file.read(4)
-            tdms_file.seek(0, 0)
+            tdms_file.seek(0, os.SEEK_SET)
 
             if tag == b"TDSh":
                 self._index_file = tdms_file

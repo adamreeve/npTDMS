@@ -2,7 +2,9 @@
 
 from collections import OrderedDict
 from datetime import datetime
-from io import UnsupportedOperation
+from io import UnsupportedOperation, BytesIO
+import os
+
 import numpy as np
 from nptdms.common import toc_properties, ObjectPath
 from nptdms.types import *
@@ -19,7 +21,7 @@ class TdmsWriter(object):
     """
 
     @classmethod
-    def resave(cls, source, destination, version=4712, with_index_file=False):
+    def resave(cls, source, destination, version=4712, with_index_file=True, store_streams=True):
         """ Resaves an existing TdmsFile 
 
         :param source: Either the path to the tdms file to read
@@ -37,14 +39,16 @@ class TdmsWriter(object):
             for channel in group.channels():
                 objects.append(ChannelObject(group.name, channel.name, channel.read_data(), channel.properties))
 
-        with cls(destination, version=version, with_index_file=with_index_file) as new_file:
+        writer = cls(destination, version=version, with_index_file=with_index_file, store_streams=store_streams)
+        with writer as new_file:
             new_file.write_segment(objects)
+        return writer
 
-    def __init__(self, file, mode='w', version=4712, with_index_file=False):
+    def __init__(self, file, mode='w', version=4712, with_index_file=False, store_streams=False):
         """Initialise a new TDMS writer
 
-        :param file: Either the path to the tdms file to open or an already
-            opened file.
+        :param file: Either the path to the tdms file, an already
+            opened file or a bytes stream.
         :param mode: The mode to open the file with, used when ``file`` is a file path.
             This will be passed through to Python's ``open`` function with 'b' appended
             to ensure the file is opened in binary mode.
@@ -53,9 +57,9 @@ class TdmsWriter(object):
             It's important that if you are appending segments to an
             existing TDMS file, this matches the existing file version (this can be queried with the
             :py:attr:`~nptdms.TdmsFile.tdms_version` property).
-        :param with_index_file: Whether or not to write a index file besides the data file ending with
-            .tdms. Index files can be used to accelerate reading speeds for faster channel extraction and
-            data positions inside the data files. Only valid if submitted file variable is a path.
+        :param with_index_file: Whether or not to write a index file besides the data file. Index files
+            can be used to accelerate reading speeds for faster channel extraction and data positions inside
+            the data files. Only valid if submitted file variable is a path.
         """
         valid_versions = (4712, 4713)
         if version not in valid_versions:
@@ -68,9 +72,13 @@ class TdmsWriter(object):
         self._tdms_version = version
         self._with_index_file = with_index_file
 
+        self.streams = {".tdms": None, ".tdms_index": None} if store_streams else None
+
         if hasattr(file, "read"):
             # Is a file
             self._file = file
+            if self._with_index_file:
+                self._index_file = BytesIO()
         else:
             if not file.endswith(".tdms"):
                 file += ".tdms"
@@ -85,6 +93,14 @@ class TdmsWriter(object):
                 self._index_file = open(self._index_file_path, self._file_mode + 'b')
 
     def close(self):
+        # save the streams to writer class for later use
+        if self.streams is not None:
+            self._file.seek(0, os.SEEK_SET)
+            self.streams[".tdms"] = self._file
+            if self._index_file is not None:
+                self._index_file.seek(0, os.SEEK_SET)
+                self.streams[".tdms_index"] = self._index_file
+        
         if self._file_path is not None:
             self._file.close()
             if self._index_file_path is not None:
@@ -99,7 +115,7 @@ class TdmsWriter(object):
         segment = TdmsSegment(objects, version=self._tdms_version)
         segment.write(self._file)
 
-        if self._index_file_path is not None:
+        if self._index_file is not None:
             segment = TdmsSegment(objects, is_index_file=True, version=self._tdms_version)
             segment.write(self._index_file)
 
