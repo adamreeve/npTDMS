@@ -22,11 +22,11 @@ class TdmsWriter(object):
 
     @classmethod
     def resave(cls, source, destination, version=4712, with_index_file=True, store_streams=True):
-        """ Resaves an existing TdmsFile 
+        """ Resaves an existing TdmsFile
 
         :param source: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
-        :param destination: Either the path to the tdms file 
+        :param destination: Either the path to the tdms file
         :param version: The TDMS format version to write, which must be either 4712 (the default) or 4713.
             It's important that if you are appending segments to an
             existing TDMS file, this matches the existing file version (this can be queried with the
@@ -100,7 +100,7 @@ class TdmsWriter(object):
             if self._index_file is not None:
                 self._index_file.seek(0, os.SEEK_SET)
                 self.streams[".tdms_index"] = self._index_file
-        
+
         if self._file_path is not None:
             self._file.close()
             if self._index_file_path is not None:

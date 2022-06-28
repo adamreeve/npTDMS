@@ -253,10 +253,10 @@ class TdmsFile(object):
 
                 self_channels = self_group.channels()
                 other_channels = other_group.channels()
-                
+
                 self_channel_names = [c.name for c in self_channels]
                 other_channel_names = [c.name for c in other_channels]
-                
+
                 equals.append(len(self_channel_names) == len(other_channel_names))
                 equals.append(len(set(self_channel_names).difference(set(other_channel_names))) == 0)
 
@@ -265,7 +265,7 @@ class TdmsFile(object):
                     equals.append(np.all(c_self.data == c_other.data))
 
             return np.all(equals)
-        except:
+        except ValueError as error:
             return False
 
     def __enter__(self):

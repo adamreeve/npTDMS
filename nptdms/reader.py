@@ -51,7 +51,8 @@ class TdmsReader(object):
             elif tag == b"TDSm":
                 self._file = tdms_file
             else:
-                raise ValueError(f"File should either start with 'b`TDSh`' or 'b`TDSm`'. Submitted file starts with '{tag}'.")
+                raise ValueError(f"File should either start with 'b`TDSh`' or 'b`TDSm`'.\
+                    Submitted file starts with '{tag}'.")
 
         else:
             # Is path to a file
@@ -75,7 +76,8 @@ class TdmsReader(object):
                     self._index_file = open(self._index_file_path, "rb")
 
             else:
-                raise ValueError(f"File should either end with '.tdms' or '.tdms_index'. Submitted path ends with '{source_path.split('.')[-1]}'.")
+                raise ValueError(f"File should either end with '.tdms' or '.tdms_index'.\
+                    Submitted path ends with '{source_path.split('.')[-1]}'.")
 
     def close(self):
         if self._file is None and self._index_file_path is None:
@@ -85,7 +87,7 @@ class TdmsReader(object):
         if self._file_path is not None:
             # File path was provided so we opened the file and should close it.
             self._file.close()
-            
+
         if self._index_file_path is not None:
             # Index file path was provided so we opened the file and should close it.
             self._index_file.close()
@@ -99,10 +101,10 @@ class TdmsReader(object):
 
         :param require_segment_indexes: Whether to create segment object indexes to allow lookup of objects by path.
         """
-        if self._index_file is not None: # generally try to read metadata from index file because it is faster
+        if self._index_file is not None:  # generally try to read metadata from index file because it is faster
             file = self._index_file
             reading_index_file = True
-        elif self._file is not None: # fallback if only a data file is supplied
+        elif self._file is not None:  # fallback if only a data file is supplied
             file = self._file
             reading_index_file = False
         else:

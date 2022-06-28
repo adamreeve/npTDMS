@@ -13,6 +13,7 @@ coverage.xml
 .ipynb_checkpoints
 .vscode
 *.ipynb
+tox.ini
 
 # Wercker directories
 _builds
