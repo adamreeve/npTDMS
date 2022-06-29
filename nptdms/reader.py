@@ -51,8 +51,8 @@ class TdmsReader(object):
             elif tag == b"TDSm":
                 self._file = tdms_file
             else:
-                raise ValueError(f"File should either start with 'b`TDSh`' or 'b`TDSm`'.\
-                    Submitted file starts with '{tag}'.")
+                raise ValueError(
+                    f"File should either start with 'b`TDSh`' or 'b`TDSm`', submitted starts with '{tag}'.")
 
         else:
             # Is path to a file
@@ -76,8 +76,9 @@ class TdmsReader(object):
                     self._index_file = open(self._index_file_path, "rb")
 
             else:
-                raise ValueError(f"File should either end with '.tdms' or '.tdms_index'.\
-                    Submitted path ends with '{source_path.split('.')[-1]}'.")
+                raise ValueError(
+                    f"File should either end with '.tdms' or '.tdms_index', submitted ends with '{source_path.split('.')[-1]}'."
+                )
 
     def close(self):
         if self._file is None and self._index_file_path is None:

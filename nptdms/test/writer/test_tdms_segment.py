@@ -1,12 +1,17 @@
 """Test TdmsSegment"""
 
+import os
+import tempfile
 from collections import OrderedDict
 from datetime import datetime
-import pytest
-import numpy as np
+from io import BytesIO
 
-from nptdms.writer import ChannelObject, TdmsSegment, read_properties_dict
+import numpy as np
+import pytest
+from nptdms.tdms import TdmsFile
 from nptdms.types import *
+from nptdms.writer import (ChannelObject, GroupObject, RootObject, TdmsSegment,
+                           TdmsWriter, read_properties_dict)
 
 
 class StubObject(object):
@@ -228,3 +233,51 @@ def _assert_sequence_equal(values, expected_values):
             (expected, position))
     except StopIteration:
         pass
+
+
+def test_resave_files():
+    buf = BytesIO()
+    with TdmsWriter(buf) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+    buf.seek(0, os.SEEK_SET)
+
+    target_buf = BytesIO()
+    TdmsWriter.resave(buf, target_buf)
+    new_file = TdmsFile(target_buf)
+
+    buf.seek(0, os.SEEK_SET)
+    assert new_file == TdmsFile(buf)
+
+
+def test_write_and_store_index_stream():
+    writer = TdmsWriter(BytesIO(), with_index_file=True, store_streams=True)
+    with writer as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    assert type(writer.streams) is not None
+    assert type(writer.streams) == dict
+    assert type(writer.streams[".tdms"]) == BytesIO
+    assert type(writer.streams[".tdms_index"]) == BytesIO
+
+
+def test_write_and_store_index_file():
+    directory = tempfile.mkdtemp()
+    tdms_path = os.path.join(directory, 'test_file.tdms')
+
+    writer = TdmsWriter(tdms_path, with_index_file=True)
+    with writer as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    assert os.path.isfile(tdms_path + "_index")

@@ -235,38 +235,35 @@ class TdmsFile(object):
     def __eq__(self, other):
         """ Compare two TdmsFile objects by properties, group names, channel names and channel values
         """
-        try:
-            equals = []
-            equals.append(self.properties == other.properties)
+        equals = []
+        equals.append(self.properties == other.properties)
 
-            self_groups = self.groups()
-            other_groups = other.groups()
+        self_groups = self.groups()
+        other_groups = other.groups()
 
-            self_group_names = [g.name for g in self_groups]
-            other_group_names = [g.name for g in other_groups]
+        self_group_names = [g.name for g in self_groups]
+        other_group_names = [g.name for g in other_groups]
 
-            equals.append(len(self_group_names) == len(other_group_names))
-            equals.append(len(set(self_group_names).difference(set(other_group_names))) == 0)
+        equals.append(len(self_group_names) == len(other_group_names))
+        equals.append(len(set(self_group_names).difference(set(other_group_names))) == 0)
 
-            for self_group, other_group in zip(self_groups, other_groups):
-                equals.append(self_group.properties == other_group.properties)
+        for self_group, other_group in zip(self_groups, other_groups):
+            equals.append(self_group.properties == other_group.properties)
 
-                self_channels = self_group.channels()
-                other_channels = other_group.channels()
+            self_channels = self_group.channels()
+            other_channels = other_group.channels()
 
-                self_channel_names = [c.name for c in self_channels]
-                other_channel_names = [c.name for c in other_channels]
+            self_channel_names = [c.name for c in self_channels]
+            other_channel_names = [c.name for c in other_channels]
 
-                equals.append(len(self_channel_names) == len(other_channel_names))
-                equals.append(len(set(self_channel_names).difference(set(other_channel_names))) == 0)
+            equals.append(len(self_channel_names) == len(other_channel_names))
+            equals.append(len(set(self_channel_names).difference(set(other_channel_names))) == 0)
 
-                for c_self, c_other in zip(self_channels, other_channels):
-                    equals.append(c_self.properties == c_other.properties)
-                    equals.append(np.all(c_self.data == c_other.data))
+            for c_self, c_other in zip(self_channels, other_channels):
+                equals.append(c_self.properties == c_other.properties)
+                equals.append(np.all(c_self.data == c_other.data))
 
-            return np.all(equals)
-        except ValueError as error:
-            return False
+        return np.all(equals)
 
     def __enter__(self):
         return self

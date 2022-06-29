@@ -72,7 +72,7 @@ class TdmsWriter(object):
         self._tdms_version = version
         self._with_index_file = with_index_file
 
-        self.streams = {".tdms": None, ".tdms_index": None} if store_streams else None
+        self.streams = {".tdms": None, ".tdms_index": None} if store_streams and hasattr(file, "read") else None
 
         if hasattr(file, "read"):
             # Is a file
@@ -80,8 +80,9 @@ class TdmsWriter(object):
             if self._with_index_file:
                 self._index_file = BytesIO()
         else:
-            if not file.endswith(".tdms"):
-                file += ".tdms"
+            if store_streams:
+                raise ValueError("store_streams is only valid when stream is input for 'file'.")
+
             self._file_path = file
             if self._with_index_file:
                 self._index_file_path = file + "_index"
@@ -106,6 +107,7 @@ class TdmsWriter(object):
             if self._index_file_path is not None:
                 self._index_file.close()
         self._file = None
+        self._index_file = None
 
     def write_segment(self, objects):
         """ Write a segment of data to a TDMS file
