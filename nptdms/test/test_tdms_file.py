@@ -1126,3 +1126,11 @@ def test_warning_on_version_mismatch(caplog):
     assert "WARNING" in caplog.text
     assert "Segment version mismatch" in caplog.text
     assert "4712 != 4713" in caplog.text
+
+def test_equality():
+    test_file1 = GeneratedFile()
+    test_file1.add_segment(*basic_segment())
+    test_file2 = GeneratedFile()
+    test_file2.add_segment(*basic_segment())
+
+    assert TdmsFile(test_file1.get_tempfile()) == TdmsFile(test_file2.get_tempfile())
