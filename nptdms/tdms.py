@@ -128,7 +128,11 @@ class TdmsFile(object):
 
         self._reader = TdmsReader(file)
         try:
-            self._read_file(self._reader, read_metadata_only, keep_open)
+            self._read_file(
+                self._reader,
+                True if self._reader._file is None else read_metadata_only,
+                keep_open
+            )
         finally:
             if not keep_open:
                 self._reader.close()
@@ -248,10 +252,10 @@ class TdmsFile(object):
 
             self_channels = self_group.channels()
             other_channels = other_group.channels()
-            
+
             self_channel_names = [c.name for c in self_channels]
             other_channel_names = [c.name for c in other_channels]
-            
+
             equals.append(len(self_channel_names) == len(other_channel_names))
             equals.append(len(set(self_channel_names).difference(set(other_channel_names))) == 0)
 
