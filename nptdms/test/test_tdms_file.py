@@ -1,29 +1,26 @@
 """Test reading of example TDMS files"""
 
-from collections import defaultdict
 import logging
 import os
 import sys
-from shutil import copyfile
 import tempfile
 import weakref
-from hypothesis import (assume, given, example, settings, strategies, HealthCheck)
+from collections import defaultdict
+from io import BytesIO
+from shutil import copyfile
+
 import numpy as np
 import pytest
-from nptdms import TdmsFile
+from hypothesis import (HealthCheck, assume, example, given, settings,
+                        strategies)
+from nptdms import TdmsFile, TdmsWriter
 from nptdms.log import log_manager
-from nptdms.test.util import (
-    BytesIoTestFile,
-    GeneratedFile,
-    basic_segment,
-    channel_metadata,
-    compare_arrays,
-    hexlify_value,
-    segment_objects_metadata,
-    string_hexlify,
-)
+from nptdms.reader import TdmsReader
 from nptdms.test import scenarios
-
+from nptdms.test.util import (BytesIoTestFile, GeneratedFile, basic_segment,
+                              channel_metadata, compare_arrays, hexlify_value,
+                              segment_objects_metadata, string_hexlify)
+from nptdms.writer import ChannelObject, GroupObject, RootObject
 
 # When running tests on GitHub actions, the first iteration can be quite
 # slow and cause failures, so disable deadlines:
@@ -562,6 +559,51 @@ def test_read_with_mismatching_index_file():
             finally:
                 os.remove(new_index_file)
                 os.remove(tdms_file.name)
+
+
+def test_equality_of_file():
+    test_file1 = GeneratedFile()
+    test_file1.add_segment(*basic_segment())
+    test_file2 = GeneratedFile()
+    test_file2.add_segment(*basic_segment())
+
+    assert TdmsFile(test_file1.get_tempfile()) == TdmsFile(test_file2.get_tempfile())
+
+
+def test_in_depth_equality_of_file():
+    """Test for tdms instances comparison
+    """
+
+    root1 = RootObject(properties={"file": "file1"})
+    group1 = GroupObject("group1")
+    channel1 = ChannelObject("group2", "channel1", np.linspace(0, 1))
+
+    root2 = RootObject(properties={"file": "file2"})
+    group2 = GroupObject("group2")
+    channel2 = ChannelObject("group2", "channel2", np.linspace(0, 2))
+
+    def create_tdms(root, group, channel):
+        buf = BytesIO()
+        with TdmsWriter(buf) as file:
+            file.write_segment([root, group, channel])
+        buf.seek(0, os.SEEK_SET)
+        return TdmsFile(buf)
+
+    assert create_tdms(root1, group1, channel1) == create_tdms(root1, group1, channel1)
+    assert create_tdms(root1, group1, channel1) != create_tdms(root1, group1, channel2)
+    assert create_tdms(root1, group1, channel1) != create_tdms(root1, group2, channel1)
+    assert create_tdms(root1, group1, channel1) != create_tdms(root1, group2, channel2)
+    assert create_tdms(root1, group1, channel1) != create_tdms(root2, group1, channel1)
+    assert create_tdms(root1, group1, channel1) != create_tdms(root2, group1, channel2)
+    assert create_tdms(root1, group1, channel1) != create_tdms(root2, group2, channel2)
+
+    assert create_tdms(root2, group2, channel2) != create_tdms(root1, group1, channel1)
+    assert create_tdms(root2, group2, channel2) != create_tdms(root1, group1, channel2)
+    assert create_tdms(root2, group2, channel2) != create_tdms(root1, group2, channel1)
+    assert create_tdms(root2, group2, channel2) != create_tdms(root1, group2, channel2)
+    assert create_tdms(root2, group2, channel2) != create_tdms(root2, group1, channel1)
+    assert create_tdms(root2, group2, channel2) != create_tdms(root2, group1, channel2)
+    assert create_tdms(root2, group2, channel2) == create_tdms(root2, group2, channel2)
 
 
 def test_get_len_of_file():
@@ -1127,10 +1169,14 @@ def test_warning_on_version_mismatch(caplog):
     assert "Segment version mismatch" in caplog.text
     assert "4712 != 4713" in caplog.text
 
-def test_equality():
-    test_file1 = GeneratedFile()
-    test_file1.add_segment(*basic_segment())
-    test_file2 = GeneratedFile()
-    test_file2.add_segment(*basic_segment())
 
-    assert TdmsFile(test_file1.get_tempfile()) == TdmsFile(test_file2.get_tempfile())
+def test_read_index_as_stream():
+    buf = BytesIO()
+    with TdmsWriter(buf, with_index_file=True, store_streams=True) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    assert TdmsFile(file.streams[".tdms_index"]) is not None
