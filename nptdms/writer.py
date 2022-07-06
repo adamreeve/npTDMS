@@ -66,7 +66,7 @@ class TdmsWriter(object):
         :param with_index_file: Whether or not to write a index file besides the data file. Index files
             can be used to accelerate reading speeds for faster channel extraction and data positions inside
             the data files. Only valid if submitted file variable is a path.
-        :param store_streams: Whether or not to store the streams after the writer is closed. If set to true 
+        :param store_streams: Whether or not to store the streams after the writer is closed. If set to true
             you can access the streams at TdmsWriter.streams after the writer is closed. It is the only way
             to access the .tdms_index by TdmsWriter.streams[".tdms_index"]. The data stream can be accessed
             by TdmsWriter.streams[".tdms"].
