@@ -33,14 +33,19 @@ class TdmsWriter(object):
             :py:attr:`~nptdms.TdmsFile.tdms_version` property).
         """
         file = TdmsFile(source)
-        
+
         writer = cls(destination, version=version, with_index_file=with_index_file, store_streams=store_streams)
         with writer as new_file:
             new_file.write_segment([RootObject(file.properties)])
             for group in file.groups():
                 new_file.write_segment([GroupObject(group.name, group.properties)])
                 for channel in group.channels():
-                    new_file.write_segment([ChannelObject(group.name, channel.name, channel.read_data(), channel.properties)])
+                    new_file.write_segment([ChannelObject(
+                        group.name,
+                        channel.name,
+                        channel.read_data(),
+                        channel.properties
+                    )])
 
         return writer
 

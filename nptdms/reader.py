@@ -77,7 +77,8 @@ class TdmsReader(object):
 
             else:
                 raise ValueError(
-                    f"File should either end with '.tdms' or '.tdms_index', submitted ends with '{source_path.split('.')[-1]}'."
+                    f"File should either end with '.tdms' or '.tdms_index', "
+                    f"submitted ends with '{source_path.split('.')[-1]}'."
                 )
 
     def close(self):
