@@ -167,7 +167,8 @@ class TdmsSegment(object):
 
         file.write(b''.join(val.bytes for val in leadin))
         file.write(b''.join(val.bytes for val in metadata))
-        self._write_data(file)
+        if not self.is_index_file:
+            self._write_data(file)
 
     def metadata(self):
         metadata = []
@@ -227,7 +228,7 @@ class TdmsSegment(object):
 
     def _write_data(self, file):
         for obj in self.objects:
-            if hasattr(obj, 'data') and not self.is_index_file:
+            if hasattr(obj, 'data'):
                 write_data(file, obj)
 
 
