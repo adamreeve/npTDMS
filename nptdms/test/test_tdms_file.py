@@ -1180,3 +1180,28 @@ def test_read_index_as_stream():
         ])
 
     assert TdmsFile(file.streams[".tdms_index"]) is not None
+
+
+def test_read_data_when_tdms_index_is_supplied():
+    directory = tempfile.mkdtemp()
+    tdms_path = os.path.join(directory, 'test_file.tdms')
+
+    writer = TdmsWriter(tdms_path, with_index_file=True)
+    with writer as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    with TdmsFile.open(f"{tdms_path}_index") as tdms_file:
+        created_data = tdms_file.groups()[0].channels()[0].read_data()
+        expected_data = np.linspace(0, 1)
+        np.testing.assert_array_equal(expected_data, created_data)
+
+    os.remove(os.path.join(directory, 'test_file.tdms'))
+
+    with TdmsFile.open(f"{tdms_path}_index") as tdms_file:
+        with pytest.raises(RuntimeError) as exc_info:
+            _ = tdms_file.groups()[0].channels()[0].read_data()
+        assert str(exc_info.value) == "No channel data available."

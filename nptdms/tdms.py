@@ -620,6 +620,14 @@ class TdmsChannel(object):
             yield ChannelDataChunk(self, raw_data_chunk, channel_offset)
             channel_offset += len(raw_data_chunk)
 
+    def data_is_available(self):
+        """ Convencience function forwarding function from TdmsReader class
+
+        :returns: True if self._file is present from the inputs
+        :rtype: bool
+        """
+        return self._reader.data_is_available()
+
     def read_data(self, offset=0, length=None, scaled=True):
         """ Reads data for this channel from the TDMS file and returns it as a numpy array
 
@@ -633,6 +641,9 @@ class TdmsChannel(object):
             Set this parameter to False to return raw unscaled data.
             For DAQmx data a dictionary of scaler id to raw scaler data will be returned.
         """
+        if not self.data_is_available():
+            raise RuntimeError("No channel data available.")
+
         if self._raw_data is None:
             raw_data = self._read_channel_data(offset, length)
         else:

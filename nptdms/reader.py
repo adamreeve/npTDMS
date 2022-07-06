@@ -66,7 +66,7 @@ class TdmsReader(object):
                     self._file_path = filepath
                     self._file = open(self._file_path, "rb")
 
-            elif source_path.endswith(".tdms"):
+            else:
                 self._file_path = source_path
                 self._file = open(self._file_path, "rb")
 
@@ -74,12 +74,6 @@ class TdmsReader(object):
                 if os.path.isfile(filepath):
                     self._index_file_path = filepath
                     self._index_file = open(self._index_file_path, "rb")
-
-            else:
-                raise ValueError(
-                    f"File should either end with '.tdms' or '.tdms_index', "
-                    f"submitted ends with '{source_path.split('.')[-1]}'."
-                )
 
     def close(self):
         if self._file is None and self._index_file_path is None:
@@ -234,6 +228,14 @@ class TdmsReader(object):
                 yield _trim_channel_chunk(chunk, skip, trim)
 
             segment_index += 1
+
+    def data_is_available(self):
+        """ Convencience function to check if data could be read for submitted data
+
+        :returns: True if self._file is present from the inputs
+        :rtype: (bool)
+        """
+        return self._file is not None
 
     def read_channel_chunk_for_index(self, channel_path, index):
         """ Read the chunk containing the given index
