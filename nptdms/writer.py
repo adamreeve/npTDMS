@@ -21,8 +21,9 @@ class TdmsWriter(object):
     """
 
     @classmethod
-    def resave(cls, source, destination, version=4712, with_index_file=True, store_streams=True):
-        """ Resaves an existing TdmsFile
+    def defragment(cls, source, destination, version=4712, with_index_file=True, store_streams=True):
+        """ Defragemnts an existing TdmsFile by loading and moving each Object to a separate channel
+        to stream read one consecutive part of the file for faster access.
 
         :param source: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
@@ -65,6 +66,10 @@ class TdmsWriter(object):
         :param with_index_file: Whether or not to write a index file besides the data file. Index files
             can be used to accelerate reading speeds for faster channel extraction and data positions inside
             the data files. Only valid if submitted file variable is a path.
+        :param store_streams: Whether or not to store the streams after the writer is closed. If set to true 
+            you can access the streams at TdmsWriter.streams after the writer is closed. It is the only way
+            to access the .tdms_index by TdmsWriter.streams[".tdms_index"]. The data stream can be accessed
+            by TdmsWriter.streams[".tdms"].
         """
         valid_versions = (4712, 4713)
         if version not in valid_versions:
