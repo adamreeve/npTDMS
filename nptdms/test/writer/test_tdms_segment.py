@@ -235,7 +235,7 @@ def _assert_sequence_equal(values, expected_values):
         pass
 
 
-def test_resave_files():
+def test_defragment_files():
     buf = BytesIO()
     with TdmsWriter(buf) as file:
         file.write_segment([
@@ -246,11 +246,7 @@ def test_resave_files():
     buf.seek(0, os.SEEK_SET)
 
     target_buf = BytesIO()
-    TdmsWriter.resave(buf, target_buf)
-    new_file = TdmsFile(target_buf)
-
-    buf.seek(0, os.SEEK_SET)
-    assert new_file == TdmsFile(buf)
+    TdmsWriter.defragment(buf, target_buf)
 
 
 def test_write_and_store_index_stream():

@@ -561,51 +561,6 @@ def test_read_with_mismatching_index_file():
                 os.remove(tdms_file.name)
 
 
-def test_equality_of_file():
-    test_file1 = GeneratedFile()
-    test_file1.add_segment(*basic_segment())
-    test_file2 = GeneratedFile()
-    test_file2.add_segment(*basic_segment())
-
-    assert TdmsFile(test_file1.get_tempfile()) == TdmsFile(test_file2.get_tempfile())
-
-
-def test_in_depth_equality_of_file():
-    """Test for tdms instances comparison
-    """
-
-    root1 = RootObject(properties={"file": "file1"})
-    group1 = GroupObject("group1")
-    channel1 = ChannelObject("group2", "channel1", np.linspace(0, 1))
-
-    root2 = RootObject(properties={"file": "file2"})
-    group2 = GroupObject("group2")
-    channel2 = ChannelObject("group2", "channel2", np.linspace(0, 2))
-
-    def create_tdms(root, group, channel):
-        buf = BytesIO()
-        with TdmsWriter(buf) as file:
-            file.write_segment([root, group, channel])
-        buf.seek(0, os.SEEK_SET)
-        return TdmsFile(buf)
-
-    assert create_tdms(root1, group1, channel1) == create_tdms(root1, group1, channel1)
-    assert create_tdms(root1, group1, channel1) != create_tdms(root1, group1, channel2)
-    assert create_tdms(root1, group1, channel1) != create_tdms(root1, group2, channel1)
-    assert create_tdms(root1, group1, channel1) != create_tdms(root1, group2, channel2)
-    assert create_tdms(root1, group1, channel1) != create_tdms(root2, group1, channel1)
-    assert create_tdms(root1, group1, channel1) != create_tdms(root2, group1, channel2)
-    assert create_tdms(root1, group1, channel1) != create_tdms(root2, group2, channel2)
-
-    assert create_tdms(root2, group2, channel2) != create_tdms(root1, group1, channel1)
-    assert create_tdms(root2, group2, channel2) != create_tdms(root1, group1, channel2)
-    assert create_tdms(root2, group2, channel2) != create_tdms(root1, group2, channel1)
-    assert create_tdms(root2, group2, channel2) != create_tdms(root1, group2, channel2)
-    assert create_tdms(root2, group2, channel2) != create_tdms(root2, group1, channel1)
-    assert create_tdms(root2, group2, channel2) != create_tdms(root2, group1, channel2)
-    assert create_tdms(root2, group2, channel2) == create_tdms(root2, group2, channel2)
-
-
 def test_get_len_of_file():
     """Test getting the length of a TdmsFile
     """
@@ -1204,4 +1159,4 @@ def test_read_data_when_tdms_index_is_supplied():
     with TdmsFile.open(f"{tdms_path}_index") as tdms_file:
         with pytest.raises(RuntimeError) as exc_info:
             _ = tdms_file.groups()[0].channels()[0].read_data()
-        assert str(exc_info.value) == "No channel data available."
+        assert str(exc_info.value) == "Data cannot be read from index file only"

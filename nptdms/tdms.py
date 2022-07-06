@@ -130,7 +130,7 @@ class TdmsFile(object):
         try:
             self._read_file(
                 self._reader,
-                True if not self._reader.data_is_available() else read_metadata_only,
+                read_metadata_only if not self._reader.is_index_file_only() else True,
                 keep_open
             )
         finally:
@@ -587,14 +587,6 @@ class TdmsChannel(object):
             yield ChannelDataChunk(self, raw_data_chunk, channel_offset)
             channel_offset += len(raw_data_chunk)
 
-    def data_is_available(self):
-        """ Convencience function forwarding function from TdmsReader class
-
-        :returns: True if self._file is present from the inputs
-        :rtype: bool
-        """
-        return self._reader.data_is_available()
-
     def read_data(self, offset=0, length=None, scaled=True):
         """ Reads data for this channel from the TDMS file and returns it as a numpy array
 
@@ -608,9 +600,6 @@ class TdmsChannel(object):
             Set this parameter to False to return raw unscaled data.
             For DAQmx data a dictionary of scaler id to raw scaler data will be returned.
         """
-        if not self.data_is_available():
-            raise RuntimeError("No channel data available.")
-
         if self._raw_data is None:
             raw_data = self._read_channel_data(offset, length)
         else:
@@ -802,6 +791,8 @@ class TdmsChannel(object):
             raise ValueError("offset must be non-negative")
         if length is not None and length < 0:
             raise ValueError("length must be non-negative")
+        if self._reader.is_index_file_only():
+            raise RuntimeError("Data cannot be read from index file only")
 
         with Timer(log, "Allocate space for channel"):
             # Allocate space for data

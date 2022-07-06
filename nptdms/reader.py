@@ -229,14 +229,6 @@ class TdmsReader(object):
 
             segment_index += 1
 
-    def data_is_available(self):
-        """ Convencience function to check if data could be read for submitted data
-
-        :returns: True if self._file is present from the inputs
-        :rtype: (bool)
-        """
-        return self._file is not None
-
     def read_channel_chunk_for_index(self, channel_path, index):
         """ Read the chunk containing the given index
 
@@ -269,6 +261,13 @@ class TdmsReader(object):
         chunk_data = next(segment.read_raw_data_for_channel(self._file, channel_path, chunk_index, 1))
         chunk_offset = segment_start_index + chunk_index * chunk_size
         return chunk_data, chunk_offset
+
+    def is_index_file_only(self):
+        """ Convenience function to access if the supplied file is an index file and not data file is available
+
+        :rtype: bool
+        """
+        return self._file is None and self._index_file is not None
 
     def _read_segment_metadata(
             self, file, segment_position, index_cache, previous_segment, is_index_file):
