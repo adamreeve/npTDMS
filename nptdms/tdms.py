@@ -130,7 +130,7 @@ class TdmsFile(object):
         try:
             self._read_file(
                 self._reader,
-                True if self._reader._file is None else read_metadata_only,
+                True if not self._reader.data_is_available() else read_metadata_only,
                 keep_open
             )
         finally:

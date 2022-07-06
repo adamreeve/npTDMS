@@ -76,7 +76,7 @@ class TdmsReader(object):
                     self._index_file = open(self._index_file_path, "rb")
 
     def close(self):
-        if self._file is None and self._index_file_path is None:
+        if self._file is None and self._index_file is None:
             # Already closed
             return
 
