@@ -249,26 +249,39 @@ def test_defragment_files():
     TdmsWriter.defragment(buf, target_buf)
 
 
-def test_write_and_store_index_stream():
-    writer = TdmsWriter(BytesIO(), with_index_file=True, store_streams=True)
-    with writer as file:
+def test_write_data_stream_with_index():
+    data_file = BytesIO()
+    index_file = BytesIO()
+    with TdmsWriter(data_file, index_file=index_file) as file:
         file.write_segment([
             RootObject(properties={"file": "file1"}),
             GroupObject("group1"),
             ChannelObject("group1", "channel1", np.linspace(0, 1))
         ])
 
-    assert type(writer.streams) is not None
-    assert type(writer.streams) == dict
-    assert type(writer.streams[".tdms"]) == BytesIO
-    assert type(writer.streams[".tdms_index"]) == BytesIO
+    assert len(data_file.read()) > 0
+    assert len(index_file.read()) > 0
+
+
+def test_write_data_stream_without_index():
+    data_file = BytesIO()
+    index_file = BytesIO()
+    with TdmsWriter(data_file) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    assert len(data_file.read()) > 0
+    assert len(index_file.read()) == 0
 
 
 def test_write_and_store_index_file():
     directory = tempfile.mkdtemp()
     tdms_path = os.path.join(directory, 'test_file.tdms')
 
-    writer = TdmsWriter(tdms_path, with_index_file=True)
+    writer = TdmsWriter(tdms_path, index_file=True)
     with writer as file:
         file.write_segment([
             RootObject(properties={"file": "file1"}),

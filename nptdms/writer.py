@@ -21,7 +21,7 @@ class TdmsWriter(object):
     """
 
     @classmethod
-    def defragment(cls, source, destination, version=4712, with_index_file=True, store_streams=True):
+    def defragment(cls, source, destination, version=4712, index_file=False):
         """ Defragemnts an existing TdmsFile by loading and moving each Object to a separate channel
         to stream read one consecutive part of the file for faster access.
 
@@ -34,9 +34,7 @@ class TdmsWriter(object):
             :py:attr:`~nptdms.TdmsFile.tdms_version` property).
         """
         file = TdmsFile(source)
-
-        writer = cls(destination, version=version, with_index_file=with_index_file, store_streams=store_streams)
-        with writer as new_file:
+        with cls(destination, version=version, index_file=index_file) as new_file:
             new_file.write_segment([RootObject(file.properties)])
             for group in file.groups():
                 new_file.write_segment([GroupObject(group.name, group.properties)])
@@ -48,9 +46,7 @@ class TdmsWriter(object):
                         channel.properties
                     )])
 
-        return writer
-
-    def __init__(self, file, mode='w', version=4712, with_index_file=False, store_streams=False):
+    def __init__(self, file, mode='w', version=4712, index_file=False):
         """Initialise a new TDMS writer
 
         :param file: Either the path to the tdms file, an already
@@ -63,13 +59,9 @@ class TdmsWriter(object):
             It's important that if you are appending segments to an
             existing TDMS file, this matches the existing file version (this can be queried with the
             :py:attr:`~nptdms.TdmsFile.tdms_version` property).
-        :param with_index_file: Whether or not to write a index file besides the data file. Index files
+        :param index_file: Whether or not to write a index file besides the data file. Index files
             can be used to accelerate reading speeds for faster channel extraction and data positions inside
             the data files. Only valid if submitted file variable is a path.
-        :param store_streams: Whether or not to store the streams after the writer is closed. If set to true
-            you can access the streams at TdmsWriter.streams after the writer is closed. It is the only way
-            to access the .tdms_index by TdmsWriter.streams[".tdms_index"]. The data stream can be accessed
-            by TdmsWriter.streams[".tdms"].
         """
         valid_versions = (4712, 4713)
         if version not in valid_versions:
@@ -80,22 +72,28 @@ class TdmsWriter(object):
         self._index_file_path = None
         self._file_mode = mode
         self._tdms_version = version
-        self._with_index_file = with_index_file
-
-        self.streams = {".tdms": None, ".tdms_index": None} if store_streams and hasattr(file, "read") else None
 
         if hasattr(file, "read"):
             # Is a file
             self._file = file
-            if self._with_index_file:
-                self._index_file = BytesIO()
+            if isinstance(index_file, BytesIO):
+                self._index_file = index_file
+            elif isinstance(index_file, bool) and not index_file:
+                pass
+            else:
+                raise ValueError(
+                    f"Invalid type, ``index_file`` can only be ``False`` or a stream to write into, "
+                    "but is {type(index_file)}"
+                )
         else:
-            if store_streams:
-                raise ValueError("store_streams is only valid when stream is input for 'file'.")
-
             self._file_path = file
-            if self._with_index_file:
-                self._index_file_path = file + "_index"
+            if isinstance(index_file, bool):
+                if index_file:
+                    self._index_file_path = file + "_index"
+            else:
+                raise ValueError(
+                    f"Invalid type, ``index_file`` can  only be ``False`` or ``True`` but is {type(index_file)}."
+                )
 
     def open(self):
         if self._file_path is not None:
@@ -104,18 +102,18 @@ class TdmsWriter(object):
                 self._index_file = open(self._index_file_path, self._file_mode + 'b')
 
     def close(self):
-        # save the streams to writer class for later use
-        if self.streams is not None:
-            self._file.seek(0, os.SEEK_SET)
-            self.streams[".tdms"] = self._file
+        if self._file_path is None:
+            if self._file is not None:
+                self._file.seek(0, os.SEEK_SET)
+        else:
+            self._file.close()
+
+        if self._index_file_path is None:
             if self._index_file is not None:
                 self._index_file.seek(0, os.SEEK_SET)
-                self.streams[".tdms_index"] = self._index_file
+        else:
+            self._index_file.close()
 
-        if self._file_path is not None:
-            self._file.close()
-            if self._index_file_path is not None:
-                self._index_file.close()
         self._file = None
         self._index_file = None
 
