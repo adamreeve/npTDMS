@@ -47,7 +47,7 @@ class TdmsWriter(object):
                     new_file.write_segment([ChannelObject(
                         group.name,
                         channel.name,
-                        channel.read_data(),
+                        channel.read_data(scaled=False),
                         channel.properties
                     )])
 
