@@ -32,6 +32,11 @@ class TdmsWriter(object):
             It's important that if you are appending segments to an
             existing TDMS file, this matches the existing file version (this can be queried with the
             :py:attr:`~nptdms.TdmsFile.tdms_version` property).
+        :param index_file: Depends on the ``destination`` input.
+            If ``destination`` is a path ``index_file`` can either be ``True`` or ``False`` to store a ``.tdms_index``
+            file at the same folder location or not.
+            If ``destination`` is a readable object ``index_file`` can either be a redable object or ``False`` to store a ``.tdms_index``
+            file inside of the submitted object or not.
         """
         file = TdmsFile(source)
         with cls(destination, version=version, index_file=index_file) as new_file:
@@ -61,7 +66,9 @@ class TdmsWriter(object):
             :py:attr:`~nptdms.TdmsFile.tdms_version` property).
         :param index_file: Whether or not to write a index file besides the data file. Index files
             can be used to accelerate reading speeds for faster channel extraction and data positions inside
-            the data files. Only valid if submitted file variable is a path.
+            the data files. If ``file```variable is a path ``index_file`` can be ``True`` to store a ``.tdms_index``
+            file at the same folder location or ``False`` to only write the data ``.tdms`` file. If ``file`` variable
+            is a readable object ``index_file`` can either be a readable object to write into or ``False`` to omit.
         """
         valid_versions = (4712, 4713)
         if version not in valid_versions:
@@ -76,7 +83,7 @@ class TdmsWriter(object):
         if hasattr(file, "read"):
             # Is a file
             self._file = file
-            if isinstance(index_file, BytesIO):
+            if hasattr(index_file, "read"):
                 self._index_file = index_file
             elif isinstance(index_file, bool) and not index_file:
                 pass
