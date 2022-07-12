@@ -99,7 +99,7 @@ class TdmsReader(object):
             file = self._file
             reading_index_file = False
         else:
-            raise ValueError("Neither tdms_index file nor tdms file ist available.")
+            raise ValueError("Neither tdms_index file nor tdms file is available.")
 
         self._segments = []
         segment_position = 0
@@ -258,7 +258,7 @@ class TdmsReader(object):
         return chunk_data, chunk_offset
 
     def is_index_file_only(self):
-        """ Convenience function to access if the supplied file is an index file and not data file is available
+        """ Convenience function to access if the supplied file is an index file and no data file is available
 
         :rtype: bool
         """
