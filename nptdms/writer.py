@@ -109,16 +109,10 @@ class TdmsWriter(object):
                 self._index_file = open(self._index_file_path, self._file_mode + 'b')
 
     def close(self):
-        if self._file_path is None:
-            if self._file is not None:
-                self._file.seek(0, os.SEEK_SET)
-        else:
+        if self._file_path is not None:
             self._file.close()
 
-        if self._index_file_path is None:
-            if self._index_file is not None:
-                self._index_file.seek(0, os.SEEK_SET)
-        else:
+        if self._index_file_path is not None:
             self._index_file.close()
 
         self._file = None
