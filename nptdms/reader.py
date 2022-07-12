@@ -65,7 +65,7 @@ class TdmsReader(object):
                 self._file_path = source_path
                 self._file = open(self._file_path, "rb")
 
-                filepath = source_path.split(".")[0] + ".tdms_index"
+                filepath = self._file_path + '_index'
                 if os.path.isfile(filepath):
                     self._index_file_path = filepath
                     self._index_file = open(self._index_file_path, "rb")
