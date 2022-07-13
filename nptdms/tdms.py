@@ -128,7 +128,11 @@ class TdmsFile(object):
 
         self._reader = TdmsReader(file)
         try:
-            self._read_file(self._reader, read_metadata_only, keep_open)
+            self._read_file(
+                self._reader,
+                read_metadata_only if not self._reader.is_index_file_only() else True,
+                keep_open
+            )
         finally:
             if not keep_open:
                 self._reader.close()
@@ -787,6 +791,8 @@ class TdmsChannel(object):
             raise ValueError("offset must be non-negative")
         if length is not None and length < 0:
             raise ValueError("length must be non-negative")
+        if self._reader.is_index_file_only():
+            raise RuntimeError("Data cannot be read from index file only")
 
         with Timer(log, "Allocate space for channel"):
             # Allocate space for data

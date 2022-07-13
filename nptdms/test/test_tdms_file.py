@@ -1,29 +1,23 @@
 """Test reading of example TDMS files"""
 
-from collections import defaultdict
 import logging
 import os
 import sys
-from shutil import copyfile
 import tempfile
 import weakref
-from hypothesis import (assume, given, example, settings, strategies, HealthCheck)
+from collections import defaultdict
+from shutil import copyfile
+
 import numpy as np
 import pytest
+from hypothesis import (HealthCheck, assume, example, given, settings,
+                        strategies)
 from nptdms import TdmsFile
 from nptdms.log import log_manager
-from nptdms.test.util import (
-    BytesIoTestFile,
-    GeneratedFile,
-    basic_segment,
-    channel_metadata,
-    compare_arrays,
-    hexlify_value,
-    segment_objects_metadata,
-    string_hexlify,
-)
 from nptdms.test import scenarios
-
+from nptdms.test.util import (BytesIoTestFile, GeneratedFile, basic_segment,
+                              channel_metadata, compare_arrays, hexlify_value,
+                              segment_objects_metadata, string_hexlify)
 
 # When running tests on GitHub actions, the first iteration can be quite
 # slow and cause failures, so disable deadlines:

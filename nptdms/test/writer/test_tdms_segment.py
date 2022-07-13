@@ -1,12 +1,17 @@
 """Test TdmsSegment"""
 
+import os
+import tempfile
 from collections import OrderedDict
 from datetime import datetime
-import pytest
-import numpy as np
+from io import BytesIO
 
-from nptdms.writer import ChannelObject, TdmsSegment, read_properties_dict
+import numpy as np
+import pytest
+from nptdms.tdms import TdmsFile
 from nptdms.types import *
+from nptdms.writer import (ChannelObject, GroupObject, RootObject, TdmsSegment,
+                           TdmsWriter, read_properties_dict)
 
 
 class StubObject(object):
@@ -228,3 +233,64 @@ def _assert_sequence_equal(values, expected_values):
             (expected, position))
     except StopIteration:
         pass
+
+
+def test_defragment_files():
+    buf = BytesIO()
+    with TdmsWriter(buf) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+    buf.seek(0, os.SEEK_SET)
+
+    target_buf = BytesIO()
+    TdmsWriter.defragment(buf, target_buf)
+
+
+def test_write_data_stream_with_index():
+    data_file = BytesIO()
+    index_file = BytesIO()
+    with TdmsWriter(data_file, index_file=index_file) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    data_file.seek(0, 0)
+    index_file.seek(0, 0)
+    assert len(data_file.read()) > 0
+    assert len(index_file.read()) > 0
+
+
+def test_write_data_stream_without_index():
+    data_file = BytesIO()
+    index_file = BytesIO()
+    with TdmsWriter(data_file) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    data_file.seek(0, 0)
+    index_file.seek(0, 0)
+    assert len(data_file.read()) > 0
+    assert len(index_file.read()) == 0
+
+
+def test_write_and_store_index_file():
+    directory = tempfile.mkdtemp()
+    tdms_path = os.path.join(directory, 'test_file.tdms')
+
+    writer = TdmsWriter(tdms_path, index_file=True)
+    with writer as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    assert os.path.isfile(tdms_path + "_index")
