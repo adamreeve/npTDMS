@@ -35,8 +35,8 @@ class TdmsWriter(object):
         :param index_file: Depends on the ``destination`` input.
             If ``destination`` is a path ``index_file`` can either be ``True`` or ``False`` to store a ``.tdms_index``
             file at the same folder location or not.
-            If ``destination`` is a readable object ``index_file`` can either be a redable object or ``False`` to store a ``.tdms_index``
-            file inside of the submitted object or not.
+            If ``destination`` is a readable object ``index_file`` can either be a redable object or ``False``
+            to store a ``.tdms_index`` file inside of the submitted object or not.
         """
         file = TdmsFile(source)
         with cls(destination, version=version, index_file=index_file) as new_file:

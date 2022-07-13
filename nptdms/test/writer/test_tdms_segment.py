@@ -259,6 +259,8 @@ def test_write_data_stream_with_index():
             ChannelObject("group1", "channel1", np.linspace(0, 1))
         ])
 
+    data_file.seek(0, 0)
+    index_file.seek(0, 0)
     assert len(data_file.read()) > 0
     assert len(index_file.read()) > 0
 
@@ -273,6 +275,8 @@ def test_write_data_stream_without_index():
             ChannelObject("group1", "channel1", np.linspace(0, 1))
         ])
 
+    data_file.seek(0, 0)
+    index_file.seek(0, 0)
     assert len(data_file.read()) > 0
     assert len(index_file.read()) == 0
 
