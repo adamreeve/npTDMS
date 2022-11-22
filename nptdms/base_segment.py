@@ -1,4 +1,3 @@
-from io import UnsupportedOperation
 import numpy as np
 
 from nptdms.log import log_manager
@@ -32,7 +31,7 @@ class BaseSegmentObject(object):
         return None
 
     def __repr__(self):
-        return "%s(%s)" % (self.__class__.__name__, self.path)
+        return f"{self.__class__.__name__}({self.path})"
 
 
 class BaseDataReader(object):

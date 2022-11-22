@@ -230,20 +230,20 @@ class GeneratedFile(object):
             lead_in = b'TDSm'
             toc_mask = 0
             for toc_item in toc:
-                if toc_item == "kTocMetaData":
-                    toc_mask = toc_mask | 1 << 1
-                elif toc_item == "kTocRawData":
-                    toc_mask = toc_mask | 1 << 3
+                if toc_item == "kTocBigEndian":
+                    toc_mask = toc_mask | 1 << 6
                 elif toc_item == "kTocDAQmxRawData":
                     toc_mask = toc_mask | 1 << 7
                 elif toc_item == "kTocInterleavedData":
                     toc_mask = toc_mask | 1 << 5
-                elif toc_item == "kTocBigEndian":
-                    toc_mask = toc_mask | 1 << 6
+                elif toc_item == "kTocMetaData":
+                    toc_mask = toc_mask | 1 << 1
                 elif toc_item == "kTocNewObjList":
                     toc_mask = toc_mask | 1 << 2
+                elif toc_item == "kTocRawData":
+                    toc_mask = toc_mask | 1 << 3
                 else:
-                    raise ValueError("Unrecognised TOC value: %s" % toc_item)
+                    raise ValueError(f"Unrecognised TOC value: {toc_item}")
             lead_in += struct.pack('<i', toc_mask)
             lead_in += struct.pack('<l', version)
             next_segment_offset = len(metadata_bytes) + len(data_bytes)

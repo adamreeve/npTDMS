@@ -57,6 +57,7 @@ class Thermocouple(object):
 class Polynomial(object):
     """ A single polynomial function with associated applicable range
     """
+
     def __init__(self, applicable_range, coefficients):
         self.applicable_range = applicable_range
         self._coefficients = coefficients
@@ -71,6 +72,7 @@ class Polynomial(object):
 class Range(object):
     """ A range with inclusive start and exclusive end
     """
+
     def __init__(self, start, end):
         if start is None and end is None:
             raise ValueError("At least one of start and end must be provided")
@@ -108,7 +110,7 @@ type_b = Thermocouple(
                 0.156682919010E-11,
                 -0.169445292400E-14,
                 0.629903470940E-18,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(630.615, None),
             coefficients=[
@@ -121,7 +123,7 @@ type_b = Thermocouple(
                 -0.445154310330E-16,
                 0.989756408210E-20,
                 -0.937913302890E-24,
-                ]),
+            ]),
     ],
     inverse_polynomials=[
         Polynomial(
@@ -136,7 +138,7 @@ type_b = Thermocouple(
                 -1.5523037E+02,
                 2.9886750E+01,
                 -2.4742860E+00,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(2.431, None),
             coefficients=[
@@ -149,7 +151,7 @@ type_b = Thermocouple(
                 -6.0625199E-03,
                 1.8661696E-04,
                 -2.4878585E-06,
-                ]),
+            ]),
     ]
 )
 
@@ -173,7 +175,7 @@ type_e = Thermocouple(
                 -0.396736195160E-22,
                 -0.558273287210E-25,
                 -0.346578420130E-28,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(0.000, None),
             coefficients=[
@@ -188,7 +190,7 @@ type_e = Thermocouple(
                 0.214892175690E-20,
                 -0.143880417820E-23,
                 0.359608994810E-27,
-                ]),
+            ]),
     ],
     inverse_polynomials=[
         Polynomial(
@@ -204,7 +206,7 @@ type_e = Thermocouple(
                 -3.4034030E-04,
                 -1.1564890E-05,
                 0.0000000E+00,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(0.000, None),
             coefficients=[
@@ -218,7 +220,7 @@ type_e = Thermocouple(
                 -1.3735879E-09,
                 1.0629823E-11,
                 -3.2447087E-14,
-                ]),
+            ]),
     ]
 )
 
@@ -237,7 +239,7 @@ type_j = Thermocouple(
                 0.209480906970E-15,
                 -0.125383953360E-18,
                 0.156317256970E-22,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(760.000, None),
             coefficients=[
@@ -247,7 +249,7 @@ type_j = Thermocouple(
                 -0.318476867010E-05,
                 0.157208190040E-08,
                 -0.306913690560E-12,
-                ]),
+            ]),
     ],
     inverse_polynomials=[
         Polynomial(
@@ -262,7 +264,7 @@ type_j = Thermocouple(
                 -2.8131513E-02,
                 -2.3963370E-03,
                 -8.3823321E-05,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(0.000, 42.919),
             coefficients=[
@@ -275,7 +277,7 @@ type_j = Thermocouple(
                 -5.344285E-08,
                 5.099890E-10,
                 0.000000E+00,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(42.919, None),
             coefficients=[
@@ -288,7 +290,7 @@ type_j = Thermocouple(
                 0.00000000E+00,
                 0.00000000E+00,
                 0.00000000E+00,
-                ]),
+            ]),
     ]
 )
 
@@ -309,7 +311,7 @@ type_k = Thermocouple(
                 -0.104516093650E-16,
                 -0.198892668780E-19,
                 -0.163226974860E-22,
-                 ]),
+            ]),
         Polynomial(
             applicable_range=Range(0.000, None),
             coefficients=[
@@ -323,7 +325,7 @@ type_k = Thermocouple(
                 -0.320207200030E-18,
                 0.971511471520E-22,
                 -0.121047212750E-25,
-                ]),
+            ]),
     ],
     inverse_polynomials=[
         Polynomial(
@@ -339,7 +341,7 @@ type_k = Thermocouple(
                 -1.0450598E-02,
                 -5.1920577E-04,
                 0.0000000E+00,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(0.000, 20.644),
             coefficients=[
@@ -353,7 +355,7 @@ type_k = Thermocouple(
                 -4.413030E-05,
                 1.057734E-06,
                 -1.052755E-08,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(20.644, None),
             coefficients=[
@@ -367,7 +369,7 @@ type_k = Thermocouple(
                 0.000000E+00,
                 0.000000E+00,
                 0.000000E+00,
-                ]),
+            ]),
     ],
     exponential_term=[
         0.118597600000E+00,
@@ -390,7 +392,7 @@ type_n = Thermocouple(
                 -0.226534380030E-13,
                 -0.760893007910E-16,
                 -0.934196678350E-19,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(0.0, None),
             coefficients=[
@@ -405,7 +407,7 @@ type_n = Thermocouple(
                 -0.608632456070E-21,
                 0.208492293390E-24,
                 -0.306821961510E-28,
-                ]),
+            ]),
     ],
     inverse_polynomials=[
         Polynomial(
@@ -421,7 +423,7 @@ type_n = Thermocouple(
                 7.7075166E-01,
                 1.1582665E-01,
                 7.3138868E-03,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(0.000, 20.613),
             coefficients=[
@@ -435,7 +437,7 @@ type_n = Thermocouple(
                 -7.98156E-08,
                 0.00000E+00,
                 0.00000E+00,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(20.613, None),
             coefficients=[
@@ -449,7 +451,7 @@ type_n = Thermocouple(
                 0.000000E+00,
                 0.000000E+00,
                 0.000000E+00,
-                ]),
+            ]),
     ]
 )
 
@@ -469,7 +471,7 @@ type_r = Thermocouple(
                 -0.373105886191E-19,
                 0.157716482367E-22,
                 -0.281038625251E-26,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(1064.180, 1664.5),
             coefficients=[
@@ -479,7 +481,7 @@ type_r = Thermocouple(
                 -0.764085947576E-08,
                 0.205305291024E-11,
                 -0.293359668173E-15,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(1664.5, None),
             coefficients=[
@@ -488,7 +490,7 @@ type_r = Thermocouple(
                 0.171280280471E-03,
                 -0.345895706453E-07,
                 -0.934633971046E-14,
-                ]),
+            ]),
     ],
     inverse_polynomials=[
         Polynomial(
@@ -505,7 +507,7 @@ type_r = Thermocouple(
                 -1.2607281E+02,
                 3.1353611E+01,
                 -3.3187769E+00,
-                ]),
+            ]),
         Polynomial(
             # The reference data from the NIST website has a range ending with
             # 13.228 for this polynomial which overlaps with the following
@@ -524,7 +526,7 @@ type_r = Thermocouple(
                 -5.313401790E-06,
                 6.481976217E-08,
                 0.000000000E+00,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(11.361, 19.739),
             coefficients=[
@@ -539,7 +541,7 @@ type_r = Thermocouple(
                 0.000000000E+00,
                 0.000000000E+00,
                 0.000000000E+00,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(19.739, None),
             coefficients=[
@@ -554,7 +556,7 @@ type_r = Thermocouple(
                 0.000000000E+00,
                 0.000000000E+00,
                 0.000000000E+00,
-                ]),
+            ]),
     ]
 )
 
@@ -573,7 +575,7 @@ type_s = Thermocouple(
                 0.255744251786E-16,
                 -0.125068871393E-19,
                 0.271443176145E-23,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(1064.180, 1664.500),
             coefficients=[
@@ -582,7 +584,7 @@ type_s = Thermocouple(
                 0.654805192818E-05,
                 -0.164856259209E-08,
                 0.129989605174E-13,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(1664.500, None),
             coefficients=[
@@ -591,7 +593,7 @@ type_s = Thermocouple(
                 0.163693574641E-03,
                 -0.330439046987E-07,
                 -0.943223690612E-14,
-                ]),
+            ]),
     ],
     inverse_polynomials=[
         Polynomial(
@@ -607,7 +609,7 @@ type_s = Thermocouple(
                 8.23027880E+01,
                 -2.34181944E+01,
                 2.79786260E+00,
-                ]),
+            ]),
         Polynomial(
             # The reference data from the NIST website has a range ending with
             # 11.950 for this polynomial which overlaps with the following
@@ -625,7 +627,7 @@ type_s = Thermocouple(
                 2.183475087E-05,
                 -1.447379511E-07,
                 8.211272125E-09,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(10.332, 17.536),
             coefficients=[
@@ -639,7 +641,7 @@ type_s = Thermocouple(
                 0.000000000E+00,
                 0.000000000E+00,
                 0.000000000E+00,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(17.536, None),
             coefficients=[
@@ -653,7 +655,7 @@ type_s = Thermocouple(
                 0.000000000E+00,
                 0.000000000E+00,
                 0.000000000E+00,
-                ]),
+            ]),
     ]
 )
 
@@ -678,7 +680,7 @@ type_t = Thermocouple(
                 0.107955392700E-23,
                 0.139450270620E-26,
                 0.797951539270E-30,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(0.000, None),
             coefficients=[
@@ -691,7 +693,7 @@ type_t = Thermocouple(
                 -0.308157587720E-13,
                 0.454791352900E-16,
                 -0.275129016730E-19,
-                ]),
+            ]),
     ],
     inverse_polynomials=[
         Polynomial(
@@ -705,7 +707,7 @@ type_t = Thermocouple(
                 1.3304473E-01,
                 2.0241446E-02,
                 1.2668171E-03,
-                ]),
+            ]),
         Polynomial(
             applicable_range=Range(0.000, None),
             coefficients=[
@@ -717,6 +719,6 @@ type_t = Thermocouple(
                 6.048144E-05,
                 -7.293422E-07,
                 0.000000E+00,
-                ]),
+            ]),
     ]
 )

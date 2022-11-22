@@ -97,7 +97,7 @@ def test_can_write_to_file_using_path():
     segment = ChannelObject("group", "a", input_1)
 
     tempdir = tempfile.mkdtemp()
-    temppath = "%s/test_file.tdms" % tempdir
+    temppath = f"{tempdir}/test_file.tdms"
     try:
         with TdmsWriter(temppath) as tdms_writer:
             tdms_writer.write_segment([segment])
@@ -114,7 +114,7 @@ def test_can_append_to_file_using_path():
     segment_2 = ChannelObject("group", "a", input_2)
 
     tempdir = tempfile.mkdtemp()
-    temppath = "%s/test_file.tdms" % tempdir
+    temppath = f"{tempdir}/test_file.tdms"
     try:
         with TdmsWriter(temppath) as tdms_writer:
             tdms_writer.write_segment([segment_1])
@@ -155,7 +155,7 @@ def test_can_write_tdms_objects_read_from_file():
     })
 
     tempdir = tempfile.mkdtemp()
-    temppath = "%s/test_file.tdms" % tempdir
+    temppath = f"{tempdir}/test_file.tdms"
     try:
         with TdmsWriter(temppath) as tdms_writer:
             tdms_writer.write_segment([group_segment, channel_segment])
@@ -189,7 +189,7 @@ def test_can_write_timestamp_data():
         np.datetime64('2017-07-09T12:35:00.00'),
         np.datetime64('2017-07-09T12:36:00.00'),
         np.datetime64('2017-07-09T12:37:00.00'),
-        ]
+    ]
 
     segment = ChannelObject("group", "timedata", input_data)
 
@@ -329,8 +329,7 @@ def test_can_write_ints_from_list():
     ]
 
     for expected_dtype, expected_tdms_type, input_data in test_cases:
-        test_case = "data = %s, expected_dtype = %s" % (
-            input_data, expected_dtype)
+        test_case = f"data = {input_data}, expected_dtype = {expected_dtype}"
         segment = ChannelObject("group", "data", input_data)
 
         output_file = BytesIO()
@@ -350,13 +349,13 @@ def test_can_write_ints_from_list():
 
 
 def test_can_write_complex():
-    input_complex64_data = np.array([1+2j, 3+4j], np.complex64)
-    input_complex128_data = np.array([5+6j, 7+8j], np.complex128)
+    input_complex64_data = np.array([1 + 2j, 3 + 4j], np.complex64)
+    input_complex128_data = np.array([5 + 6j, 7 + 8j], np.complex128)
 
     complex64_segment = ChannelObject(
-            "group", "complex64_data", input_complex64_data)
+        "group", "complex64_data", input_complex64_data)
     complex128_segment = ChannelObject(
-            "group", "complex128_data", input_complex128_data)
+        "group", "complex128_data", input_complex128_data)
 
     output_file = BytesIO()
     with TdmsWriter(output_file) as tdms_writer:

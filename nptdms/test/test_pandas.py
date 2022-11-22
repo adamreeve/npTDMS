@@ -347,9 +347,8 @@ def test_export_with_empty_channels():
 
 
 def on_test_file(test_file, lazy_load, func):
-    if lazy_load:
-        with test_file.get_tempfile() as temp_file:
-            with TdmsFile.open(temp_file) as tdms_file:
-                return func(tdms_file)
-    else:
+    if not lazy_load:
         return func(test_file.load())
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file) as tdms_file:
+            return func(tdms_file)

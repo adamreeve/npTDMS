@@ -1,17 +1,18 @@
 """ Test reading example TDMS files
 """
 
+
 import os
 import numpy as np
 from nptdms import tdms
 
 
-DATA_DIR = os.path.dirname(os.path.realpath(__file__)) + '/data'
+DATA_DIR = f'{os.path.dirname(os.path.realpath(__file__))}/data'
 
 
 def test_labview_file():
     """Test reading a file that was created by LabVIEW"""
-    test_file = tdms.TdmsFile(DATA_DIR + '/Digital_Input.tdms')
+    test_file = tdms.TdmsFile(f'{DATA_DIR}/Digital_Input.tdms')
     group = ("07/09/2012 06:58:23 PM - " +
              "Digital Input - Decimated Data_Level1")
     channel = "Dev1_port3_line7 - line 0"
@@ -23,7 +24,7 @@ def test_labview_file():
 
 def test_raw_format():
     """Test reading a file with DAQmx raw data"""
-    test_file = tdms.TdmsFile(DATA_DIR + '/raw1.tdms')
+    test_file = tdms.TdmsFile(f'{DATA_DIR}/raw1.tdms')
     group = test_file.groups()[0]
     data = group['First  Channel'].data
     np.testing.assert_almost_equal(data[:10],
@@ -35,7 +36,7 @@ def test_raw_format():
 
 def test_big_endian_format():
     """Test reading a file that encodes data in big endian mode"""
-    test_file = tdms.TdmsFile(DATA_DIR + '/big_endian.tdms')
+    test_file = tdms.TdmsFile(f'{DATA_DIR}/big_endian.tdms')
     data = test_file['Measured Data']['Phase sweep'].data
     np.testing.assert_almost_equal(data[:10],
                                    [0.0000000, 0.0634176, 0.1265799,

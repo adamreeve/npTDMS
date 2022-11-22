@@ -66,7 +66,7 @@ class TdmsType(object):
 
     def __repr__(self):
         if self.value is None:
-            return "%s" % self.__class__.__name__
+            return f"{self.__class__.__name__}"
         return "%s(%r)" % (self.__class__.__name__, self.value)
 
     @classmethod
@@ -90,7 +90,7 @@ class StructType(TdmsType):
 
     def __init__(self, value):
         self.value = value
-        self.bytes = _struct_pack('<' + self.struct_declaration, value)
+        self.bytes = _struct_pack(f'<{self.struct_declaration}', value)
 
     @classmethod
     def read(cls, file, endianness="<"):
@@ -204,7 +204,7 @@ class String(TdmsType):
     @staticmethod
     def read(file, endianness="<"):
         size_bytes = file.read(4)
-        size = _struct_unpack(endianness + 'L', size_bytes)[0]
+        size = _struct_unpack(f'{endianness}L', size_bytes)[0]
         return file.read(size).decode('utf-8')
 
     @classmethod
@@ -215,8 +215,7 @@ class String(TdmsType):
             followed by the contiguous string data.
         """
         offsets = [0]
-        for i in range(number_values):
-            offsets.append(Uint32.read(file, endianness))
+        offsets.extend(Uint32.read(file, endianness) for _ in range(number_values))
         strings = []
         for i in range(number_values):
             s = file.read(offsets[i + 1] - offsets[i])
@@ -231,7 +230,7 @@ class Boolean(StructType):
 
     def __init__(self, value):
         self.value = bool(value)
-        self.bytes = _struct_pack('<' + self.struct_declaration, self.value)
+        self.bytes = _struct_pack(f'<{self.struct_declaration}', self.value)
 
     @classmethod
     def read(cls, file, endianness="<"):
@@ -260,7 +259,7 @@ class TimeStamp(TdmsType):
         zero_delta = np.timedelta64(0, 's')
         if remainder < zero_delta:
             remainder = np.timedelta64(1, 's') + remainder
-            seconds = seconds - 1
+            seconds -= 1
         microseconds = int(remainder / np.timedelta64(1, 'us'))
         second_fractions = int(microseconds * self._fractions_per_microsecond)
         self.bytes = _struct_pack('<Qq', second_fractions, seconds)
@@ -269,11 +268,9 @@ class TimeStamp(TdmsType):
     def read(cls, file, endianness="<"):
         data = file.read(16)
         if endianness == "<":
-            (second_fractions, seconds) = _struct_unpack(
-                endianness + 'Qq', data)
+            (second_fractions, seconds) = _struct_unpack(f'{endianness}Qq', data)
         else:
-            (seconds, second_fractions) = _struct_unpack(
-                 endianness + 'qQ', data)
+            (seconds, second_fractions) = _struct_unpack(f'{endianness}qQ', data)
         return TdmsTimestamp(seconds, second_fractions)
 
     @classmethod

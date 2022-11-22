@@ -438,8 +438,8 @@ def test_thermistor_scaling_with_invalid_excitation_type():
 
 
 _strain_voltage = [
-        0.0068827, 0.0068036, 0.00688, 0.0068545, 0.0069104,
-        0.0068033, 0.0068023, 0.0068316, 0.0067672, 0.00679]
+    0.0068827, 0.0068036, 0.00688, 0.0068545, 0.0069104,
+    0.0068033, 0.0068023, 0.0068316, 0.0067672, 0.00679]
 
 _measured_strain = {
     10183: {
@@ -609,10 +609,7 @@ def test_strain_scaling(configuration, key):
 
     lead_wire_resistance = 0.0
     initial_bridge_voltage = 0.0
-    gain_adjustment = 1.0
-
-    if key in ("with_adjustment", "with_all"):
-        gain_adjustment = 1.123
+    gain_adjustment = 1.123 if key in ("with_adjustment", "with_all") else 1.0
     if key in ("with_initial_voltage", "with_all"):
         initial_bridge_voltage = 0.00135
     if key in ("with_lead_resistance", "with_all"):

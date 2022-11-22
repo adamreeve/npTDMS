@@ -622,10 +622,8 @@ def float_data():
     """
     single_arr = np.array([0.123, 0.234, 0.345, 0.456], dtype=np.float32)
     double_arr = np.array([0.987, 0.876, 0.765, 0.654], dtype=np.double)
-    data = ""
-    for num in single_arr[0:2]:
-        data += hexlify_value("<f", num)
-    for num in double_arr[0:2]:
+    data = "".join(hexlify_value("<f", num) for num in single_arr[:2])
+    for num in double_arr[:2]:
         data += hexlify_value("<d", num)
     for num in single_arr[2:4]:
         data += hexlify_value("<f", num)
@@ -656,10 +654,8 @@ def float_data_with_unit():
     """
     single_arr = np.array([0.123, 0.234, 0.345, 0.456], dtype=np.float32)
     double_arr = np.array([0.987, 0.876, 0.765, 0.654], dtype=np.double)
-    data = ""
-    for num in single_arr[0:2]:
-        data += hexlify_value("<f", num)
-    for num in double_arr[0:2]:
+    data = "".join(hexlify_value("<f", num) for num in single_arr[:2])
+    for num in double_arr[:2]:
         data += hexlify_value("<d", num)
     for num in single_arr[2:4]:
         data += hexlify_value("<f", num)
