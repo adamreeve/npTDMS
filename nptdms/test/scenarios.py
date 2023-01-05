@@ -600,7 +600,7 @@ def incomplete_last_row_of_interleaved_data():
 def bool_data():
     """ Test reading a file with boolean valued data
     """
-    expected_channel_data = np.array([False, True, False, True], dtype=np.dtype('bool8'))
+    expected_channel_data = np.array([False, True, False, True], dtype=np.dtype(np.bool_))
 
     test_file = GeneratedFile()
     test_file.add_segment(

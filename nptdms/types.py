@@ -224,7 +224,7 @@ class String(TdmsType):
         return strings
 
 
-@tds_data_type(0x21, np.bool8)
+@tds_data_type(0x21, np.bool_)
 class Boolean(StructType):
     size = 1
     struct_declaration = "b"
