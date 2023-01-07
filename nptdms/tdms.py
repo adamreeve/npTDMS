@@ -3,6 +3,8 @@
     This module contains the public facing API for reading TDMS files
 """
 
+
+import contextlib
 from collections import defaultdict, OrderedDict
 import numpy as np
 
@@ -128,11 +130,9 @@ class TdmsFile(object):
 
         self._reader = TdmsReader(file)
         try:
-            self._read_file(
-                self._reader,
-                read_metadata_only if not self._reader.is_index_file_only() else True,
-                keep_open
-            )
+            self._read_file(self._reader, True if self._reader.is_index_file_only()
+                            else read_metadata_only, keep_open)
+
         finally:
             if not keep_open:
                 self._reader.close()
@@ -224,8 +224,8 @@ class TdmsFile(object):
         """
         try:
             return self._groups[group_name]
-        except KeyError:
-            raise KeyError("There is no group named '%s' in the TDMS file" % group_name)
+        except KeyError as e:
+            raise KeyError("There is no group named '%s' in the TDMS file" % group_name) from e
 
     def _ipython_key_completions_(self):
         """ Return possible group names for tab-completion when indexing
@@ -248,11 +248,8 @@ class TdmsFile(object):
         object_properties = {
             path_string: self._convert_properties(obj.properties)
             for path_string, obj in tdms_reader.object_metadata.items()}
-        try:
+        with contextlib.suppress(KeyError):
             self._properties = object_properties['/']
-        except KeyError:
-            pass
-
         for (path_string, obj) in tdms_reader.object_metadata.items():
             properties = object_properties[path_string]
             path = ObjectPath.from_string(path_string)
@@ -353,7 +350,7 @@ class TdmsGroup(object):
         self._channels = {c.name: c for c in channels}
 
     def __repr__(self):
-        return "<TdmsGroup with path %s>" % self.path
+        return f"<TdmsGroup with path {self.path}>"
 
     @property
     def path(self):
@@ -405,10 +402,10 @@ class TdmsGroup(object):
         """
         try:
             return self._channels[channel_name]
-        except KeyError:
+        except KeyError as e:
             raise KeyError(
                 "There is no channel named '%s' in group '%s' of the TDMS file" %
-                (channel_name, self.name))
+                (channel_name, self.name)) from e
 
     def _ipython_key_completions_(self):
         """ Return possible channel names for tab-completion when indexing
@@ -461,7 +458,7 @@ class TdmsChannel(object):
         self._cached_chunk_bounds = None
 
     def __repr__(self):
-        return "<TdmsChannel with path %s>" % self.path
+        return f"<TdmsChannel with path {self.path}>"
 
     def __len__(self):
         """ Returns the number of values in this channel
@@ -471,10 +468,7 @@ class TdmsChannel(object):
     def __iter__(self):
         """ Returns an iterator over the values in this channel
         """
-        if self._raw_data is not None:
-            return iter(self.data)
-        else:
-            return self._read_data_values()
+        return self._read_data_values() if self._raw_data is None else iter(self.data)
 
     def __getitem__(self, index):
         if self._raw_data is not None:
@@ -557,7 +551,7 @@ class TdmsChannel(object):
             return np.empty((0, ), dtype=self._raw_data_dtype())
         if self._raw_data.scaler_data:
             if len(self._raw_data.scaler_data) == 1:
-                return next(v for v in self._raw_data.scaler_data.values())
+                return next(iter(self._raw_data.scaler_data.values()))
             else:
                 raise Exception(
                     "This object has data for multiple DAQmx scalers, "
@@ -610,10 +604,7 @@ class TdmsChannel(object):
             return np.empty((0,), dtype=dtype)
         if scaled:
             return self._scale_data(raw_data)
-        else:
-            if raw_data.scaler_data:
-                return raw_data.scaler_data
-            return raw_data.data
+        return raw_data.scaler_data or raw_data.data
 
     def time_track(self, absolute_time=False, accuracy='ns'):
         """Return an array of time or the independent variable for this channel
@@ -643,8 +634,8 @@ class TdmsChannel(object):
         try:
             increment = self.properties['wf_increment']
             offset = self.properties['wf_start_offset']
-        except KeyError:
-            raise KeyError("Object does not have time properties available.")
+        except KeyError as e:
+            raise KeyError("Object does not have time properties available.") from e
 
         relative_time = np.linspace(
             offset,
@@ -656,9 +647,9 @@ class TdmsChannel(object):
 
         try:
             start_time = self.properties['wf_start_time']
-        except KeyError:
-            raise KeyError(
-                "Object does not have start time property available.")
+        except KeyError as exc:
+            raise KeyError("Object does not have start time property available.") from exc
+
         if isinstance(start_time, TdmsTimestamp):
             start_time = start_time.as_datetime64(accuracy)
 
@@ -669,8 +660,8 @@ class TdmsChannel(object):
                 'us': 1e6,
                 'ns': 1e9,
             }[accuracy]
-        except KeyError:
-            raise KeyError("Invalid accuracy: {0}".format(accuracy))
+        except KeyError as err:
+            raise KeyError("Invalid accuracy: {0}".format(accuracy)) from err
 
         # Because numpy only knows ints as its date datatype,
         # convert to accuracy.
@@ -696,8 +687,7 @@ class TdmsChannel(object):
 
     def _read_data_values(self):
         for chunk in self.data_chunks():
-            for value in chunk:
-                yield value
+            yield from chunk
 
     def _read_slice(self, start, stop, step):
         if step == 0:
@@ -725,15 +715,12 @@ class TdmsChannel(object):
             return np.empty((0,), dtype=self.dtype)
 
         # Trim values outside bounds
-        if start < 0:
-            start = 0
+        start = max(start, 0)
         if start >= self._length:
             start = self._length - 1
         if stop > self._length:
             stop = self._length
-        if stop < -1:
-            stop = -1
-
+        stop = max(stop, -1)
         # Read data and handle step size
         if step > 0:
             read_data = self.read_data(start, stop - start)
@@ -828,6 +815,7 @@ class DataChunk(object):
         group_chunk = data_chunk[group_name]
         channel_chunk = group_chunk[channel_name]
     """
+
     def __init__(self, tdms_file, raw_data_chunk, channel_offsets):
         self._groups = OrderedDict(
             (group.name, GroupDataChunk(tdms_file, group, raw_data_chunk, channel_offsets))
@@ -856,6 +844,7 @@ class GroupDataChunk(object):
 
     :ivar ~.name: Name of the group
     """
+
     def __init__(self, tdms_file, group, raw_data_chunk, channel_offsets):
         self.name = group.name
         self._channels = OrderedDict(
@@ -889,6 +878,7 @@ class ChannelDataChunk(object):
     :ivar ~.name: Name of the channel
     :ivar ~.offset: Starting index of this chunk of data in the entire channel
     """
+
     def __init__(self, channel, raw_data_chunk, offset):
         self._path = channel._path
         self._channel = channel

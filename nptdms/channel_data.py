@@ -45,10 +45,7 @@ class ListDataReceiver(object):
     def __init__(self, channel):
         """Initialise new data receiver for a TDMS object
         """
-        if channel.data_type == types.String:
-            self._dtype = np.dtype('O')
-        else:
-            self._dtype = None
+        self._dtype = np.dtype('O') if channel.data_type == types.String else None
         self._data = []
         self.scaler_data = {}
 
@@ -183,8 +180,9 @@ def slice_raw_data(raw_data, offset, length=None):
         return raw_data
     end = None if length is None else offset + length
     data = None if raw_data.data is None else raw_data.data[offset:end]
-    scaler_data = dict(
-        (scale_id, scaler_data[offset:end]) for (scale_id, scaler_data) in raw_data.scaler_data.items())
+    scaler_data = {scale_id: scaler_data[offset:end] for (scale_id, scaler_data)
+                   in raw_data.scaler_data.items()}
+
     return RawDataSlice(data, scaler_data)
 
 

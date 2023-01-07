@@ -72,7 +72,8 @@ class TdmsWriter(object):
         """
         valid_versions = (4712, 4713)
         if version not in valid_versions:
-            raise ValueError("version must be one of %s" % ",".join("%d" % v for v in valid_versions))
+            raise ValueError(f'version must be one of {",".join("%d" % v for v in valid_versions)}')
+
         self._file = None
         self._index_file = None
         self._file_path = None
@@ -85,18 +86,16 @@ class TdmsWriter(object):
             self._file = file
             if hasattr(index_file, "read"):
                 self._index_file = index_file
-            elif isinstance(index_file, bool) and not index_file:
-                pass
-            else:
+            elif not isinstance(index_file, bool) or index_file:
                 raise ValueError(
-                    f"Invalid type, ``index_file`` can only be ``False`` or a stream to write into, "
-                    "but is {type(index_file)}"
-                )
+                    'Invalid type, ``index_file`` can only be ``False`` or a stream to'
+                    f' write into, but is {type(index_file)}')
+
         else:
             self._file_path = file
             if isinstance(index_file, bool):
                 if index_file:
-                    self._index_file_path = file + "_index"
+                    self._index_file_path = f"{file}_index"
             else:
                 raise ValueError(
                     f"Invalid type, ``index_file`` can  only be ``False`` or ``True`` but is {type(index_file)}."
@@ -104,9 +103,9 @@ class TdmsWriter(object):
 
     def open(self):
         if self._file_path is not None:
-            self._file = open(self._file_path, self._file_mode + 'b')
+            self._file = open(self._file_path, f'{self._file_mode}b')
             if self._index_file_path is not None:
-                self._index_file = open(self._index_file_path, self._file_mode + 'b')
+                self._index_file = open(self._index_file_path, f'{self._file_mode}b')
 
     def close(self):
         if self._file_path is not None:
@@ -149,7 +148,7 @@ class TdmsSegment(object):
         :param is_index_file: Whether a written file is a data file (.tdms) or a index file (.tdms_index).
         :param version: The TDMS format version to write, which must be either 4712 (the default) or 4713.
         """
-        paths = set(obj.path for obj in objects)
+        paths = {obj.path for obj in objects}
         if len(paths) != len(objects):
             raise ValueError("Duplicate object paths found")
 
@@ -170,8 +169,7 @@ class TdmsSegment(object):
             self._write_data(file)
 
     def metadata(self):
-        metadata = []
-        metadata.append(Uint32(len(self.objects)))
+        metadata = [Uint32(len(self.objects))]
         for obj in self.objects:
             metadata.append(String(obj.path))
             metadata.extend(self.raw_data_index(obj))
@@ -180,30 +178,26 @@ class TdmsSegment(object):
             metadata.append(Uint32(num_properties))
             for prop_name, prop_value in properties.items():
                 metadata.append(String(prop_name))
-                metadata.append(Int32(prop_value.enum_value))
-                metadata.append(prop_value)
+                metadata.extend((Int32(prop_value.enum_value), prop_value))
         return metadata
 
     def raw_data_index(self, obj):
-        if hasattr(obj, 'data'):
-            data_type = Int32(obj.data_type.enum_value)
-            dimension = Uint32(1)
-            num_values = Uint64(len(obj.data))
-
-            data_index = [Uint32(20), data_type, dimension, num_values]
-            # For strings, we also need to write the total data size in bytes
-            if obj.data_type == String:
-                total_size = object_data_size(obj.data_type, obj.data)
-                data_index.append(Uint64(total_size))
-
-            return data_index
-        else:
+        if not hasattr(obj, 'data'):
             return [Bytes(b'\xFF\xFF\xFF\xFF')]
+        data_type = Int32(obj.data_type.enum_value)
+        dimension = Uint32(1)
+        num_values = Uint64(len(obj.data))
+
+        data_index = [Uint32(20), data_type, dimension, num_values]
+        # For strings, we also need to write the total data size in bytes
+        if obj.data_type == String:
+            total_size = object_data_size(obj.data_type, obj.data)
+            data_index.append(Uint64(total_size))
+
+        return data_index
 
     def leadin(self, toc, metadata_size):
-        leadin = []
-        leadin.append(Bytes(b'TDSh' if self.is_index_file else b'TDSm'))
-
+        leadin = [Bytes(b'TDSh' if self.is_index_file else b'TDSm')]
         toc_mask = 0
         for toc_flag in toc:
             toc_mask = toc_mask | toc_properties[toc_flag]
@@ -219,11 +213,7 @@ class TdmsSegment(object):
         return leadin
 
     def _data_size(self):
-        data_size = 0
-        for obj in self.objects:
-            if hasattr(obj, 'data'):
-                data_size += object_data_size(obj.data_type, obj.data)
-        return data_size
+        return sum(object_data_size(obj.data_type, obj.data) for obj in self.objects if hasattr(obj, 'data'))
 
     def _write_data(self, file):
         for obj in self.objects:
@@ -248,6 +238,7 @@ class TdmsObject(object):
 class RootObject(TdmsObject):
     """The root TDMS object containing properties for the TDMS file
     """
+
     def __init__(self, properties=None):
         """Initialise a new GroupObject
 
@@ -339,7 +330,7 @@ def _to_tdms_value(value):
         return numpy_data_types[value.dtype](value)
     if isinstance(value, TdmsType):
         return value
-    if isinstance(value, bool) or isinstance(value, np.bool_):
+    if isinstance(value, (bool, np.bool_)):
         return Boolean(value)
     if isinstance(value, int):
         return to_int_property_value(value)
@@ -359,9 +350,7 @@ def _to_tdms_value(value):
 def to_int_property_value(value):
     if value >= 2 ** 63:
         return Uint64(value)
-    if value >= 2 ** 31 or value < -2 ** 31:
-        return Int64(value)
-    return Int32(value)
+    return Int64(value) if value >= 2 ** 31 or value < -2 ** 31 else Int32(value)
 
 
 def write_data(file, tdms_object):

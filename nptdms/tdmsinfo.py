@@ -36,16 +36,16 @@ def tdmsinfo(file, show_properties=False):
         display_properties(tdms_file, level + 1)
     for group in tdms_file.groups():
         level = 1
-        display("%s" % group.path, level)
+        display(f"{group.path}", level)
         if show_properties:
             display_properties(group, level + 1)
         for channel in group.channels():
             level = 2
-            display("%s" % channel.path, level)
+            display(f"{channel.path}", level)
             if show_properties:
                 level = 3
                 if channel.data_type is not None:
-                    display("data type: %s" % channel.data_type.__name__, level)
+                    display(f"data type: {channel.data_type.__name__}", level)
                 display("length: %d" % len(channel), level)
                 display_properties(channel, level)
 
@@ -54,8 +54,8 @@ def display_properties(tdms_object, level):
     if tdms_object.properties:
         display("properties:", level)
         for prop, val in tdms_object.properties.items():
-            display("%s: %s" % (prop, val), level + 1)
+            display(f"{prop}: {val}", level + 1)
 
 
 def display(s, level):
-    print("%s%s" % (" " * 2 * level, s))
+    print(f'{" " * 2 * level}{s}')

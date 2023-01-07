@@ -151,7 +151,7 @@ def test_timestamp_str():
 
 def test_timestamp_array_slicing():
     timestamp_array = _get_test_timestamp_array()
-    array_slice = timestamp_array[0:2]
+    array_slice = timestamp_array[:2]
     assert isinstance(array_slice, TimestampArray)
 
 

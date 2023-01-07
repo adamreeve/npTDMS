@@ -35,8 +35,11 @@ class TdmsTimestamp(object):
         """
         try:
             fractions_per_step = _fractions_per_step[resolution]
-        except KeyError:
-            raise ValueError("Unsupported resolution for converting to numpy datetime64: '{0}'".format(resolution))
+        except KeyError as e:
+            raise ValueError(
+                "Unsupported resolution for converting to numpy datetime64: '{0}'".format(resolution)
+                ) from e
+
         return (
                 EPOCH +
                 np.timedelta64(self.seconds, 's') +
@@ -108,8 +111,11 @@ class TimestampArray(np.ndarray):
         """
         try:
             fractions_per_step = _fractions_per_step[resolution]
-        except KeyError:
-            raise ValueError("Unsupported resolution for converting to numpy datetime64: '{0}'".format(resolution))
+        except KeyError as e:
+            raise ValueError(
+                "Unsupported resolution for converting to numpy datetime64: '{0}'".format(resolution)
+                ) from e
+
         return (
                 EPOCH +
                 self['seconds'] * np.timedelta64(1, 's') +

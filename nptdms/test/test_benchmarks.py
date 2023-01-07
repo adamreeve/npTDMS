@@ -162,7 +162,7 @@ def test_stream_scaled_data_chunks(benchmark):
         ),
         data, binary_data=True
     )
-    for _ in range(0, 9):
+    for _ in range(9):
         test_file.add_segment(
             ("kTocRawData", ), "", data, binary_data=True)
 
@@ -232,7 +232,7 @@ def test_read_interleaved_timestamp_data(benchmark):
 
     tdms_file = benchmark(read_from_start, test_file.get_bytes_io_file())
 
-    np.testing.assert_equal(tdms_file['group']['channel1'][:], timestamps[0::2])
+    np.testing.assert_equal(tdms_file['group']['channel1'][:], timestamps[::2])
     np.testing.assert_equal(tdms_file['group']['channel2'][:], timestamps[1::2])
 
 
@@ -321,7 +321,7 @@ def get_contiguous_file():
         ),
         data, binary_data=True
     )
-    for _ in range(0, 9):
+    for _ in range(9):
         test_file.add_segment(
             ("kTocRawData", ), "", data, binary_data=True)
     return test_file
@@ -341,7 +341,7 @@ def get_interleaved_file():
         ),
         data, binary_data=True
     )
-    for _ in range(0, 9):
+    for _ in range(9):
         test_file.add_segment(
             ("kTocRawData", "kTocInterleavedData"), "", data, binary_data=True)
     return test_file
@@ -362,10 +362,7 @@ def read_channel_data(chan):
 
 
 def stream_chunks(chan):
-    all_data = []
-    for chunk in chan.data_chunks():
-        all_data.append(chunk[:])
-    return all_data
+    return [chunk[:] for chunk in chan.data_chunks()]
 
 
 def get_slice(chan, start, stop):

@@ -65,7 +65,7 @@ class TdmsReader(object):
                 self._file_path = source_path
                 self._file = open(self._file_path, "rb")
 
-                filepath = self._file_path + '_index'
+                filepath = f'{self._file_path}_index'
                 if os.path.isfile(filepath):
                     self._index_file_path = filepath
                     self._index_file = open(self._index_file_path, "rb")
@@ -142,8 +142,7 @@ class TdmsReader(object):
                 "Cannot read data unless metadata has first been read")
         for segment in self._segments:
             self._verify_segment_start(segment)
-            for chunk in segment.read_raw_data(self._file):
-                yield chunk
+            yield from segment.read_raw_data(self._file)
 
     def read_raw_data_for_channel(self, channel_path, offset=0, length=None):
         """ Read raw data for a single channel, chunk by chunk
@@ -299,7 +298,7 @@ class TdmsReader(object):
         endianness = '>' if (toc_mask & toc_properties['kTocBigEndian']) else '<'
 
         # Next four bytes are version number, then 8 bytes each for the offset values
-        (version, next_segment_offset, raw_data_offset) = _struct_unpack(endianness + 'lQQ', lead_in_bytes[8:28])
+        (version, next_segment_offset, raw_data_offset) = _struct_unpack(f'{endianness}lQQ', lead_in_bytes[8:28])
 
         if self.tdms_version is None:
             if version not in (4712, 4713):
@@ -328,7 +327,7 @@ class TdmsReader(object):
             log.debug("Next segment offset = %d, raw data offset = %d, data size = %d b",
                       next_segment_offset, raw_data_offset, next_segment_offset - raw_data_offset)
             next_segment_pos = (
-                    segment_position + next_segment_offset + lead_size)
+                segment_position + next_segment_offset + lead_size)
 
         return segment_position, toc_mask, data_position, next_segment_pos, segment_incomplete
 
@@ -464,6 +463,7 @@ def _update_object_scaler_data_types(path, obj, segment_object):
 class ObjectMetadata(object):
     """ Stores information about an object in a TDMS file
     """
+
     def __init__(self):
         self.properties = OrderedDict()
         self.data_type = None
@@ -474,10 +474,8 @@ class ObjectMetadata(object):
 def _trim_channel_chunk(chunk, skip=0, trim=0):
     if skip == 0 and trim == 0:
         return chunk
-    data = None
     scaler_data = None
-    if chunk.data is not None:
-        data = chunk.data[skip:len(chunk.data) - trim]
+    data = None if chunk.data is None else chunk.data[skip:len(chunk.data) - trim]
     if chunk.scaler_data is not None:
         scaler_data = {
             scale_id: d[skip:len(d) - trim]
@@ -506,6 +504,6 @@ def _array_equal(a, b, chunk_size=100):
     num_chunks = (len(a) + chunk_size - 1) // chunk_size
     for i in range(num_chunks):
         offset = i * chunk_size
-        if not (a[offset:offset+chunk_size] == b[offset:offset+chunk_size]).all():
+        if not (a[offset:offset + chunk_size] == b[offset:offset + chunk_size]).all():
             return False
     return True

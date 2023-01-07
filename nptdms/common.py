@@ -17,10 +17,11 @@ class ObjectPath(object):
         :ivar group: Group name or None for the root object
         :ivar channel: Channel name or None for the root object or a group objecct
     """
+
     def __init__(self, *path_components):
         self.group = None
         self.channel = None
-        if len(path_components) > 0:
+        if path_components:
             self.group = path_components[0]
         if len(path_components) > 1:
             self.channel = path_components[1]

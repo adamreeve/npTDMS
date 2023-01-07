@@ -40,7 +40,7 @@ def test_write_leadin_with_one_channel():
         Int32(4712),  # TDMS version
         Uint64(52),  # Next segment offset
         Uint64(12),  # Raw data offset
-        ]
+    ]
 
     _assert_sequence_equal(leadin, expected_values)
 
@@ -62,7 +62,7 @@ def test_write_leadin_with_object_without_data():
         Int32(4712),  # TDMS version
         Uint64(12),  # Next segment offset
         Uint64(12),  # Raw data offset
-        ]
+    ]
 
     _assert_sequence_equal(leadin, expected_values)
 
@@ -100,7 +100,7 @@ def test_write_metadata_with_properties():
         String("prop2"),
         Int32(3),
         Int32(42),
-        ]
+    ]
 
     _assert_sequence_equal(metadata, expected_values)
 
@@ -119,7 +119,7 @@ def test_write_metadata_with_no_data():
         String("object_path"),
         Bytes(b'\xFF\xFF\xFF\xFF'),  # Raw data index
         Uint32(0),  # Number of properties
-        ]
+    ]
 
     _assert_sequence_equal(metadata, expected_values)
 
@@ -220,10 +220,9 @@ def _assert_sequence_equal(values, expected_values):
     for val in values:
         try:
             expected = next(expected_values)
-        except StopIteration:
-            raise ValueError(
-                "Expected end of sequence at position %d but found: %r" %
-                (position, val))
+        except StopIteration as e:
+            raise ValueError("Expected end of sequence at position %d but found: %r" % (position, val)) from e
+
         assert val == expected, "Expected %r to equal %r at position %d" % (val, expected, position)
         position += 1
     try:
@@ -293,4 +292,4 @@ def test_write_and_store_index_file():
             ChannelObject("group1", "channel1", np.linspace(0, 1))
         ])
 
-    assert os.path.isfile(tdms_path + "_index")
+    assert os.path.isfile(f"{tdms_path}_index")

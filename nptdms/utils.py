@@ -6,7 +6,7 @@ import time
 def cached_property(func):
     """ Wraps a method on a class to make it a property and caches the result the first time it is evaluated
     """
-    attr_name = '_cached_prop_' + func.__name__
+    attr_name = f'_cached_prop_{func.__name__}'
 
     @property
     @wraps(func)

@@ -124,14 +124,9 @@ def test_lazily_read_channel_data_with_file_path():
 def test_reading_subset_of_data(offset, length):
     channel_data = np.arange(0, 100, 1, dtype=np.int32)
     # Split data into different sized segments
-    segment_data = [
-        channel_data[0:10],
-        channel_data[10:20],
-        channel_data[20:60],
-        channel_data[60:80],
-        channel_data[80:90],
-        channel_data[90:100],
-    ]
+    segment_data = [channel_data[:10], channel_data[10:20], channel_data[20:60],
+                    channel_data[60:80], channel_data[80:90], channel_data[90:100]]
+
     hex_segment_data = [
         "".join(hexlify_value('<i', x) for x in data) for data in segment_data]
     test_file = GeneratedFile()
@@ -226,9 +221,7 @@ def test_iterate_channel_data_in_open_mode():
     with test_file.get_tempfile() as temp_file:
         with TdmsFile.open(temp_file.file) as tdms_file:
             for ((group, channel), expected_channel_data) in expected_data.items():
-                actual_data = []
-                for value in tdms_file[group][channel]:
-                    actual_data.append(value)
+                actual_data = list(tdms_file[group][channel])
                 compare_arrays(actual_data, expected_channel_data)
 
 
@@ -240,9 +233,7 @@ def test_iterate_channel_data_in_read_mode():
     with test_file.get_tempfile() as temp_file:
         tdms_file = TdmsFile.read(temp_file.file)
         for ((group, channel), expected_channel_data) in expected_data.items():
-            actual_data = []
-            for value in tdms_file[group][channel]:
-                actual_data.append(value)
+            actual_data = list(tdms_file[group][channel])
             compare_arrays(actual_data, expected_channel_data)
 
 
@@ -305,9 +296,7 @@ def test_indexing_channel_with_integer_and_caching(test_file, expected_data):
         with TdmsFile.open(temp_file.file) as tdms_file:
             for ((group, channel), expected_channel_data) in expected_data.items():
                 channel_object = tdms_file[group][channel]
-                values = []
-                for i in range(len(channel_object)):
-                    values.append(channel_object[i])
+                values = [channel_object[i] for i in range(len(channel_object))]
                 compare_arrays(values, expected_channel_data)
 
 
@@ -331,9 +320,7 @@ def test_indexing_scaled_channel_with_integer():
         with TdmsFile.open(temp_file.file) as tdms_file:
             for ((group, channel), expected_channel_data) in expected_data.items():
                 channel_object = tdms_file[group][channel]
-                values = []
-                for i in range(len(channel_object)):
-                    values.append(channel_object[i])
+                values = [channel_object[i] for i in range(len(channel_object))]
                 compare_arrays(values, expected_channel_data)
 
 
@@ -546,8 +533,8 @@ def test_read_with_mismatching_index_file():
     with test_file.get_tempfile(delete=False) as tdms_file:
         with test_file_with_index.get_tempfile_with_index() as tdms_file_with_index_path:
             # Move index file from second file to match the name of the first file
-            new_index_file = tdms_file.name + '_index'
-            copyfile(tdms_file_with_index_path + '_index', new_index_file)
+            new_index_file = f'{tdms_file.name}_index'
+            copyfile(f'{tdms_file_with_index_path}_index', new_index_file)
             try:
                 tdms_file.file.close()
                 with pytest.raises(ValueError) as exc_info:
@@ -803,9 +790,9 @@ def test_truncated_metadata_in_last_segment():
                 try:
                     tdms_data = TdmsFile.read(truncated_file.file)
                 except Exception as exc:
-                    raise RuntimeError(
-                        "Failed to read file with segment truncated after "
-                        "%d bytes: %s" % (end_point - first_segment_size, exc))
+                    raise RuntimeError("Failed to read file with segment truncated after "
+                                       "%d bytes: %s" % (end_point - first_segment_size, exc)) from exc
+
                 for ((group, channel), expected_values) in expected_data.items():
                     channel_obj = tdms_data[group][channel]
                     compare_arrays(channel_obj.data, expected_values)

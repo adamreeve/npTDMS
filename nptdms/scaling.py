@@ -18,6 +18,7 @@ CURRENT_EXCITATION = 10134
 class NoOpScaling(object):
     """ Does not apply any scaling
     """
+
     def __init__(self, input_source):
         self.input_source = input_source
 
@@ -37,6 +38,7 @@ class NoOpScaling(object):
 class LinearScaling(object):
     """ Linear scaling with slope and intercept
     """
+
     def __init__(self, intercept, slope, input_source):
         self.intercept = intercept
         self.slope = slope
@@ -61,6 +63,7 @@ class LinearScaling(object):
 class PolynomialScaling(object):
     """ Polynomial scaling with an arbitrary number of coefficients
     """
+
     def __init__(self, coefficients, input_source):
         self.coefficients = coefficients
         self.input_source = input_source
@@ -96,6 +99,7 @@ class RtdScaling(object):
     """ Converts a signal from a resistance temperature detector into
         degrees Celsius using the Callendar-Van Dusen equation
     """
+
     def __init__(
             self, current_excitation, r0_nominal_resistance,
             a, b, c,
@@ -112,19 +116,14 @@ class RtdScaling(object):
     @staticmethod
     def from_properties(properties, scale_index):
         prefix = "NI_Scale[%d]" % scale_index
-        current_excitation = properties[
-            "%s_RTD_Current_Excitation" % prefix]
-        r0_nominal_resistance = properties[
-            "%s_RTD_R0_Nominal_Resistance" % prefix]
-        a = properties["%s_RTD_A" % prefix]
-        b = properties["%s_RTD_B" % prefix]
-        c = properties["%s_RTD_C" % prefix]
-        lead_wire_resistance = properties[
-            "%s_RTD_Lead_Wire_Resistance" % prefix]
-        resistance_configuration = properties[
-            "%s_RTD_Resistance_Configuration" % prefix]
-        input_source = properties[
-            "%s_RTD_Input_Source" % prefix]
+        current_excitation = properties[f"{prefix}_RTD_Current_Excitation"]
+        r0_nominal_resistance = properties[f"{prefix}_RTD_R0_Nominal_Resistance"]
+        a = properties[f"{prefix}_RTD_A"]
+        b = properties[f"{prefix}_RTD_B"]
+        c = properties[f"{prefix}_RTD_C"]
+        lead_wire_resistance = properties[f"{prefix}_RTD_Lead_Wire_Resistance"]
+        resistance_configuration = properties[f"{prefix}_RTD_Resistance_Configuration"]
+        input_source = properties[f"{prefix}_RTD_Input_Source"]
         return RtdScaling(
             current_excitation, r0_nominal_resistance, a, b, c,
             lead_wire_resistance, resistance_configuration, input_source)
@@ -167,6 +166,7 @@ class RtdScaling(object):
 class StrainScaling(object):
     """ Converts a voltage measurement from a strain gauge bridge to strain
     """
+
     def __init__(
             self, configuration, poisson_ratio, gage_resistance, lead_wire_resistance, initial_bridge_voltage,
             gage_factor, gain_adjustment, voltage_excitation, input_source):
@@ -183,15 +183,16 @@ class StrainScaling(object):
     @staticmethod
     def from_properties(properties, scale_index):
         prefix = "NI_Scale[%d]_Strain" % scale_index
-        configuration = properties["%s_Configuration" % prefix]
-        poisson_ratio = properties["%s_Poisson_Ratio" % prefix]
-        gage_resistance = properties["%s_Gage_Resistance" % prefix]
-        lead_wire_resistance = properties["%s_Lead_Wire_Resistance" % prefix]
-        initial_bridge_voltage = properties["%s_Initial_Bridge_Voltage" % prefix]
-        gage_factor = properties["%s_Gage_Factor" % prefix]
-        gain_adjustment = properties["%s_Bridge_Shunt_Calibration_Gain_Adjustment" % prefix]
-        voltage_excitation = properties["%s_Voltage_Excitation" % prefix]
-        input_source = properties["%s_Input_Source" % prefix]
+        configuration = properties[f"{prefix}_Configuration"]
+        poisson_ratio = properties[f"{prefix}_Poisson_Ratio"]
+        gage_resistance = properties[f"{prefix}_Gage_Resistance"]
+        lead_wire_resistance = properties[f"{prefix}_Lead_Wire_Resistance"]
+        initial_bridge_voltage = properties[f"{prefix}_Initial_Bridge_Voltage"]
+        gage_factor = properties[f"{prefix}_Gage_Factor"]
+        gain_adjustment = properties[f"{prefix}_Bridge_Shunt_Calibration_Gain_Adjustment"]
+
+        voltage_excitation = properties[f"{prefix}_Voltage_Excitation"]
+        input_source = properties[f"{prefix}_Input_Source"]
         return StrainScaling(
             configuration, poisson_ratio, gage_resistance, lead_wire_resistance, initial_bridge_voltage, gage_factor,
             gain_adjustment, voltage_excitation, input_source)
@@ -249,7 +250,7 @@ class StrainScaling(object):
             # ε = -4 (Vo / Vex) / [G (1 + ν + 2 (Vo / Vex) (1 - ν))]
             lead_adjustment = 1.0 / (1.0 + self.lead_wire_resistance / self.gage_resistance)
             common_factor = -self.gage_factor * self.voltage_excitation * lead_adjustment / (
-                    4.0 * self.gain_adjustment)
+                4.0 * self.gain_adjustment)
             temp = voltage_out.copy()
             temp *= common_factor * 2.0 * (1.0 - self.poisson_ratio) / self.voltage_excitation
             temp += common_factor * (1.0 + self.poisson_ratio)
@@ -260,7 +261,7 @@ class StrainScaling(object):
             lead_adjustment = 1.0 / (1.0 + self.lead_wire_resistance / self.gage_resistance)
             strain = voltage_out
             strain *= -2.0 * self.gain_adjustment / (
-                    self.gage_factor * self.voltage_excitation * lead_adjustment)
+                self.gage_factor * self.voltage_excitation * lead_adjustment)
             return strain
         elif self.configuration in (StrainScaling.QUARTER_BRIDGE_1, StrainScaling.QUARTER_BRIDGE_2):
             # In the quarter bridge configuration:
@@ -293,6 +294,7 @@ class TableScaling(object):
     """ Scales data using a map from input to output values with
         linear interpolation for points in between inputs.
     """
+
     def __init__(
             self, pre_scaled_values, scaled_values, input_source):
 
@@ -318,13 +320,11 @@ class TableScaling(object):
     def from_properties(properties, scale_index):
         prefix = "NI_Scale[%d]_Table_" % scale_index
         try:
-            input_source = properties[prefix + "Input_Source"]
+            input_source = properties[f"{prefix}Input_Source"]
         except KeyError:
             input_source = RAW_DATA_INPUT_SOURCE
-        num_pre_scaled_values = properties[
-            prefix + "Pre_Scaled_Values_Size"]
-        num_scaled_values = properties[
-            prefix + "Scaled_Values_Size"]
+        num_pre_scaled_values = properties[f"{prefix}Pre_Scaled_Values_Size"]
+        num_scaled_values = properties[f"{prefix}Scaled_Values_Size"]
         if num_pre_scaled_values != num_scaled_values:
             raise ValueError(
                 "Number of pre-scaled values does not match "
@@ -346,6 +346,7 @@ class TableScaling(object):
 class ThermistorScaling(object):
     """ Converts a voltage measurement from a Thermistor into temperature in Kelvin
     """
+
     def __init__(
             self,
             excitation_type,
@@ -370,16 +371,16 @@ class ThermistorScaling(object):
     @staticmethod
     def from_properties(properties, scale_index):
         prefix = "NI_Scale[%d]_Thermistor" % scale_index
-        excitation_type = properties["%s_Excitation_Type" % prefix]
-        excitation_value = properties["%s_Excitation_Value" % prefix]
-        resistance_configuration = properties["%s_Resistance_Configuration" % prefix]
-        r1_reference_resistance = properties["%s_R1_Reference_Resistance" % prefix]
-        lead_wire_resistance = properties["%s_Lead_Wire_Resistance" % prefix]
-        a = properties["%s_A" % prefix]
-        b = properties["%s_B" % prefix]
-        c = properties["%s_C" % prefix]
-        temperature_offset = properties["%s_Temperature_Offset" % prefix]
-        input_source = properties["%s_Input_Source" % prefix]
+        excitation_type = properties[f"{prefix}_Excitation_Type"]
+        excitation_value = properties[f"{prefix}_Excitation_Value"]
+        resistance_configuration = properties[f"{prefix}_Resistance_Configuration"]
+        r1_reference_resistance = properties[f"{prefix}_R1_Reference_Resistance"]
+        lead_wire_resistance = properties[f"{prefix}_Lead_Wire_Resistance"]
+        a = properties[f"{prefix}_A"]
+        b = properties[f"{prefix}_B"]
+        c = properties[f"{prefix}_C"]
+        temperature_offset = properties[f"{prefix}_Temperature_Offset"]
+        input_source = properties[f"{prefix}_Input_Source"]
         return ThermistorScaling(
             excitation_type, excitation_value,
             resistance_configuration, r1_reference_resistance, lead_wire_resistance,
@@ -397,7 +398,7 @@ class ThermistorScaling(object):
             # R_t = R1 / ((V_excitation / V_out) - 1)
             r_t = self.r1_reference_resistance * np.reciprocal(self.excitation_value * np.reciprocal(data) - 1.0)
         else:
-            raise ValueError("Invalid excitation type: %s" % self.excitation_type)
+            raise ValueError(f"Invalid excitation type: {self.excitation_type}")
 
         r_t = _adjust_for_lead_resistance(
             r_t, self.excitation_type, self.resistance_configuration, self.lead_wire_resistance)
@@ -412,6 +413,7 @@ class ThermocoupleScaling(object):
         Can convert in either direction depending on the scaling direction
         parameter.
     """
+
     def __init__(self, type_code, scaling_direction, input_source):
         # Thermocouple types from
         # http://zone.ni.com/reference/en-XX/help/371361R-01/glang/tdms_create_scalinginfo/#instance2
@@ -433,28 +435,24 @@ class ThermocoupleScaling(object):
     @staticmethod
     def from_properties(properties, scale_index):
         prefix = "NI_Scale[%d]_Thermocouple" % scale_index
-        input_source = properties.get(
-            "%s_Input_Source" % prefix, RAW_DATA_INPUT_SOURCE)
-        type_code = properties.get(
-            "%s_Thermocouple_Type" % prefix, 10072)
-        scaling_direction = properties.get(
-            "%s_Scaling_Direction" % prefix, 0)
+        input_source = properties.get(f"{prefix}_Input_Source", RAW_DATA_INPUT_SOURCE)
+        type_code = properties.get(f"{prefix}_Thermocouple_Type", 10072)
+        scaling_direction = properties.get(f"{prefix}_Scaling_Direction", 0)
         return ThermocoupleScaling(type_code, scaling_direction, input_source)
 
     def scale(self, data):
         """ Apply thermocouple scaling
         """
-        # Note that the thermocouple conversions use mV for voltages, but TDMS uses uV.
         if self.scaling_direction == 1:
             return 1000.0 * self.thermocouple.celsius_to_mv(data)
-        else:
-            milli_volts = data / 1000.0
-            return self.thermocouple.mv_to_celsius(milli_volts)
+        milli_volts = data / 1000.0
+        return self.thermocouple.mv_to_celsius(milli_volts)
 
 
 class AddScaling(object):
     """ Adds two scalings
     """
+
     def __init__(self, left_input_source, right_input_source):
         self.left_input_source = left_input_source
         self.right_input_source = right_input_source
@@ -474,6 +472,7 @@ class AddScaling(object):
 class SubtractScaling(object):
     """ Subtracts one scaling from another
     """
+
     def __init__(self, left_input_source, right_input_source):
         self.left_input_source = left_input_source
         self.right_input_source = right_input_source
@@ -498,6 +497,7 @@ class SubtractScaling(object):
 class DaqMxScalerScaling(object):
     """ Reads scaler from DAQmx data
     """
+
     def __init__(self, scale_id):
         self.scale_id = scale_id
 
@@ -508,6 +508,7 @@ class DaqMxScalerScaling(object):
 class MultiScaling(object):
     """ Computes scaled data from multiple scalings
     """
+
     def __init__(self, scalings):
         self.scalings = scalings
 
@@ -527,7 +528,7 @@ class MultiScaling(object):
         scaling = self.scalings[scale_index]
         if isinstance(scaling, DaqMxScalerScaling):
             return scaler_data_types[scaling.scale_id].nptype
-        elif isinstance(scaling, AddScaling) or isinstance(scaling, SubtractScaling):
+        elif isinstance(scaling, (AddScaling, SubtractScaling)):
             return np.result_type(
                 self._compute_scale_dtype(scaling.left_input_source, raw_data_type, scaler_data_types),
                 self._compute_scale_dtype(scaling.right_input_source, raw_data_type, scaler_data_types))
@@ -633,9 +634,7 @@ def _get_channel_scaling(properties):
             log.warning("Unsupported scale type: %s", scale_type)
             return None
 
-    if not scalings:
-        return None
-    return MultiScaling(scalings)
+    return MultiScaling(scalings) if scalings else None
 
 
 _scale_regex = re.compile(r"NI_Scale\[(\d+)\]_Scale_Type")

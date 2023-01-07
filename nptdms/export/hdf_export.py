@@ -43,7 +43,7 @@ def from_tdms_file(tdms_file, filepath, mode='w', group='/'):
 
         # Write properties and data for each channel
         for channel in group.channels():
-            channel_key = group.name + '/' + channel.name
+            channel_key = f'{group.name}/{channel.name}'
 
             if channel.data_type is types.String:
                 # Encode as variable length UTF-8 strings

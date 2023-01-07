@@ -93,14 +93,15 @@ class TdmsSegment(object):
 
         # First four bytes have number of objects in metadata
         num_objects_bytes = file.read(4)
-        num_objects = _struct_unpack(endianness + 'L', num_objects_bytes)[0]
+        num_objects = _struct_unpack(f'{endianness}L', num_objects_bytes)[0]
         properties = None
 
         for _ in range(num_objects):
             # Read the object path
             object_path = types.String.read(file, endianness)
             raw_data_index_header_bytes = file.read(4)
-            raw_data_index_header = _struct_unpack(endianness + 'L', raw_data_index_header_bytes)[0]
+            raw_data_index_header = _struct_unpack(f'{endianness}L', raw_data_index_header_bytes)[0]
+
             log.debug("Reading metadata for object %s with index header 0x%08x", object_path, raw_data_index_header)
 
             # Check whether we already have this object in our list from
@@ -148,61 +149,65 @@ class TdmsSegment(object):
             self, existing_object_index, existing_object, raw_data_index_header, file, endianness):
         """ Update raw data index information for an object already in the list of segment objects
         """
-        object_path = existing_object.path
         if raw_data_index_header == RAW_DATA_INDEX_NO_DATA:
             # Re-use object but leave data index information as set previously
             if existing_object.has_data:
-                new_obj = copy(existing_object)
-                new_obj.has_data = False
-                self.ordered_objects[existing_object_index] = new_obj
+                self._reuse_copy(existing_object, False, existing_object_index)
+
         elif raw_data_index_header == RAW_DATA_INDEX_MATCHES_PREVIOUS:
             # Re-use object and ensure we set has data to true for this segment
             if not existing_object.has_data:
-                new_obj = copy(existing_object)
-                new_obj.has_data = True
-                self.ordered_objects[existing_object_index] = new_obj
+                self._reuse_copy(existing_object, True, existing_object_index)
+
         else:
-            # New segment metadata, or updates to existing data
-            segment_obj = self._new_segment_object(object_path, raw_data_index_header)
-            segment_obj.has_data = True
-            segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
+            object_path = existing_object.path
+            segment_obj = self._reuse_index(object_path, raw_data_index_header, file, endianness)
+
             self.ordered_objects[existing_object_index] = segment_obj
+
+    # TODO Rename this here and in `_update_existing_object`
+    def _reuse_copy(self, existing_object, arg1, existing_object_index):
+        # Re-use object and ensure we set has data to `arg1`` for this segment
+        new_obj = copy(existing_object)
+        new_obj.has_data = arg1
+        self.ordered_objects[existing_object_index] = new_obj
 
     def _reuse_previous_object(
             self, previous_segment_obj, raw_data_index_header, file, endianness):
         """ Attempt to reuse raw data index information from a previous segment
         """
         object_path = previous_segment_obj.path
-        if raw_data_index_header == RAW_DATA_INDEX_NO_DATA:
-            # Re-use object but leave data index information as set previously
-            if previous_segment_obj.has_data:
-                segment_obj = copy(previous_segment_obj)
-                segment_obj.has_data = False
-            else:
-                segment_obj = previous_segment_obj
+        if raw_data_index_header == RAW_DATA_INDEX_NO_DATA and previous_segment_obj.has_data:
+            segment_obj = copy(previous_segment_obj)
+            segment_obj.has_data = False
+        elif (raw_data_index_header == RAW_DATA_INDEX_NO_DATA
+              or raw_data_index_header == RAW_DATA_INDEX_MATCHES_PREVIOUS
+              and previous_segment_obj.has_data
+              ):
+            segment_obj = previous_segment_obj
         elif raw_data_index_header == RAW_DATA_INDEX_MATCHES_PREVIOUS:
-            # Re-use previous object and ensure we set has data to true for this segment
-            if not previous_segment_obj.has_data:
-                segment_obj = copy(previous_segment_obj)
-                segment_obj.has_data = True
-            else:
-                segment_obj = previous_segment_obj
-        else:
-            # Changed metadata in this segment
-            segment_obj = self._new_segment_object(object_path, raw_data_index_header)
+            segment_obj = copy(previous_segment_obj)
             segment_obj.has_data = True
-            segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
+        else:
+            segment_obj = self._reuse_index(object_path, raw_data_index_header, file, endianness)
+
         self.ordered_objects.append(segment_obj)
+
+    # TODO Rename this here and in `_update_existing_object` and `_reuse_previous_object`
+    def _reuse_index(self, object_path, raw_data_index_header, file, endianness):
+        # Re-use object and ensure we set has data to true for this segment
+        result = self._new_segment_object(object_path, raw_data_index_header)
+        result.has_data = True
+        result.read_raw_data_index(file, raw_data_index_header, endianness)
+        return result
 
     def _reuse_previous_segment_metadata(self, previous_segment, segment_incomplete):
         try:
             self.ordered_objects = previous_segment.ordered_objects
             self.object_index = previous_segment.object_index
             self._calculate_chunks(segment_incomplete)
-        except AttributeError:
-            raise ValueError(
-                "kTocMetaData is not set for segment but "
-                "there is no previous segment")
+        except AttributeError as e:
+            raise ValueError("kTocMetaData is not set for segment but " "there is no previous segment") from e
 
     def _get_existing_object(self, existing_objects, object_path):
         """ Find an object already in the list of objects that are reused from the previous segment
@@ -216,7 +221,7 @@ class TdmsSegment(object):
         """Read properties for an object in the segment
         """
         num_properties_bytes = file.read(4)
-        num_properties = _struct_unpack(endianness + 'L', num_properties_bytes)[0]
+        num_properties = _struct_unpack(f'{endianness}L', num_properties_bytes)[0]
         if num_properties > 0:
             log.debug("Reading %d properties", num_properties)
             return [read_property(file, endianness) for _ in range(num_properties)]
@@ -241,8 +246,7 @@ class TdmsSegment(object):
             total_data_size, f.tell(), self.num_chunks)
 
         data_objects = [o for o in self.ordered_objects if o.has_data]
-        for chunk in self._read_data_chunks(f, data_objects, self.num_chunks):
-            yield chunk
+        yield from self._read_data_chunks(f, data_objects, self.num_chunks)
 
     def read_raw_data_for_channel(self, f, channel_path, chunk_offset=0, num_chunks=None):
         """Read raw data from a TDMS segment
@@ -266,8 +270,7 @@ class TdmsSegment(object):
         if chunk_offset > 0:
             f.seek(chunk_size * chunk_offset, os.SEEK_CUR)
         stop_chunk = self.num_chunks if num_chunks is None else num_chunks + chunk_offset
-        for chunk in self._read_channel_data_chunks(f, data_objects, channel_path, chunk_offset, stop_chunk):
-            yield chunk
+        yield from self._read_channel_data_chunks(f, data_objects, channel_path, chunk_offset, stop_chunk)
 
     def _calculate_chunks(self, segment_incomplete):
         """
@@ -314,16 +317,12 @@ class TdmsSegment(object):
             return obj_chunk_sizes
 
         interleaved_data = self.toc_mask & toc_properties['kTocInterleavedData']
-        if interleaved_data or not segment_incomplete:
-            for obj in self.ordered_objects:
-                if not obj.has_data:
-                    continue
+        for obj in self.ordered_objects:
+            if not obj.has_data:
+                continue
+            if interleaved_data or not segment_incomplete:
                 obj_chunk_sizes[obj.path] = (obj.number_values * chunk_remainder) // chunk_size
-        else:
-            # Have contiguous truncated data
-            for obj in self.ordered_objects:
-                if not obj.has_data:
-                    continue
+            else:
                 data_size = obj.number_values * obj.data_type.size
                 if chunk_remainder > data_size:
                     obj_chunk_sizes[obj.path] = obj.number_values
@@ -356,16 +355,14 @@ class TdmsSegment(object):
             In the base case we read each chunk individually but subclasses can override this
         """
         reader = self._get_data_reader()
-        for chunk in reader.read_data_chunks(file, data_objects, num_chunks):
-            yield chunk
+        yield from reader.read_data_chunks(file, data_objects, num_chunks)
 
     def _read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk):
         """ Read multiple data chunks for a single channel at once
             In the base case we read each chunk individually but subclasses can override this
         """
         reader = self._get_data_reader()
-        for chunk in reader.read_channel_data_chunks(file, data_objects, channel_path, chunk_offset, stop_chunk):
-            yield chunk
+        yield from reader.read_channel_data_chunks(file, data_objects, channel_path, chunk_offset, stop_chunk)
 
     def _get_data_reader(self):
         endianness = '>' if (self.toc_mask & toc_properties['kTocBigEndian']) else '<'
@@ -424,8 +421,7 @@ class InterleavedDataReader(BaseDataReader):
         """
         if len(data_objects) == 0:
             return []
-        same_length = (len(
-            set((o.number_values for o in data_objects))) == 1)
+        same_length = len({o.number_values for o in data_objects}) == 1
         if not same_length:
             raise ValueError("Cannot read interleaved data with different chunk sizes")
         return [self._read_interleaved_chunks(file, data_objects, num_chunks)]
@@ -493,13 +489,11 @@ class ContiguousDataReader(BaseDataReader):
             elif number_values == obj.number_values:
                 # Seek over data for other channel data
                 file.seek(obj.data_size, os.SEEK_CUR)
+            elif obj.data_type.size is None:
+                # Type is unsized (eg. string), try reading number of values
+                obj.read_values(file, number_values, self.endianness)
             else:
-                # In last chunk with reduced chunk size
-                if obj.data_type.size is None:
-                    # Type is unsized (eg. string), try reading number of values
-                    obj.read_values(file, number_values, self.endianness)
-                else:
-                    file.seek(obj.data_type.size * number_values, os.SEEK_CUR)
+                file.seek(obj.data_type.size * number_values, os.SEEK_CUR)
         return channel_data
 
     def _get_channel_number_values(self, obj, chunk_index):
@@ -521,14 +515,15 @@ class TdmsSegmentObject(BaseSegmentObject):
 
         # Read type, dimension and chunk size at once for performance
         index_bytes = f.read(16)
-        (data_type, dimension, number_values) = _struct_unpack(endianness + 'LLQ', index_bytes)
+        (data_type, dimension, number_values) = _struct_unpack(f'{endianness}LLQ', index_bytes)
+
         self.number_values = number_values
 
         # Get data type
         try:
             self.data_type = types.tds_data_types[data_type]
-        except KeyError:
-            raise KeyError("Unrecognised data type")
+        except KeyError as e:
+            raise KeyError("Unrecognised data type") from e
 
         log.debug(
             "Object data type: %s\nObject number of values in segment: %d",
@@ -582,7 +577,7 @@ class SegmentIndexCache(object):
         try:
             return self._indexes[key]
         except KeyError:
-            index = dict((o.path, i) for (i, o) in enumerate(object_list))
+            index = {o.path: i for (i, o) in enumerate(object_list)}
             self._indexes[key] = index
             return index
 
