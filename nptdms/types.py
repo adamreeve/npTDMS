@@ -3,6 +3,10 @@
 import numpy as np
 import struct
 from nptdms.timestamp import TdmsTimestamp, TimestampArray
+from nptdms.log import log_manager
+
+
+log = log_manager.get_logger(__name__)
 
 
 __all__ = [
@@ -205,7 +209,7 @@ class String(TdmsType):
     def read(file, endianness="<"):
         size_bytes = file.read(4)
         size = _struct_unpack(endianness + 'L', size_bytes)[0]
-        return file.read(size).decode('utf-8')
+        return String._decode(file.read(size))
 
     @classmethod
     def read_values(cls, file, number_values, endianness="<"):
@@ -220,8 +224,18 @@ class String(TdmsType):
         strings = []
         for i in range(number_values):
             s = file.read(offsets[i + 1] - offsets[i])
-            strings.append(s.decode('utf-8'))
+            strings.append(String._decode(s))
         return strings
+
+    @staticmethod
+    def _decode(string_bytes):
+        try:
+            return string_bytes.decode('utf-8')
+        except UnicodeDecodeError as exc:
+            log.warning(
+                "Error decoding string from bytes %s, retrying with replace handler: %s",
+                string_bytes, exc)
+            return string_bytes.decode('utf-8', errors='replace')
 
 
 @tds_data_type(0x21, np.bool_)
