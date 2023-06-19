@@ -64,11 +64,11 @@ class TdmsWriter(object):
             It's important that if you are appending segments to an
             existing TDMS file, this matches the existing file version (this can be queried with the
             :py:attr:`~nptdms.TdmsFile.tdms_version` property).
-        :param index_file: Whether or not to write a index file besides the data file. Index files
+        :param index_file: Whether to write an index file besides the data file. Index files
             can be used to accelerate reading speeds for faster channel extraction and data positions inside
-            the data files. If ``file```variable is a path ``index_file`` can be ``True`` to store a ``.tdms_index``
-            file at the same folder location or ``False`` to only write the data ``.tdms`` file. If ``file`` variable
-            is a readable object ``index_file`` can either be a readable object to write into or ``False`` to omit.
+            the data files. If ``file```variable is a path, ``index_file`` can be ``True`` to store a ``.tdms_index``
+            file at the same folder location or ``False`` to only write the data ``.tdms`` file. If ``file``
+            is a readable object, ``index_file`` can either be a readable object to write into or ``False`` to omit.
         """
         valid_versions = (4712, 4713)
         if version not in valid_versions:
@@ -79,6 +79,8 @@ class TdmsWriter(object):
         self._index_file_path = None
         self._file_mode = mode
         self._tdms_version = version
+        self._root_written = False
+        self._groups_written = set()
 
         if hasattr(file, "read"):
             # Is a file
@@ -123,12 +125,36 @@ class TdmsWriter(object):
 
         :param objects: A list of TdmsObject instances to write
         """
+        path_object_pairs = [(ObjectPath.from_string(o.path), o) for o in objects]
+
+        # Make sure a root object is included if this is the first segment,
+        # and any groups used by channels have associated group objects
+        add_root = (not self._root_written) and (not any(p[0].is_root for p in path_object_pairs))
+        groups_included = set(p[0].group for p in path_object_pairs if p[0].is_group)
+        groups_required = set(p[0].group for p in path_object_pairs if p[0].is_channel)
+        groups_to_add = sorted(groups_required - groups_included - self._groups_written)
+
+        if add_root:
+            path_object_pairs.append((ObjectPath(), RootObject()))
+        if groups_to_add:
+            path_object_pairs.extend((ObjectPath(g), GroupObject(g)) for g in groups_to_add)
+
+        # Ensure objects are ordered with root first, then groups, in case any readers depend
+        # on parent objects being defined before their children.
+        # Channel ordering will be unchanged as sorts are stable.
+        path_object_pairs.sort(key=lambda p: _path_ordering_key(p[0]))
+
+        objects = [p[1] for p in path_object_pairs]
         segment = TdmsSegment(objects, version=self._tdms_version)
         segment.write(self._file)
 
         if self._index_file is not None:
             segment = TdmsSegment(objects, is_index_file=True, version=self._tdms_version)
             segment.write(self._index_file)
+
+        self._root_written = True
+        self._groups_written.update(groups_included)
+        self._groups_written.update(groups_to_add)
 
     def __enter__(self):
         self.open()
@@ -450,3 +476,12 @@ def _infer_dtype(data):
         else:
             return np.dtype('int8')
     return None
+
+
+def _path_ordering_key(path):
+    if path.is_root:
+        return 0
+    if path.is_group:
+        return 1
+    if path.is_channel:
+        return 2

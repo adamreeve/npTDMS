@@ -403,3 +403,89 @@ def test_specifying_invalid_version():
     error_message = str(exception.value)
 
     assert "4712,4713" in error_message
+
+
+def test_root_object_added():
+    """ When not explicitly included, a root object should be added
+    """
+    group = GroupObject("group")
+    channel = ChannelObject("group", "a", np.linspace(0.0, 1.0, 10))
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([group, channel])
+        tdms_writer.write_segment([group, channel])
+
+    output_file.seek(0)
+
+    tdms_file = TdmsFile(output_file)
+    first_segment_objects = tdms_file._reader._segments[0].ordered_objects
+    second_segment_objects = tdms_file._reader._segments[1].ordered_objects
+
+    assert first_segment_objects[0].path == "/"
+    assert not any(obj.path == "/" for obj in second_segment_objects)
+
+
+def test_group_object_added():
+    """ When not explicitly included, a group object should be added
+    """
+    root = RootObject()
+    channel = ChannelObject("group", "a", np.linspace(0.0, 1.0, 10))
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([root, channel])
+        tdms_writer.write_segment([root, channel])
+
+    output_file.seek(0)
+
+    tdms_file = TdmsFile(output_file)
+    first_segment_objects = tdms_file._reader._segments[0].ordered_objects
+    second_segment_objects = tdms_file._reader._segments[1].ordered_objects
+
+    assert first_segment_objects[1].path == "/'group'"
+    assert not any(obj.path == "/'group'" for obj in second_segment_objects)
+
+
+def test_group_not_duplicated():
+    root = RootObject()
+    group = GroupObject("group")
+    channel = ChannelObject("group", "a", np.linspace(0.0, 1.0, 10))
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([root, group, channel])
+        tdms_writer.write_segment([channel])
+
+    output_file.seek(0)
+
+    tdms_file = TdmsFile(output_file)
+    first_segment_objects = tdms_file._reader._segments[0].ordered_objects
+    second_segment_objects = tdms_file._reader._segments[1].ordered_objects
+
+    assert len(first_segment_objects) == 3
+    assert len(second_segment_objects) == 1
+
+
+def test_root_and_groups_ordered_first():
+    """
+    The root and group objects should always come first
+    """
+    root = RootObject()
+    group = GroupObject("group")
+    channel_0 = ChannelObject("group", "b", np.linspace(0.0, 1.0, 10))
+    channel_1 = ChannelObject("group", "a", np.linspace(0.0, 1.0, 10))
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([channel_0, group, channel_1, root])
+
+    output_file.seek(0)
+
+    tdms_file = TdmsFile(output_file)
+    first_segment_objects = tdms_file._reader._segments[0].ordered_objects
+
+    assert first_segment_objects[0].path == "/"
+    assert first_segment_objects[1].path == "/'group'"
+    assert first_segment_objects[2].path == "/'group'/'b'"
+    assert first_segment_objects[3].path == "/'group'/'a'"
