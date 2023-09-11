@@ -11,13 +11,13 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os
+import sys
 import configparser
+from pathlib import Path
 
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-sys.path.insert(0, os.path.abspath('..'))
+# Allow importing nptdms from the parent directory for building API docs
+repo_root = Path(__file__).parent.parent
+sys.path.insert(0, str(repo_root))
 
 # -- General configuration -----------------------------------------------------
 
@@ -52,7 +52,7 @@ copyright = u'Adam Reeve'
 # built documents.
 #
 setup_cfg = configparser.ConfigParser()
-setup_cfg.read('../setup.cfg')
+setup_cfg.read(repo_root / 'setup.cfg')
 # The short X.Y version.
 version = '.'.join(setup_cfg['metadata']['version'].split('.')[:2])
 # The full version, including alpha/beta/rc tags.
