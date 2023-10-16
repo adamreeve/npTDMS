@@ -189,7 +189,7 @@ def test_file_as_dataframe_with_absolute_time():
     df = tdms_data.as_dataframe(time_index=True, absolute_time=True)
 
     expected_start = datetime(2015, 9, 8, 10, 5, 49)
-    assert (df.index == expected_start)[0]
+    assert (df.index[0] == expected_start)
 
 
 @pytest.mark.parametrize('lazy_load', [True, False])
@@ -319,6 +319,37 @@ def test_raw_daqmx_channel_export(lazy_load):
     assert dataframe["/'Group'/'Channel1'[1]"].dtype == np.int16
     np.testing.assert_equal(dataframe["/'Group'/'Channel1'[0]"], expected_data[0])
     np.testing.assert_equal(dataframe["/'Group'/'Channel1'[1]"], expected_data[1])
+
+
+@pytest.mark.parametrize('abs_time_index', [False, True])
+def test_dataframe_with_arrow_types(abs_time_index):
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+
+    tdms_data = test_file.load()
+
+    file_df = tdms_data.as_dataframe(
+        arrow_dtypes=True, time_index=abs_time_index, absolute_time=abs_time_index)
+
+    group_df = tdms_data['Group'].as_dataframe(
+        arrow_dtypes=True, time_index=abs_time_index, absolute_time=abs_time_index)
+
+    channel_df = tdms_data['Group']['Channel1'].as_dataframe(
+        arrow_dtypes=True, time_index=abs_time_index, absolute_time=abs_time_index)
+
+    assert len(file_df) == 2
+    assert "/'Group'/'Channel1'" in file_df.keys()
+    assert "/'Group'/'Channel2'" in file_df.keys()
+
+    def check_series(series):
+        assert (series == [1, 2]).all()
+        assert series.dtype == "int32[pyarrow]"
+        if abs_time_index:
+            assert series.index.dtype == "timestamp[ns][pyarrow]"
+
+    check_series(file_df["/'Group'/'Channel1'"])
+    check_series(group_df['Channel1'])
+    check_series(channel_df["/'Group'/'Channel1'"])
 
 
 def test_export_with_empty_channels():

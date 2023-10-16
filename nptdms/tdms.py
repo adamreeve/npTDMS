@@ -160,7 +160,7 @@ class TdmsFile(object):
 
         return self._properties
 
-    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
+    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
         """
         Converts the TDMS file to a DataFrame. DataFrame columns are named using the TDMS object paths.
 
@@ -170,11 +170,14 @@ class TdmsFile(object):
         :param scaled_data: By default the scaled data will be used.
             Set to False to use raw unscaled data.
             For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
+        :param arrow_dtypes: Use PyArrow data types in the DataFrame.
         :return: The full TDMS file data.
         :rtype: pandas.DataFrame
         """
 
-        return pandas_export.from_tdms_file(self, time_index, absolute_time, scaled_data)
+        return pandas_export.from_tdms_file(
+            self, time_index=time_index, absolute_time=absolute_time, scaled_data=scaled_data,
+            arrow_dtypes=arrow_dtypes)
 
     def as_hdf(self, filepath, mode='w', group='/'):
         """
@@ -388,7 +391,7 @@ class TdmsGroup(object):
         """
         return list(self._channels.values())
 
-    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
+    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
         """
         Converts the TDMS group to a DataFrame. DataFrame columns are named using the channel names.
 
@@ -398,11 +401,14 @@ class TdmsGroup(object):
         :param scaled_data: By default the scaled data will be used.
             Set to False to use raw unscaled data.
             For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
+        :param arrow_dtypes: Use PyArrow data types in the DataFrame.
         :return: The TDMS object data.
         :rtype: pandas.DataFrame
         """
 
-        return pandas_export.from_group(self, time_index, absolute_time, scaled_data)
+        return pandas_export.from_group(
+            self, time_index=time_index, absolute_time=absolute_time, scaled_data=scaled_data,
+            arrow_dtypes=arrow_dtypes)
 
     def __len__(self):
         """ Returns the number of channels in this group
@@ -692,7 +698,7 @@ class TdmsChannel(object):
         return (start_time +
                 (relative_time * unit_correction).astype(time_type))
 
-    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
+    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
         """
         Converts the TDMS channel to a DataFrame. The DataFrame column is named using the channel path.
 
@@ -702,11 +708,14 @@ class TdmsChannel(object):
         :param scaled_data: By default the scaled data will be used.
             Set to False to use raw unscaled data.
             For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
+        :param arrow_dtypes: Use PyArrow data types in the DataFrame.
         :return: The TDMS object data.
         :rtype: pandas.DataFrame
         """
 
-        return pandas_export.from_channel(self, time_index, absolute_time, scaled_data)
+        return pandas_export.from_channel(
+            self, time_index=time_index, absolute_time=absolute_time, scaled_data=scaled_data,
+            arrow_dtypes=arrow_dtypes)
 
     def _read_data_values(self):
         for chunk in self.data_chunks():
