@@ -145,8 +145,8 @@ class TdmsFile(object):
 
         return list(self._groups.values())
 
-    def group_exists(self, group_name):
-        """Returns a True if a group exists and false if it does not
+    def has_group(self, group_name):
+        """Returns a True if TDMS file contains the group and false if it does not
         
         :rtype: bool 
         """
@@ -385,8 +385,8 @@ class TdmsGroup(object):
         """
         return list(self._channels.values())
 
-    def channel_exists(self, channel_name):
-        """Returns a True if a channel exists and false if it does not
+    def has_channel(self, channel_name):
+        """Returns a True if a channel is in group and false if it is not
         
         :rtype: bool 
         """
