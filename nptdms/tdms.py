@@ -145,6 +145,17 @@ class TdmsFile(object):
 
         return list(self._groups.values())
 
+    def group_exists(self, group_name):
+        """Returns a True if a group exists and false if it does not
+        
+        :rtype: bool 
+        """
+        try:
+            self._groups[group_name]
+        except KeyError:
+            return False
+        return True
+
     @property
     def tdms_version(self):
         """ The TDMS format version of this file
@@ -373,6 +384,18 @@ class TdmsGroup(object):
         :rtype: A list of TdmsChannel
         """
         return list(self._channels.values())
+
+    def channel_exists(self, channel_name):
+        """Returns a True if a channel exists and false if it does not
+        
+        :rtype: bool 
+        """
+        try:
+            self._channels[channel_name]
+        except KeyError:
+            return False
+        return True 
+            
 
     def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
         """
