@@ -145,17 +145,6 @@ class TdmsFile(object):
 
         return list(self._groups.values())
 
-    def has_group(self, group_name):
-        """Returns a True if TDMS file contains the group and false if it does not
-        
-        :rtype: bool 
-        """
-        try:
-            self._groups[group_name]
-        except KeyError:
-            return False
-        return True
-
     @property
     def tdms_version(self):
         """ The TDMS format version of this file
@@ -366,6 +355,13 @@ class TdmsGroup(object):
     def __repr__(self):
         return "<TdmsGroup with path %s>" % self.path
 
+    def __contains__(self, channel_name):
+        """ Check if group contains channel
+
+        :rtype: Boolean
+        """
+        return channel_name in self._channels
+
     @property
     def path(self):
         """ Path to the TDMS object for this group
@@ -384,18 +380,6 @@ class TdmsGroup(object):
         :rtype: A list of TdmsChannel
         """
         return list(self._channels.values())
-
-    def has_channel(self, channel_name):
-        """Returns a True if a channel is in group and false if it is not
-        
-        :rtype: bool 
-        """
-        try:
-            self._channels[channel_name]
-        except KeyError:
-            return False
-        return True 
-            
 
     def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True):
         """
