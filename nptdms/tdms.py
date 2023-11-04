@@ -137,6 +137,13 @@ class TdmsFile(object):
             if not keep_open:
                 self._reader.close()
 
+    def __contains__(self, group_name):
+        """ Check if TDMS file contains groupp
+
+        :rtype: Boolean
+        """
+        return group_name in self._groups
+
     def groups(self):
         """Returns a list of the groups in this file
 
