@@ -899,6 +899,28 @@ def test_object_repr():
     assert repr(channel) == "<TdmsChannel with path /'Group'/'Channel1'>"
 
 
+def test_group_in_tdms_object():
+    """Test in for TDMS object
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    assert 'Group' in tdms_data
+    assert 'group' not in tdms_data
+
+
+def test_channel_in_group_object():
+    """Test in for group
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(*basic_segment())
+    tdms_data = test_file.load()
+
+    assert 'Channel1' in tdms_data['Group']
+    assert 'channel1' not in tdms_data['Group']
+
+
 def test_data_read_from_bytes_io():
     """Test reading data"""
 

@@ -214,6 +214,13 @@ class TdmsFile(object):
         """
         return len(self._groups)
 
+    def __contains__(self, group_name):
+        """ Check if TDMS file contains groupp
+
+        :rtype: Boolean
+        """
+        return group_name in self._groups
+
     def __iter__(self):
         """ Returns an iterator over the names of groups in this file
         """
@@ -354,6 +361,13 @@ class TdmsGroup(object):
 
     def __repr__(self):
         return "<TdmsGroup with path %s>" % self.path
+
+    def __contains__(self, channel_name):
+        """ Check if group contains channel
+
+        :rtype: Boolean
+        """
+        return channel_name in self._channels
 
     @property
     def path(self):
