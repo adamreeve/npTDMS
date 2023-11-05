@@ -114,7 +114,7 @@ def _channels_to_dataframe(
 def _array_for_pd(array):
     """ Convert data array to a format suitable for a Pandas dataframe
     """
-    if np.issubdtype(array.dtype, np.dtype('void')):
+    if np.issubdtype(array.dtype, np.dtype('void')) and len(array.dtype) == 0:
         # If dtype is void then the array must also be empty.
         # Pandas doesn't like void data types, so these are converted to empty float64 arrays
         # and Pandas will fill values with NaN
