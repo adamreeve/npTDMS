@@ -189,7 +189,7 @@ def test_file_as_dataframe_with_absolute_time():
     df = tdms_data.as_dataframe(time_index=True, absolute_time=True)
 
     expected_start = datetime(2015, 9, 8, 10, 5, 49)
-    assert (df.index == expected_start)[0]
+    assert (df.index[0] == expected_start)
 
 
 @pytest.mark.parametrize('lazy_load', [True, False])
@@ -319,6 +319,117 @@ def test_raw_daqmx_channel_export(lazy_load):
     assert dataframe["/'Group'/'Channel1'[1]"].dtype == np.int16
     np.testing.assert_equal(dataframe["/'Group'/'Channel1'[0]"], expected_data[0])
     np.testing.assert_equal(dataframe["/'Group'/'Channel1'[1]"], expected_data[1])
+
+
+@pytest.mark.parametrize('abs_time_index', [False, True])
+def test_dataframe_with_arrow_types(abs_time_index):
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+
+    tdms_data = test_file.load()
+
+    file_df = tdms_data.as_dataframe(
+        arrow_dtypes=True, time_index=abs_time_index, absolute_time=abs_time_index)
+
+    group_df = tdms_data['Group'].as_dataframe(
+        arrow_dtypes=True, time_index=abs_time_index, absolute_time=abs_time_index)
+
+    channel_df = tdms_data['Group']['Channel1'].as_dataframe(
+        arrow_dtypes=True, time_index=abs_time_index, absolute_time=abs_time_index)
+
+    assert len(file_df) == 2
+    assert "/'Group'/'Channel1'" in file_df.keys()
+    assert "/'Group'/'Channel2'" in file_df.keys()
+
+    def check_series(series):
+        assert (series == [1, 2]).all()
+        assert series.dtype == "int32[pyarrow]"
+        if abs_time_index:
+            assert series.index.dtype == "timestamp[ns][pyarrow]"
+
+    check_series(file_df["/'Group'/'Channel1'"])
+    check_series(group_df['Channel1'])
+    check_series(channel_df["/'Group'/'Channel1'"])
+
+
+@pytest.mark.parametrize('arrow_dtypes', [False, True])
+def test_bool_data_to_pandas(arrow_dtypes):
+    test_file, expected_data = scenarios.bool_data().values
+    df = test_file.load()['group'].as_dataframe(arrow_dtypes=arrow_dtypes)
+    np.testing.assert_allclose(df['bool_channel'], expected_data[('group', 'bool_channel')])
+
+
+@pytest.mark.parametrize('arrow_dtypes', [False, True])
+def test_string_data_to_pandas(arrow_dtypes):
+    strings = ["abcdefg", "qwertyuiop"]
+
+    test_file = GeneratedFile()
+    toc = ("kTocMetaData", "kTocRawData", "kTocNewObjList")
+    metadata = (
+        # Number of objects
+        "01 00 00 00"
+        # Length of the object path
+        "18 00 00 00")
+    metadata += string_hexlify("/'Group'/'StringChannel'")
+    metadata += (
+        # Length of index information
+        "1C 00 00 00"
+        # Raw data data type
+        "20 00 00 00"
+        # Dimension
+        "01 00 00 00"
+        # Number of raw data values
+        "02 00 00 00"
+        "00 00 00 00"
+        # Number of bytes in data
+        "19 00 00 00"
+        "00 00 00 00"
+        # Number of properties (0)
+        "00 00 00 00")
+    data = (
+        "07 00 00 00"  # index to after first string
+        "11 00 00 00"  # index to after second string
+    )
+    for string in strings:
+        data += string_hexlify(string)
+    test_file.add_segment(toc, metadata, data)
+    tdms_data = test_file.load()
+
+    series = tdms_data["Group"].as_dataframe(arrow_dtypes=arrow_dtypes)["StringChannel"]
+
+    assert len(series) == len(strings)
+    for expected, read in zip(strings, series):
+        assert expected == read
+
+
+def test_dataframe_with_complex_data():
+    test_file, expected_data = scenarios.complex_data().values
+    df = test_file.load()['group'].as_dataframe()
+    np.testing.assert_allclose(df['complex_single_channel'], expected_data[('group', 'complex_single_channel')])
+    np.testing.assert_allclose(df['complex_double_channel'], expected_data[('group', 'complex_double_channel')])
+
+
+def test_dataframe_with_raw_timestamp_data():
+    test_file = GeneratedFile()
+    seconds = 3672033330
+    second_fractions = 1234567890 * 10 ** 10
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 0x44, 4),
+        ),
+        hexlify_value("<Q", 0) + hexlify_value("<q", seconds) +
+        hexlify_value("<Q", second_fractions) + hexlify_value("<q", seconds) +
+        hexlify_value("<Q", 0) + hexlify_value("<q", seconds + 1) +
+        hexlify_value("<Q", second_fractions) + hexlify_value("<q", seconds + 1)
+    )
+
+    with test_file.get_tempfile() as temp_file:
+        tdms_data = TdmsFile.read(temp_file.file, raw_timestamps=True)
+        with pytest.raises(ValueError) as exc_info:
+            tdms_data['group'].as_dataframe()
+        message = str(exc_info.value)
+        assert "compound dtype" in message
 
 
 def test_export_with_empty_channels():
