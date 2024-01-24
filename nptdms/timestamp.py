@@ -30,6 +30,9 @@ class TdmsTimestamp(object):
         fraction_string = "{0:.6f}".format(self.second_fractions * 2.0 ** -64).split('.')[1]
         return "{0}.{1}".format(dt, fraction_string)
 
+    def __eq__(self, other):
+        return self.seconds == other.seconds and self.second_fractions == other.second_fractions
+
     def as_datetime64(self, resolution='us'):
         """ Convert this timestamp to a numpy datetime64 object
 
