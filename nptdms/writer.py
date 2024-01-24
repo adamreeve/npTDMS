@@ -22,7 +22,7 @@ class TdmsWriter(object):
     """
 
     @classmethod
-    def defragment(cls, source, destination, version=4712, index_file=False, raw_timestamps=False):
+    def defragment(cls, source, destination, version=4712, index_file=False):
         """ Defragemnts an existing TdmsFile by loading and moving each Object to a separate channel
         to stream read one consecutive part of the file for faster access.
 
@@ -39,7 +39,7 @@ class TdmsWriter(object):
             If ``destination`` is a readable object ``index_file`` can either be a redable object or ``False``
             to store a ``.tdms_index`` file inside of the submitted object or not.
         """
-        file = TdmsFile(source, raw_timestamps)
+        file = TdmsFile(source, raw_timestamps=True)
         with cls(destination, version=version, index_file=index_file) as new_file:
             new_file.write_segment([RootObject(file.properties)])
             for group in file.groups():

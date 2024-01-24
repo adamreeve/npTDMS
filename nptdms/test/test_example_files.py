@@ -38,7 +38,17 @@ def test_defragment_raw_timestamps():
     """Test defragmenting a file with raw timestamps"""
     test_file_path = DATA_DIR + '/raw_timestamps.tdms'
     output_file = BytesIO()
-    TdmsWriter.defragment(test_file_path, output_file, raw_timestamps=True)
+
+    # verify we can defragment a file with raw timestamps
+    TdmsWriter.defragment(test_file_path, output_file)
+
+    # verify that both files' channel data are the same
+    input_tdms = tdms.TdmsFile(test_file_path)
+    output_file.seek(0)
+    output_tdms = tdms.TdmsFile(output_file)
+    for group in input_tdms.groups():
+        for channel in group.channels():
+            np.testing.assert_equal(channel.data, output_tdms[group.name][channel.name].data)
 
 
 def test_big_endian_format():
