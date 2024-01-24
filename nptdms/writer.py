@@ -375,6 +375,8 @@ def _to_tdms_value(value):
         return TimeStamp(value)
     if isinstance(value, np.datetime64):
         return TimeStamp(value)
+    if isinstance(value, TdmsTimestamp):
+        return value
     if isinstance(value, str):
         return String(value)
     if isinstance(value, bytes):

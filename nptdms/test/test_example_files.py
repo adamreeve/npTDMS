@@ -2,9 +2,10 @@
 """
 
 import os
-import numpy as np
-from nptdms import tdms
+from io import BytesIO
 
+import numpy as np
+from nptdms import tdms, TdmsWriter
 
 DATA_DIR = os.path.dirname(os.path.realpath(__file__)) + '/data'
 
@@ -31,6 +32,13 @@ def test_raw_format():
                                     -0.29725028, -0.20020142, 0.18158513,
                                     0.02380444, 0.20661031, 0.20447401,
                                     0.2517777])
+
+
+def test_defragment_raw_timestamps():
+    """Test defragmenting a file with raw timestamps"""
+    test_file_path = DATA_DIR + '/raw_timestamps.tdms'
+    output_file = BytesIO()
+    TdmsWriter.defragment(test_file_path, output_file, raw_timestamps=True)
 
 
 def test_big_endian_format():
