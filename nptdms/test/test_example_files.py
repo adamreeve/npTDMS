@@ -48,7 +48,12 @@ def test_defragment_raw_timestamps():
     output_tdms = tdms.TdmsFile(output_file)
     for group in input_tdms.groups():
         for channel in group.channels():
+            # verify that both files' channel data are the same
             np.testing.assert_equal(channel.data, output_tdms[group.name][channel.name].data)
+            # verify that both files' timestamps are the same
+            input_timestamps = channel.time_track()
+            output_timestamps = output_tdms[group.name][channel.name].time_track()
+            np.testing.assert_equal(input_timestamps, output_timestamps)
 
 
 def test_big_endian_format():
