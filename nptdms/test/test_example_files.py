@@ -68,12 +68,14 @@ def test_defragment(tdms_file):
     # verify we can defragment a file with raw timestamps
     TdmsWriter.defragment(test_file_path, output_file)
 
-    # rewind output file BytesIO instance and read it back in as a TdmsFile
+    # rewind output file BytesIO instance, so it can read it back in as a TdmsFile
     output_file.seek(0)
-    output_tdms = tdms.TdmsFile(output_file)
 
     # verify that both TdmsFile objects are the same
-    tdms_files_assert_equal(tdms.TdmsFile(test_file_path), output_tdms)
+    tdms_files_assert_equal(
+        tdms.TdmsFile(test_file_path, raw_timestamps=True),
+        tdms.TdmsFile(output_file, raw_timestamps=True),
+    )
 
 
 def test_big_endian_format():
