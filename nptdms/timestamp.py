@@ -1,8 +1,10 @@
+import struct
 from datetime import datetime, timedelta
 import numpy as np
 
-
 EPOCH = np.datetime64('1904-01-01 00:00:00', 's')
+
+_struct_pack = struct.pack
 
 
 class TdmsTimestamp(object):
@@ -14,6 +16,7 @@ class TdmsTimestamp(object):
         :ivar ~.seconds: Seconds since the epoch as a signed integer
         :ivar ~.second_fractions: A positive number of 2^-64 fractions of a second
     """
+    enum_value = 0x44
 
     def __init__(self, seconds, second_fractions):
         self.seconds = seconds
@@ -26,6 +29,9 @@ class TdmsTimestamp(object):
         dt = EPOCH + np.timedelta64(self.seconds, 's')
         fraction_string = "{0:.6f}".format(self.second_fractions * 2.0 ** -64).split('.')[1]
         return "{0}.{1}".format(dt, fraction_string)
+
+    def __eq__(self, other):
+        return self.seconds == other.seconds and self.second_fractions == other.second_fractions
 
     def as_datetime64(self, resolution='us'):
         """ Convert this timestamp to a numpy datetime64 object
@@ -48,6 +54,10 @@ class TdmsTimestamp(object):
         fractions_per_us = _fractions_per_step['us']
         microseconds = (self.second_fractions / fractions_per_us)
         return datetime(1904, 1, 1, 0, 0, 0) + timedelta(seconds=self.seconds) + timedelta(microseconds=microseconds)
+
+    @property
+    def bytes(self):
+        return _struct_pack('<Qq', self.second_fractions, self.seconds)
 
 
 class TimestampArray(np.ndarray):

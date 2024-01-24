@@ -7,6 +7,7 @@ import os
 
 import numpy as np
 from nptdms.common import toc_properties, ObjectPath
+from nptdms.timestamp import TdmsTimestamp
 from nptdms.types import *
 from nptdms import TdmsFile
 
@@ -38,7 +39,7 @@ class TdmsWriter(object):
             If ``destination`` is a readable object ``index_file`` can either be a redable object or ``False``
             to store a ``.tdms_index`` file inside of the submitted object or not.
         """
-        file = TdmsFile(source)
+        file = TdmsFile(source, raw_timestamps=True)
         with cls(destination, version=version, index_file=index_file) as new_file:
             new_file.write_segment([RootObject(file.properties)])
             for group in file.groups():
@@ -375,6 +376,8 @@ def _to_tdms_value(value):
         return TimeStamp(value)
     if isinstance(value, np.datetime64):
         return TimeStamp(value)
+    if isinstance(value, TdmsTimestamp):
+        return value
     if isinstance(value, str):
         return String(value)
     if isinstance(value, bytes):
