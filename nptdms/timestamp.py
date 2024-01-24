@@ -1,8 +1,10 @@
+import struct
 from datetime import datetime, timedelta
 import numpy as np
 
-
 EPOCH = np.datetime64('1904-01-01 00:00:00', 's')
+
+_struct_pack = struct.pack
 
 
 class TdmsTimestamp(object):
@@ -18,6 +20,8 @@ class TdmsTimestamp(object):
     def __init__(self, seconds, second_fractions):
         self.seconds = seconds
         self.second_fractions = second_fractions
+        self.enum_value = 0x44
+        self.bytes = _struct_pack('<Qq', second_fractions, seconds)
 
     def __repr__(self):
         return "TdmsTimestamp({0}, {1})".format(self.seconds, self.second_fractions)
