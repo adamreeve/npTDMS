@@ -8,6 +8,7 @@ import pytest
 import tempfile
 
 from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject, types
+from nptdms.test import scenarios
 
 
 def test_can_read_tdms_file_after_writing():
@@ -489,3 +490,76 @@ def test_root_and_groups_ordered_first():
     assert first_segment_objects[1].path == "/'group'"
     assert first_segment_objects[2].path == "/'group'/'b'"
     assert first_segment_objects[3].path == "/'group'/'a'"
+
+
+def test_defragment_files():
+    buf = BytesIO()
+    with TdmsWriter(buf) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+    buf.seek(0, os.SEEK_SET)
+
+    target_buf = BytesIO()
+    TdmsWriter.defragment(buf, target_buf)
+
+
+def test_write_data_stream_with_index():
+    data_file = BytesIO()
+    index_file = BytesIO()
+    with TdmsWriter(data_file, index_file=index_file) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    data_file.seek(0, 0)
+    index_file.seek(0, 0)
+    assert len(data_file.read()) > 0
+    assert len(index_file.read()) > 0
+
+
+def test_write_data_stream_without_index():
+    data_file = BytesIO()
+    index_file = BytesIO()
+    with TdmsWriter(data_file) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    data_file.seek(0, 0)
+    index_file.seek(0, 0)
+    assert len(data_file.read()) > 0
+    assert len(index_file.read()) == 0
+
+
+def test_write_and_store_index_file():
+    directory = tempfile.mkdtemp()
+    tdms_path = os.path.join(directory, 'test_file.tdms')
+
+    writer = TdmsWriter(tdms_path, index_file=True)
+    with writer as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.linspace(0, 1))
+        ])
+
+    assert os.path.isfile(tdms_path + "_index")
+
+
+def test_defragment_raw_timestamp_file():
+    test_file, expected_data = scenarios.timestamp_data().values
+    with test_file.get_tempfile() as temp_file:
+        target_buf = BytesIO()
+        TdmsWriter.defragment(temp_file, target_buf)
+        target_buf.seek(0, os.SEEK_SET)
+        f = TdmsFile.read(target_buf)
+        for (group, channel), expected_values in expected_data.items():
+            channel_data = f[group][channel][:]
+            np.testing.assert_equal(channel_data, expected_values)
