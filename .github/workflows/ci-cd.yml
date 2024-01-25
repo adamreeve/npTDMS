@@ -43,7 +43,7 @@ jobs:
         run: pip install tox
       - name: Compute TOXENV
         id: toxenv
-        run: echo "::set-output name=toxenv::py$(tr -d . <<< ${{ matrix.python }})"
+        run: echo "toxenv=py$(tr -d . <<< ${{ matrix.python }})" >> $GITHUB_OUTPUT
         shell: bash
       - name: Run tests
         run: tox
