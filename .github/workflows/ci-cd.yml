@@ -11,9 +11,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       - name: Install tox
@@ -34,16 +34,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
       - name: Install tox
         run: pip install tox
       - name: Compute TOXENV
         id: toxenv
-        run: echo "::set-output name=toxenv::py$(tr -d . <<< ${{ matrix.python }})"
+        run: echo "toxenv=py$(tr -d . <<< ${{ matrix.python }})" >> $GITHUB_OUTPUT
         shell: bash
       - name: Run tests
         run: tox
@@ -51,7 +51,7 @@ jobs:
           TOXENV: ${{ steps.toxenv.outputs.toxenv }}
       - name: Upload coverage to Codecov
         if: ${{ !(github.event_name == 'push' && github.event.repository.fork) }}
-        uses: codecov/codecov-action@v2
+        uses: codecov/codecov-action@v3
         with:
           env_vars: OS,PYTHON
         env:
@@ -65,9 +65,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
       - name: Create package
