@@ -16,7 +16,10 @@ class TdmsTimestamp(object):
         :ivar ~.seconds: Seconds since the epoch as a signed integer
         :ivar ~.second_fractions: A positive number of 2^-64 fractions of a second
     """
+
+    # Attributes that let this class act like a TdmsType when writing data
     enum_value = 0x44
+    size = 16
 
     def __init__(self, seconds, second_fractions):
         self.seconds = seconds

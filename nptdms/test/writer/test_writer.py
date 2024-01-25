@@ -8,6 +8,7 @@ import pytest
 import tempfile
 
 from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject, types
+from nptdms.test import scenarios
 
 
 def test_can_read_tdms_file_after_writing():
@@ -550,3 +551,15 @@ def test_write_and_store_index_file():
         ])
 
     assert os.path.isfile(tdms_path + "_index")
+
+
+def test_defragment_raw_timestamp_file():
+    test_file, expected_data = scenarios.timestamp_data().values
+    with test_file.get_tempfile() as temp_file:
+        target_buf = BytesIO()
+        TdmsWriter.defragment(temp_file, target_buf)
+        target_buf.seek(0, os.SEEK_SET)
+        f = TdmsFile.read(target_buf)
+        for (group, channel), expected_values in expected_data.items():
+            channel_data = f[group][channel][:]
+            np.testing.assert_equal(channel_data, expected_values)
