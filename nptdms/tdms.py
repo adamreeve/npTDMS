@@ -43,6 +43,10 @@ class TdmsFile(object):
         tdms_file = TdmsFile.read(tdms_file_path)
         group = tdms_file[group_name]
 
+    And you can check for the presence of a group with the ``in`` keyword::
+
+        contains_group = group_name in tdms_file
+
     Iterating over a TdmsFile produces the names of groups in this file,
     or you can use the groups method to directly access all groups::
 
@@ -346,6 +350,10 @@ class TdmsGroup(object):
     A TdmsGroup can be indexed by channel name to access a channel in this group, for example::
 
         channel = group[channel_name]
+
+    And you can check for the presence of a channel with the ``in`` keyword::
+
+        contains_channel = channel_name in group
 
     Iterating over a TdmsGroup produces the names of channels in this group,
     or you can use the channels method to directly access all channels::
