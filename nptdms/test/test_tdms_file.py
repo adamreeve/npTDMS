@@ -764,6 +764,36 @@ def test_incomplete_segment_with_string_data():
     assert len(channel) == 0
 
 
+def test_truncated_interleaved_data():
+    """
+    Test when a segment is truncated within a row of interleaved data,
+    and the next segment offset is set but is beyond the end of the file.
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 4),
+            channel_metadata("/'group'/'channel2'", 3, 4),
+        ),
+        "01 00 00 00" "02 00 00 00"
+        "03 00 00 00" "04 00 00 00"
+        "05 00 00 00" "06 00 00 00"
+        "07 00 00 00",
+        data_size_override=4 * 2 * 4
+    )
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            group = tdms_file['group']
+            chan1 = group['channel1']
+            chan2 = group['channel2']
+            for chan in [chan1, chan2]:
+                chan_data = chan[:]
+                assert chan[-1] == chan_data[-1]
+                assert len(chan) == 3
+                assert len(chan_data) == 3
+
+
 def test_truncated_metadata_in_last_segment():
     """ Test the scenario where writing the file was aborted with part of the metadata written
     """
