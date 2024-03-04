@@ -223,7 +223,9 @@ class GeneratedFile(object):
     def __init__(self):
         self._content = []
 
-    def add_segment(self, toc, metadata, data, incomplete=False, binary_data=False, version=4713):
+    def add_segment(
+            self, toc, metadata, data, incomplete=False, binary_data=False, version=4713,
+            data_size_override=None):
         metadata_bytes = _hex_to_bytes(metadata)
         data_bytes = data if binary_data else _hex_to_bytes(data)
         if toc is not None:
@@ -246,7 +248,8 @@ class GeneratedFile(object):
                     raise ValueError("Unrecognised TOC value: %s" % toc_item)
             lead_in += struct.pack('<i', toc_mask)
             lead_in += struct.pack('<l', version)
-            next_segment_offset = len(metadata_bytes) + len(data_bytes)
+            data_len = data_size_override if data_size_override is not None else len(data_bytes)
+            next_segment_offset = len(metadata_bytes) + data_len
             raw_data_offset = len(metadata_bytes)
             if incomplete:
                 lead_in += _hex_to_bytes('FF' * 8)

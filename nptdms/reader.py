@@ -70,6 +70,11 @@ class TdmsReader(object):
                     self._index_file_path = filepath
                     self._index_file = open(self._index_file_path, "rb")
 
+        if self._file is not None:
+            self._data_file_size = _get_file_size(self._file)
+        else:
+            self._data_file_size = None
+
     def close(self):
         if self._file is None and self._index_file is None:
             # Already closed
@@ -314,21 +319,31 @@ class TdmsReader(object):
         segment_incomplete = next_segment_offset == 0xFFFFFFFFFFFFFFFF
         if segment_incomplete:
             # Segment size is unknown. This can happen if LabVIEW crashes.
-            next_segment_pos = self._get_data_file_size()
+            next_segment_pos = self._data_file_size
+        else:
+            next_segment_pos = (
+                    segment_position + next_segment_offset + lead_size)
+            if self._data_file_size is not None and next_segment_pos > self._data_file_size:
+                # The raw data offset is incorrect, and there is less data than expected in this segment
+                next_segment_pos = self._data_file_size
+                segment_incomplete = True
+
+        if segment_incomplete:
             if next_segment_pos < data_position:
                 # Metadata wasn't completely written and don't have any data in this segment,
                 # don't try to read any metadata
                 log.warning("Last segment metadata is incomplete")
                 raise EOFError
-            # Try to read until the end of the file if we have complete metadata
-            log.warning(
-                "Last segment of file has unknown size, "
-                "will attempt to read to the end of the file")
-        else:
-            log.debug("Next segment offset = %d, raw data offset = %d, data size = %d b",
-                      next_segment_offset, raw_data_offset, next_segment_offset - raw_data_offset)
-            next_segment_pos = (
-                    segment_position + next_segment_offset + lead_size)
+            else:
+                # Try to read until the end of the file if we have complete metadata
+                log.warning(
+                    "Last segment of file has less data than expected, "
+                    "will attempt to read to the end of the file")
+
+        log.debug("Next segment offset = %d, raw data offset = %d, expected data size = %d b, actual data size = %d b",
+                  next_segment_offset, raw_data_offset,
+                  next_segment_offset - raw_data_offset,
+                  next_segment_pos - data_position)
 
         return segment_position, toc_mask, data_position, next_segment_pos, segment_incomplete
 
@@ -345,13 +360,6 @@ class TdmsReader(object):
                 "Attempted to read data segment at position {0} but did not find segment start header. ".format(
                     position) +
                 "Check that the tdms_index file matches the tdms data file.")
-
-    def _get_data_file_size(self):
-        current_pos = self._file.tell()
-        self._file.seek(0, os.SEEK_END)
-        end_pos = self._file.tell()
-        self._file.seek(current_pos, os.SEEK_SET)
-        return end_pos
 
     def _update_object_metadata(self, segment):
         """ Update object metadata using the metadata read from a single segment
@@ -509,3 +517,11 @@ def _array_equal(a, b, chunk_size=100):
         if not (a[offset:offset+chunk_size] == b[offset:offset+chunk_size]).all():
             return False
     return True
+
+
+def _get_file_size(file):
+    current_pos = file.tell()
+    file.seek(0, os.SEEK_END)
+    end_pos = file.tell()
+    file.seek(current_pos, os.SEEK_SET)
+    return end_pos

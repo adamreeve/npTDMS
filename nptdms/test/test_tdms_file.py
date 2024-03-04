@@ -482,6 +482,20 @@ def test_read_with_index_file(test_file, expected_data):
         compare_arrays(channel_obj.data, expected_channel_data)
 
 
+def test_read_index_file_only():
+    """ Test reading the index file directly
+    """
+    test_file, expected_data = scenarios.single_segment_with_two_channels().values
+    with test_file.get_tempfile_with_index() as tdms_file_path:
+        with TdmsFile.open(tdms_file_path + "_index") as tdms_file:
+            for ((group, channel), expected_channel_data) in expected_data.items():
+                channel_obj = tdms_file[group][channel]
+                assert len(channel_obj) == len(expected_channel_data)
+                with pytest.raises(RuntimeError) as exc_info:
+                    channel_obj[:]
+                assert "Data cannot be read from index file only" in str(exc_info.value)
+
+
 @pytest.mark.skipif(sys.version_info < (3, 4), reason="pathlib only available in stdlib since 3.4")
 def test_read_file_passed_as_pathlib_path():
     """ Test reading a file when using a pathlib Path object
@@ -762,6 +776,36 @@ def test_incomplete_segment_with_string_data():
 
     channel = tdms_data["Group"]["StringChannel"]
     assert len(channel) == 0
+
+
+def test_truncated_interleaved_data():
+    """
+    Test when a segment is truncated within a row of interleaved data,
+    and the next segment offset is set but is beyond the end of the file.
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList", "kTocInterleavedData"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 4),
+            channel_metadata("/'group'/'channel2'", 3, 4),
+        ),
+        "01 00 00 00" "02 00 00 00"
+        "03 00 00 00" "04 00 00 00"
+        "05 00 00 00" "06 00 00 00"
+        "07 00 00 00",
+        data_size_override=4 * 2 * 4
+    )
+    with test_file.get_tempfile() as temp_file:
+        with TdmsFile.open(temp_file.file) as tdms_file:
+            group = tdms_file['group']
+            chan1 = group['channel1']
+            chan2 = group['channel2']
+            for chan in [chan1, chan2]:
+                chan_data = chan[:]
+                assert chan[-1] == chan_data[-1]
+                assert len(chan) == 3
+                assert len(chan_data) == 3
 
 
 def test_truncated_metadata_in_last_segment():
