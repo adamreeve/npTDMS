@@ -625,6 +625,22 @@ def test_incomplete_segment_with_different_length_buffers():
     np.testing.assert_array_equal(group["Channel5"][:], [5] * 2)
     np.testing.assert_array_equal(group["Channel6"][:], [6] * 2)
 
+    file_status = tdms_data.file_status
+    assert file_status.incomplete_final_segment
+    assert file_status.channel_statuses is not None
+    for channel in ["Channel1", "Channel2"]:
+        channel_status = file_status.channel_statuses[f"/'Group'/'{channel}'"]
+        assert channel_status.expected_length == 4
+        assert channel_status.read_length == 4
+    for channel in ["Channel3", "Channel4"]:
+        channel_status = file_status.channel_statuses[f"/'Group'/'{channel}'"]
+        assert channel_status.expected_length == 2
+        assert channel_status.read_length == 1
+    for channel in ["Channel5", "Channel6"]:
+        channel_status = file_status.channel_statuses[f"/'Group'/'{channel}'"]
+        assert channel_status.expected_length == 1
+        assert channel_status.read_length == 0
+
 
 def test_multiple_raw_data_buffers_with_scalers_split_across_buffers():
     """ DAQmx with scalers split across different raw data buffers

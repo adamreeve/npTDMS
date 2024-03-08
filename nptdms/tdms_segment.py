@@ -44,9 +44,10 @@ class TdmsSegment(object):
         'data_position',
         'final_chunk_lengths_override',
         'object_index',
+        'segment_incomplete',
     ]
 
-    def __init__(self, position, toc_mask, next_segment_pos, data_position):
+    def __init__(self, position, toc_mask, next_segment_pos, data_position, segment_incomplete):
         self.position = position
         self.toc_mask = toc_mask
         self.next_segment_pos = next_segment_pos
@@ -55,11 +56,12 @@ class TdmsSegment(object):
         self.final_chunk_lengths_override = None
         self.ordered_objects = None
         self.object_index = None
+        self.segment_incomplete = segment_incomplete
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
 
-    def read_segment_objects(self, file, previous_segment_objects, index_cache, previous_segment, segment_incomplete):
+    def read_segment_objects(self, file, previous_segment_objects, index_cache, previous_segment):
         """Read segment metadata section and update object information
 
         :param file: Open TDMS file
@@ -67,11 +69,10 @@ class TdmsSegment(object):
             recently read segment object for a TDMS object.
         :param index_cache: A SegmentIndexCache instance, or None if segment indexes are not required.
         :param previous_segment: Previous segment in the file.
-        :param segment_incomplete: Whether the next segment offset was not set.
         """
 
         if not self.toc_mask & toc_properties['kTocMetaData']:
-            self._reuse_previous_segment_metadata(previous_segment, segment_incomplete)
+            self._reuse_previous_segment_metadata(previous_segment)
             return
 
         endianness = '>' if (self.toc_mask & toc_properties['kTocBigEndian']) else '<'
@@ -134,7 +135,7 @@ class TdmsSegment(object):
 
         if index_cache is not None:
             self.object_index = index_cache.get_index(self.ordered_objects)
-        self._calculate_chunks(segment_incomplete)
+        self._calculate_chunks()
         return properties
 
     def get_segment_object(self, object_path):
@@ -194,11 +195,11 @@ class TdmsSegment(object):
             segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
         self.ordered_objects.append(segment_obj)
 
-    def _reuse_previous_segment_metadata(self, previous_segment, segment_incomplete):
+    def _reuse_previous_segment_metadata(self, previous_segment):
         try:
             self.ordered_objects = previous_segment.ordered_objects
             self.object_index = previous_segment.object_index
-            self._calculate_chunks(segment_incomplete)
+            self._calculate_chunks()
         except AttributeError:
             raise ValueError(
                 "kTocMetaData is not set for segment but "
@@ -269,7 +270,7 @@ class TdmsSegment(object):
         for chunk in self._read_channel_data_chunks(f, data_objects, channel_path, chunk_offset, stop_chunk):
             yield chunk
 
-    def _calculate_chunks(self, segment_incomplete):
+    def _calculate_chunks(self):
         """
         Work out the number of chunks the data is in, for cases
         where the meta data doesn't change at all so there is no
@@ -299,9 +300,9 @@ class TdmsSegment(object):
                 total_data_size, data_size)
             self.num_chunks = 1 + int(total_data_size // data_size)
             self.final_chunk_lengths_override = self._compute_final_chunk_lengths(
-                data_size, chunk_remainder, segment_incomplete)
+                data_size, chunk_remainder)
 
-    def _compute_final_chunk_lengths(self, chunk_size, chunk_remainder, segment_incomplete):
+    def _compute_final_chunk_lengths(self, chunk_size, chunk_remainder):
         """Compute object data lengths for a final chunk that has less data than expected
         """
         if self._have_daqmx_objects():
@@ -314,7 +315,7 @@ class TdmsSegment(object):
             return obj_chunk_sizes
 
         interleaved_data = self.toc_mask & toc_properties['kTocInterleavedData']
-        if interleaved_data or not segment_incomplete:
+        if interleaved_data or not self.segment_incomplete:
             for obj in self.ordered_objects:
                 if not obj.has_data:
                     continue
