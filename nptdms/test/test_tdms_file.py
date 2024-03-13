@@ -777,6 +777,12 @@ def test_incomplete_segment_with_string_data():
     channel = tdms_data["Group"]["StringChannel"]
     assert len(channel) == 0
 
+    file_status = tdms_data.file_status
+    assert file_status.incomplete_final_segment
+    channel_status = file_status.channel_statuses["/'Group'/'StringChannel'"]
+    assert channel_status.expected_length == 2
+    assert channel_status.read_length == 0
+
 
 def test_truncated_interleaved_data():
     """
@@ -806,6 +812,49 @@ def test_truncated_interleaved_data():
                 assert chan[-1] == chan_data[-1]
                 assert len(chan) == 3
                 assert len(chan_data) == 3
+
+            file_status = tdms_file.file_status
+            assert file_status.incomplete_final_segment
+            chan1_status = file_status.channel_statuses["/'group'/'channel1'"]
+            assert chan1_status.expected_length == 4
+            assert chan1_status.read_length == 3
+            chan2_status = file_status.channel_statuses["/'group'/'channel2'"]
+            assert chan2_status.expected_length == 4
+            assert chan2_status.read_length == 3
+
+
+def test_incomplete_last_segment_with_all_data_present():
+    """ Last segment doesn't have length set, but all data can be read
+    """
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", 3, 2),
+            channel_metadata("/'group'/'channel2'", 3, 2),
+        ),
+        "01 00 00 00" "02 00 00 00"
+        "05 00 00 00" "06 00 00 00"
+    )
+    test_file.add_segment(
+        ("kTocRawData", ),
+        "",
+        "03 00 00 00" "04 00 00 00"
+        "07 00 00 00" "08 00 00 00",
+        incomplete=True
+    )
+
+    tdms_data = test_file.load()
+
+    compare_arrays(tdms_data['group']['channel1'][:], np.array([1, 2, 3, 4], dtype=np.int32))
+    compare_arrays(tdms_data['group']['channel2'][:], np.array([5, 6, 7, 8], dtype=np.int32))
+
+    file_status = tdms_data.file_status
+    assert file_status.incomplete_final_segment
+    for channel in ['channel1', 'channel2']:
+        chan_status = file_status.channel_statuses[f"/'group'/'{channel}'"]
+        assert chan_status.expected_length == 2
+        assert chan_status.read_length == 2
 
 
 def test_truncated_metadata_in_last_segment():

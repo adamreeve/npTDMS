@@ -164,6 +164,33 @@ class TdmsFile(object):
 
         return self._properties
 
+    @property
+    def file_status(self):
+        """ Return information about the file status
+
+        :rtype: FileStatus
+        """
+
+        incomplete_final_segment = False
+        channel_statuses = None
+        if self._reader._segments:
+            last_segment = self._reader._segments[-1]
+            incomplete_final_segment = last_segment.segment_incomplete
+            last_chunk_overrides = last_segment.final_chunk_lengths_override
+            if last_chunk_overrides is not None:
+                channel_statuses = dict(
+                    (obj.path, ChannelSegmentStatus(obj.number_values, last_chunk_overrides.get(obj.path, 0)))
+                    for obj in last_segment.ordered_objects
+                    if obj.has_data)
+            elif incomplete_final_segment:
+                # Data lengths match expected lengths
+                channel_statuses = dict(
+                    (obj.path, ChannelSegmentStatus(obj.number_values, obj.number_values))
+                    for obj in last_segment.ordered_objects
+                    if obj.has_data)
+
+        return FileStatus(incomplete_final_segment, channel_statuses)
+
     def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
         """
         Converts the TDMS file to a DataFrame. DataFrame columns are named using the TDMS object paths.
@@ -953,6 +980,27 @@ class ChannelDataChunk(object):
             raise ValueError("Missing scaling information for DAQmx data")
         else:
             return self._raw_data.data
+
+
+class FileStatus:
+    """
+    Contains status information about a read TDMS file
+    """
+    def __init__(self, incomplete_final_segment, channel_statuses):
+        #: Boolean indicating whether the last data segment was not written completely,
+        #: meaning it may contain less data than expected
+        self.incomplete_final_segment = incomplete_final_segment
+        #: Dictionary mapping from channel paths to ChannelSegmentStatus objects
+        #: when the last segment is incomplete or had an unexpected length
+        self.channel_statuses = channel_statuses
+
+
+class ChannelSegmentStatus:
+    def __init__(self, expected_length, read_length):
+        #: Number of values expected in the segment
+        self.expected_length = expected_length
+        #: Number of values read from the segment
+        self.read_length = read_length
 
 
 def _convert_data_chunk(chunk, raw_timestamps):

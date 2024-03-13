@@ -27,6 +27,12 @@ Reading TDMS Files
 .. autoclass:: ChannelDataChunk()
   :members:
 
+.. autoclass:: nptdms.tdms.FileStatus()
+  :members:
+
+.. autoclass:: nptdms.tdms.ChannelSegmentStatus()
+  :members:
+
 Writing TDMS Files
 ------------------
 
