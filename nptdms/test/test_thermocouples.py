@@ -193,3 +193,21 @@ def _test_voltage_to_temperature(reference_thermocouple, thermocouple, voltage, 
     reference_temperature = reference_thermocouple.inverse_CmV(voltage, Tref=0.0)
     temperature = thermocouple.mv_to_celsius(voltage)
     assert abs(temperature - reference_temperature) < max_error + 1.0E-6
+
+
+@pytest.fixture(autouse=True)
+def patch_thermocouples_reference(monkeypatch):
+    """
+    thermocouples_reference creates an array with np.array(T, copy=False)
+    which causes an error on numpy 2 for non-array inputs.
+    We can't workaround this by only passing in numpy arrays as there are also
+    internal uses that cause this error, so monkeypatch to fix this.
+    """
+    prev_call = thermocouples_reference.function_types.Polynomial_Gaussian_Piecewise_Function.__call__
+
+    def new_call(self, t, *args, **kwargs):
+        t = np.asarray(t)
+        return prev_call(self, t, *args, **kwargs)
+
+    monkeypatch.setattr(
+        thermocouples_reference.function_types.Polynomial_Gaussian_Piecewise_Function, "__call__", new_call)

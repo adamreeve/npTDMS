@@ -92,5 +92,5 @@ def _hdf_attr_value(value):
     """ Convert a value into a format suitable for an HDF attribute
     """
     if isinstance(value, np.datetime64):
-        return np.string_(np.datetime_as_string(value, unit='us', timezone='UTC'))
+        return np.bytes_(np.datetime_as_string(value, unit='us', timezone='UTC'))
     return value
