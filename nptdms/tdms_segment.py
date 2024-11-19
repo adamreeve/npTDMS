@@ -264,6 +264,11 @@ class TdmsSegment(object):
         data_objects = [o for o in self.ordered_objects if o.has_data]
         chunk_size = self._get_chunk_size()
 
+        # Ensure we're working with Python ints as np.int32 values could overflow
+        # (https://github.com/adamreeve/npTDMS/issues/338)
+        chunk_size = int(chunk_size)
+        chunk_offset = int(chunk_offset)
+
         if chunk_offset > 0:
             f.seek(chunk_size * chunk_offset, os.SEEK_CUR)
         stop_chunk = self.num_chunks if num_chunks is None else num_chunks + chunk_offset
