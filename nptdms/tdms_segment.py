@@ -518,20 +518,22 @@ class ContiguousDataReader(BaseDataReader):
         """ Read data from a chunk for a single channel
         """
         channel_data = RawChannelDataChunk.empty()
+        current_position = file.tell()
         for obj in data_objects:
             number_values = self._get_channel_number_values(obj, chunk_index)
             if obj.path == channel_path:
+                file.seek(current_position)
                 channel_data = RawChannelDataChunk.channel_data(obj.read_values(file, number_values, self.endianness))
+                current_position = file.tell()
             elif number_values == obj.number_values:
                 # Seek over data for other channel data
-                file.seek(obj.data_size, os.SEEK_CUR)
+                current_position += obj.data_size
             else:
                 # In last chunk with reduced chunk size
-                if obj.data_type.size is None:
-                    # Type is unsized (eg. string), try reading number of values
-                    obj.read_values(file, number_values, self.endianness)
-                else:
-                    file.seek(obj.data_type.size * number_values, os.SEEK_CUR)
+                if obj.data_type.size is not None:
+                    current_position += obj.data_type.size * number_values
+
+        file.seek(current_position)
         return channel_data
 
     def _get_channel_number_values(self, obj, chunk_index):
