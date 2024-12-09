@@ -45,6 +45,7 @@ class TdmsSegment(object):
         'final_chunk_lengths_override',
         'object_index',
         'segment_incomplete',
+        'has_daqmx_objects_cached',
     ]
 
     def __init__(self, position, toc_mask, next_segment_pos, data_position, segment_incomplete):
@@ -57,6 +58,7 @@ class TdmsSegment(object):
         self.ordered_objects = None
         self.object_index = None
         self.segment_incomplete = segment_incomplete
+        self.has_daqmx_objects_cached = None
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
@@ -135,6 +137,8 @@ class TdmsSegment(object):
 
         if index_cache is not None:
             self.object_index = index_cache.get_index(self.ordered_objects)
+
+        self._invalidate_cached_values()
         self._calculate_chunks()
         return properties
 
@@ -194,6 +198,7 @@ class TdmsSegment(object):
             segment_obj.has_data = True
             segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
         self.ordered_objects.append(segment_obj)
+        self._invalidate_cached_values()
 
     def _reuse_previous_segment_metadata(self, previous_segment):
         try:
@@ -383,6 +388,9 @@ class TdmsSegment(object):
             return ContiguousDataReader(self.num_chunks, self.final_chunk_lengths_override, endianness)
 
     def _have_daqmx_objects(self):
+        if self.has_daqmx_objects_cached is not None:
+            return self.has_daqmx_objects_cached
+
         data_obj_count = 0
         daqmx_count = 0
         for o in self.ordered_objects:
@@ -391,12 +399,12 @@ class TdmsSegment(object):
                 if isinstance(o, DaqmxSegmentObject):
                     daqmx_count += 1
         if daqmx_count == 0:
-            return False
-        if daqmx_count == data_obj_count:
-            return True
-        if daqmx_count > 0:
+            self.has_daqmx_objects_cached = False
+        elif daqmx_count == data_obj_count:
+            self.has_daqmx_objects_cached = True
+        elif daqmx_count > 0:
             raise Exception("Cannot read mixed DAQmx and non-DAQmx data")
-        return False
+        return self.has_daqmx_objects_cached
 
     def _have_interleaved_data(self):
         """ Whether data in this segment is interleaved. Assumes data is not DAQmx.
@@ -420,6 +428,8 @@ class TdmsSegment(object):
         else:
             raise ValueError("Cannot read interleaved segment containing channels with unsized types")
 
+    def _invalidate_cached_values(self):
+        self.has_daqmx_objects_cached = None
 
 class InterleavedDataReader(BaseDataReader):
     """ Reads data in a TDMS segment with interleaved data
