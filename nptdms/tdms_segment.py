@@ -46,6 +46,7 @@ class TdmsSegment(object):
         'object_index',
         'segment_incomplete',
         'has_daqmx_objects_cached',
+        'chunk_size_cached',
     ]
 
     def __init__(self, position, toc_mask, next_segment_pos, data_position, segment_incomplete):
@@ -59,6 +60,7 @@ class TdmsSegment(object):
         self.object_index = None
         self.segment_incomplete = segment_incomplete
         self.has_daqmx_objects_cached = None
+        self.chunk_size_cached = None
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
@@ -271,7 +273,6 @@ class TdmsSegment(object):
 
         # Ensure we're working with Python ints as np.int32 values could overflow
         # (https://github.com/adamreeve/npTDMS/issues/338)
-        chunk_size = int(chunk_size)
         chunk_offset = int(chunk_offset)
 
         if chunk_offset > 0:
@@ -356,11 +357,15 @@ class TdmsSegment(object):
         return TdmsSegmentObject(object_path)
 
     def _get_chunk_size(self):
+        if self.chunk_size_cached is not None:
+            return self.chunk_size_cached
+
         if self._have_daqmx_objects():
-            return get_daqmx_chunk_size(self.ordered_objects)
-        return sum(
-            o.data_size
-            for o in self.ordered_objects if o.has_data)
+            self.chunk_size_cached = int(get_daqmx_chunk_size(self.ordered_objects))
+            return self.chunk_size_cached
+
+        self.chunk_size_cached = int(sum(o.data_size for o in self.ordered_objects if o.has_data))
+        return self.chunk_size_cached
 
     def _read_data_chunks(self, file, data_objects, num_chunks):
         """ Read multiple data chunks at once
@@ -428,8 +433,10 @@ class TdmsSegment(object):
         else:
             raise ValueError("Cannot read interleaved segment containing channels with unsized types")
 
+
     def _invalidate_cached_values(self):
         self.has_daqmx_objects_cached = None
+        self.chunk_size_cached = None
 
 class InterleavedDataReader(BaseDataReader):
     """ Reads data in a TDMS segment with interleaved data
