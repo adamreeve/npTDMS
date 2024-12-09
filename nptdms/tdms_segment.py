@@ -279,7 +279,7 @@ class TdmsSegment(object):
         if chunk_offset > 0:
             f.seek(chunk_size * chunk_offset, os.SEEK_CUR)
         stop_chunk = self.num_chunks if num_chunks is None else num_chunks + chunk_offset
-        for chunk in self._read_channel_data_chunks(f, self._get_data_objects(), channel_path, chunk_offset, stop_chunk):
+        for chunk in self._read_channel_data_chunks(f, self._get_data_objects(), channel_path, chunk_offset, stop_chunk, chunk_size):
             yield chunk
 
     def _calculate_chunks(self):
@@ -376,13 +376,15 @@ class TdmsSegment(object):
         for chunk in reader.read_data_chunks(file, data_objects, num_chunks):
             yield chunk
 
-    def _read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk):
+    def _read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk, chunk_size):
         """ Read multiple data chunks for a single channel at once
             In the base case we read each chunk individually but subclasses can override this
         """
         reader = self._get_data_reader()
-        for chunk in reader.read_channel_data_chunks(file, data_objects, channel_path, chunk_offset, stop_chunk):
+        initial_position = file.tell()
+        for i, chunk in enumerate(reader.read_channel_data_chunks(file, data_objects, channel_path, chunk_offset, stop_chunk, chunk_size)):
             yield chunk
+            file.seek(initial_position + (i + 1) * chunk_size)
 
     def _get_data_reader(self):
         endianness = '>' if (self.toc_mask & toc_properties['kTocBigEndian']) else '<'
@@ -462,7 +464,7 @@ class InterleavedDataReader(BaseDataReader):
             raise ValueError("Cannot read interleaved data with different chunk sizes")
         return [self._read_interleaved_chunks(file, data_objects, num_chunks)]
 
-    def read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk):
+    def read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk, chunk_size):
         """ Read multiple data chunks for a single channel at once
         """
         num_chunks = stop_chunk - chunk_offset
@@ -514,7 +516,7 @@ class ContiguousDataReader(BaseDataReader):
             object_data[obj.path] = obj.read_values(file, number_values, self.endianness)
         return RawDataChunk.channel_data(object_data)
 
-    def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
+    def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path, chunk_size):
         """ Read data from a chunk for a single channel
         """
         channel_data = RawChannelDataChunk.empty()
@@ -525,13 +527,13 @@ class ContiguousDataReader(BaseDataReader):
                 file.seek(current_position)
                 channel_data = RawChannelDataChunk.channel_data(obj.read_values(file, number_values, self.endianness))
                 current_position = file.tell()
+                break
             elif number_values == obj.number_values:
                 # Seek over data for other channel data
                 current_position += obj.data_size
-            else:
+            elif obj.data_type.size is not None:
                 # In last chunk with reduced chunk size
-                if obj.data_type.size is not None:
-                    current_position += obj.data_type.size * number_values
+                current_position += obj.data_type.size * number_values
 
         file.seek(current_position)
         return channel_data
