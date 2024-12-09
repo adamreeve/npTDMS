@@ -537,7 +537,7 @@ class ContiguousDataReader(BaseDataReader):
         return channel_data
 
     def _get_channel_number_values(self, obj, chunk_index):
-        if chunk_index == (self.num_chunks - 1) and self.final_chunk_lengths_override is not None:
+        if self.final_chunk_lengths_override is not None and chunk_index == (self.num_chunks - 1):
             return self.final_chunk_lengths_override.get(obj.path, 0)
         else:
             return obj.number_values
