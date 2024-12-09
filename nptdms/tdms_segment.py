@@ -279,7 +279,9 @@ class TdmsSegment(object):
         if chunk_offset > 0:
             f.seek(chunk_size * chunk_offset, os.SEEK_CUR)
         stop_chunk = self.num_chunks if num_chunks is None else num_chunks + chunk_offset
-        for chunk in self._read_channel_data_chunks(f, self._get_data_objects(), channel_path, chunk_offset, stop_chunk, chunk_size):
+        for chunk in self._read_channel_data_chunks(
+                f, self._get_data_objects(), channel_path, chunk_offset, stop_chunk, chunk_size
+        ):
             yield chunk
 
     def _calculate_chunks(self):
@@ -382,7 +384,9 @@ class TdmsSegment(object):
         """
         reader = self._get_data_reader()
         initial_position = file.tell()
-        for i, chunk in enumerate(reader.read_channel_data_chunks(file, data_objects, channel_path, chunk_offset, stop_chunk, chunk_size)):
+        for i, chunk in enumerate(reader.read_channel_data_chunks(
+                file, data_objects, channel_path, chunk_offset, stop_chunk, chunk_size
+        )):
             yield chunk
             file.seek(initial_position + (i + 1) * chunk_size)
 
