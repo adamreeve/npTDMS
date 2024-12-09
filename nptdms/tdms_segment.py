@@ -47,6 +47,7 @@ class TdmsSegment(object):
         'segment_incomplete',
         'has_daqmx_objects_cached',
         'chunk_size_cached',
+        'data_objects_cached',
     ]
 
     def __init__(self, position, toc_mask, next_segment_pos, data_position, segment_incomplete):
@@ -61,6 +62,7 @@ class TdmsSegment(object):
         self.segment_incomplete = segment_incomplete
         self.has_daqmx_objects_cached = None
         self.chunk_size_cached = None
+        self.data_objects_cached = None
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
@@ -268,7 +270,6 @@ class TdmsSegment(object):
 
         f.seek(self.data_position)
 
-        data_objects = [o for o in self.ordered_objects if o.has_data]
         chunk_size = self._get_chunk_size()
 
         # Ensure we're working with Python ints as np.int32 values could overflow
@@ -278,7 +279,7 @@ class TdmsSegment(object):
         if chunk_offset > 0:
             f.seek(chunk_size * chunk_offset, os.SEEK_CUR)
         stop_chunk = self.num_chunks if num_chunks is None else num_chunks + chunk_offset
-        for chunk in self._read_channel_data_chunks(f, data_objects, channel_path, chunk_offset, stop_chunk):
+        for chunk in self._read_channel_data_chunks(f, self._get_data_objects(), channel_path, chunk_offset, stop_chunk):
             yield chunk
 
     def _calculate_chunks(self):
@@ -433,10 +434,18 @@ class TdmsSegment(object):
         else:
             raise ValueError("Cannot read interleaved segment containing channels with unsized types")
 
+    def _get_data_objects(self):
+        if self.data_objects_cached is not None:
+            return self.data_objects_cached
+
+        self.data_objects_cached = [o for o in self.ordered_objects if o.has_data]
+        return self.data_objects_cached
 
     def _invalidate_cached_values(self):
         self.has_daqmx_objects_cached = None
         self.chunk_size_cached = None
+        self.data_objects_cached = None
+
 
 class InterleavedDataReader(BaseDataReader):
     """ Reads data in a TDMS segment with interleaved data
