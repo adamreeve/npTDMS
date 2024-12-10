@@ -56,14 +56,14 @@ class BaseDataReader(object):
         """
         raise NotImplementedError("Data chunk reading must be implemented in base classes")
 
-    def read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk):
+    def read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk, chunk_size):
         """ Read multiple data chunks for a single channel at once
             In the base case we read each chunk individually but subclasses can override this
         """
         for chunk_index in range(chunk_offset, stop_chunk):
-            yield self._read_channel_data_chunk(file, data_objects, chunk_index, channel_path)
+            yield self._read_channel_data_chunk(file, data_objects, chunk_index, channel_path, chunk_size)
 
-    def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
+    def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path, chunk_size):
         """ Read data from a chunk for a single channel
         """
         # In the base case we can read data for all channels
