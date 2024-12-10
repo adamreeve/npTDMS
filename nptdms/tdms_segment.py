@@ -539,7 +539,6 @@ class ContiguousDataReader(BaseDataReader):
                 # In last chunk with reduced chunk size
                 current_position += obj.data_type.size * number_values
 
-        file.seek(current_position)
         return channel_data
 
     def _get_channel_number_values(self, obj, chunk_index):
