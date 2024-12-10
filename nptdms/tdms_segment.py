@@ -142,7 +142,6 @@ class TdmsSegment(object):
         if index_cache is not None:
             self.object_index = index_cache.get_index(self.ordered_objects)
 
-        self._invalidate_cached_values()
         self._calculate_chunks()
         return properties
 
@@ -202,7 +201,6 @@ class TdmsSegment(object):
             segment_obj.has_data = True
             segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
         self.ordered_objects.append(segment_obj)
-        self._invalidate_cached_values()
 
     def _reuse_previous_segment_metadata(self, previous_segment):
         try:
@@ -446,11 +444,6 @@ class TdmsSegment(object):
 
         self.data_objects_cached = [o for o in self.ordered_objects if o.has_data]
         return self.data_objects_cached
-
-    def _invalidate_cached_values(self):
-        self.has_daqmx_objects_cached = None
-        self.chunk_size_cached = None
-        self.data_objects_cached = None
 
 
 class InterleavedDataReader(BaseDataReader):
