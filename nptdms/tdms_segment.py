@@ -383,7 +383,7 @@ class TdmsSegment(object):
         reader = self._get_data_reader()
         initial_position = file.tell()
         for i, chunk in enumerate(reader.read_channel_data_chunks(
-                file, data_objects, channel_path, chunk_offset, stop_chunk, chunk_size
+                file, data_objects, channel_path, chunk_offset, stop_chunk
         )):
             yield chunk
             file.seek(initial_position + (i + 1) * chunk_size)
@@ -461,7 +461,7 @@ class InterleavedDataReader(BaseDataReader):
             raise ValueError("Cannot read interleaved data with different chunk sizes")
         return [self._read_interleaved_chunks(file, data_objects, num_chunks)]
 
-    def read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk, chunk_size):
+    def read_channel_data_chunks(self, file, data_objects, channel_path, chunk_offset, stop_chunk):
         """ Read multiple data chunks for a single channel at once
         """
         num_chunks = stop_chunk - chunk_offset
@@ -513,7 +513,7 @@ class ContiguousDataReader(BaseDataReader):
             object_data[obj.path] = obj.read_values(file, number_values, self.endianness)
         return RawDataChunk.channel_data(object_data)
 
-    def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path, chunk_size):
+    def _read_channel_data_chunk(self, file, data_objects, chunk_index, channel_path):
         """ Read data from a chunk for a single channel
         """
         channel_data = RawChannelDataChunk.empty()
