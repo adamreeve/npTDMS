@@ -531,6 +531,8 @@ class ContiguousDataReader(BaseDataReader):
             elif obj.data_type.size is not None:
                 # In last chunk with reduced chunk size
                 current_position += obj.data_type.size * number_values
+            else:
+                raise Exception("Cannot skip over channel with unsized type in a truncated segment")
 
         return channel_data
 
