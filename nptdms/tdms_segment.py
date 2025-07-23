@@ -569,9 +569,12 @@ class TdmsSegmentObject(BaseSegmentObject):
             self.data_type.__name__, self.number_values)
 
         if (self.data_type.size is None and
-                self.data_type != types.String):
+                self.data_type not in (types.String, types.Void)):
             raise ValueError(
                 "Unsupported data type: %r" % self.data_type)
+
+        if self.data_type == types.Void and self.number_values != 0:
+            raise ValueError("Void data only supported for empty segments")
 
         # In TDMS version 2.0, 1 is the only valid value for dimension
         if dimension != 1:
@@ -580,6 +583,8 @@ class TdmsSegmentObject(BaseSegmentObject):
         # Variable length data types have total size
         if self.data_type == types.String:
             self.data_size = types.Uint64.read(f, endianness)
+        elif self.number_values == 0:
+            return 0
         else:
             self.data_size = self.number_values * self.data_type.size
 
