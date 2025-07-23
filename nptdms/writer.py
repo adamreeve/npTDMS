@@ -438,6 +438,11 @@ def write_string_values(file, strings):
 
 
 def object_data_size(data_type, data_values):
+    if len(data_values) == 0:
+        # If there are no values, the size is 0
+        # Avoids issue with data_type void and empty values
+        return 0
+
     if data_type == String:
         # For string data, the total size is 8 bytes per string for the
         # offsets to the start of each string, plus the length of each string.
