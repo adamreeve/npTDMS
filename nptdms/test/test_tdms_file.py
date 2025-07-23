@@ -52,10 +52,16 @@ def test_lazily_read_channel_data(test_file, expected_data):
                 compare_arrays(actual_data, expected_data)
 
 
-def test_read_raw_channel_data():
+@pytest.mark.parametrize(
+    "test_file,expected_data",
+    [
+        scenarios.single_segment_with_one_channel(),
+        scenarios.channel_without_data_or_data_type(),
+    ],
+)
+def test_read_raw_channel_data(test_file, expected_data):
     """Test reading raw channel data"""
 
-    test_file, expected_data = scenarios.single_segment_with_one_channel().values
     with test_file.get_tempfile() as temp_file:
         tdms_file = TdmsFile.read(temp_file.file)
         for ((group, channel), expected_data) in expected_data.items():
