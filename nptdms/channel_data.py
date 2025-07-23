@@ -20,16 +20,13 @@ def get_data_receiver(obj, num_values, raw_timestamps, memmap_dir=None):
     :param memmap_dir: Optional directory to store memory map files,
         or None to not use memory map files
     """
-    if obj.data_type is None:
-        return None
-
     if obj.data_type == types.DaqMxRawData:
         return DaqmxDataReceiver(obj, num_values, memmap_dir)
 
     if obj.data_type == types.TimeStamp:
         return TimestampDataReceiver(obj, num_values, raw_timestamps, memmap_dir)
 
-    if obj.data_type.nptype is None:
+    if obj.data_type is None or obj.data_type.nptype is None:
         return ListDataReceiver(obj)
 
     return NumpyDataReceiver(obj, num_values, memmap_dir)
@@ -59,7 +56,8 @@ class ListDataReceiver(object):
 
     @property
     def data(self):
-        return np.array(self._data, dtype=self._dtype)
+        dtype = self._dtype if len(self._data) > 0 else np.dtype('void')
+        return np.array(self._data, dtype=dtype)
 
 
 class NumpyDataReceiver(object):
