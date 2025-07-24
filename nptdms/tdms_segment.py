@@ -584,7 +584,9 @@ class TdmsSegmentObject(BaseSegmentObject):
         if self.data_type == types.String:
             self.data_size = types.Uint64.read(f, endianness)
         elif self.number_values == 0:
-            return 0
+            # If there are no values, the data size is zero
+            # Avoid issues with empty arrays and void data where size is not defined
+            self.data_size = 0
         else:
             self.data_size = self.number_values * self.data_type.size
 
