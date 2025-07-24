@@ -56,7 +56,7 @@ class ListDataReceiver(object):
 
     @property
     def data(self):
-        dtype = self._dtype if len(self._data) > 0 else np.dtype('void')
+        dtype = self._dtype if self._dtype is not None else np.dtype('V8')
         return np.array(self._data, dtype=dtype)
 
 

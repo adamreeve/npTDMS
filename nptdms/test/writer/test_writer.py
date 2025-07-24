@@ -571,11 +571,11 @@ def test_write_empty_void_data():
         file.write_segment([
             RootObject(properties={"file": "file1"}),
             GroupObject("group1"),
-            ChannelObject("group1", "channel1", np.array([], dtype='void'))
+            ChannelObject("group1", "channel1", np.array([], dtype='V8'))
         ])
 
     data_file.seek(0, 0)
     with TdmsFile.open(data_file) as tdms_file:
         channel_data = tdms_file["group1"]["channel1"].data
-        assert channel_data.dtype == np.dtype('void')
-        compare_arrays(channel_data, np.array([], dtype=np.dtype('void')))
+        assert channel_data.dtype == np.dtype('V8')
+        compare_arrays(channel_data, np.array([], dtype=np.dtype('V8')))

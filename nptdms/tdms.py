@@ -581,7 +581,7 @@ class TdmsChannel(object):
             return np.dtype('<M8[us]')
         if self.data_type is not None and self.data_type.nptype is not None:
             return self.data_type.nptype
-        return np.dtype('void')
+        return np.dtype('V8')
 
     @cached_property
     def data(self):
