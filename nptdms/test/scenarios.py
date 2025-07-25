@@ -951,7 +951,7 @@ def channel_without_data_or_data_type():
         ""
     )
     expected_data = {
-        ('group', 'channel1'): np.array([], dtype=np.dtype('void')),
+        ('group', 'channel1'): np.array([], dtype=np.dtype('V8')),
     }
     return test_file, expected_data
 

@@ -9,6 +9,7 @@ import tempfile
 
 from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject, types
 from nptdms.test import scenarios
+from nptdms.test.util import compare_arrays
 
 
 def test_can_read_tdms_file_after_writing():
@@ -563,3 +564,19 @@ def test_defragment_raw_timestamp_file():
         for (group, channel), expected_values in expected_data.items():
             channel_data = f[group][channel][:]
             np.testing.assert_equal(channel_data, expected_values)
+
+
+def test_write_empty_void_data():
+    data_file = BytesIO()
+    with TdmsWriter(data_file) as file:
+        file.write_segment([
+            RootObject(properties={"file": "file1"}),
+            GroupObject("group1"),
+            ChannelObject("group1", "channel1", np.array([], dtype='V8'))
+        ])
+
+    data_file.seek(0, 0)
+    with TdmsFile.open(data_file) as tdms_file:
+        channel_data = tdms_file["group1"]["channel1"].data
+        assert channel_data.dtype == np.dtype('V8')
+        compare_arrays(channel_data, np.array([], dtype=np.dtype('V8')))
