@@ -565,6 +565,7 @@ def test_defragment_raw_timestamp_file():
             channel_data = f[group][channel][:]
             np.testing.assert_equal(channel_data, expected_values)
 
+
 def test_write_empty_void_data():
     data_file = BytesIO()
     with TdmsWriter(data_file) as file:
