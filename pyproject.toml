@@ -3,3 +3,59 @@ requires = [
     "setuptools",
 ]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "npTDMS"
+version = "1.10.0"
+requires-python = ">=3.9"
+description = "Cross-platform, NumPy based module for reading TDMS files produced by LabView"
+authors = [{ name = "Adam Reeve", email = "adreeve@gmail.com" }]
+readme = "README.rst"
+license-files = ["COPYING.LESSER"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering",
+    "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
+    "Intended Audience :: Science/Research",
+    "Natural Language :: English",
+]
+dependencies = [
+    "numpy",
+]
+
+[project.optional-dependencies]
+test =[
+    "pytest >= 3.1.0",
+    "hypothesis",
+    "pytest-benchmark",
+    "thermocouples_reference",
+    "scipy",
+]
+pandas = [
+    "pandas",
+    "pyarrow",
+]
+hdf = [
+    "h5py >= 2.10.0",
+]
+
+[project.urls]
+Documentation = "https://npTDMS.readthedocs.io"
+Github = "https://github.com/adamreeve/npTDMS"
+
+[project.scripts]
+npTDMS_info = "nptdms.tdmsinfo:main"
+
+[tool.setuptools]
+packages = [
+    "nptdms",
+    "nptdms.export",
+    "nptdms.test",
+]
