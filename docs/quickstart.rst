@@ -16,7 +16,7 @@ You can specify these extra features when installing npTDMS to also install the 
 Alternatively, after downloading the source code you can extract it and
 change into the new directory, then run::
 
-    python setup.py install
+    python -m pip install .
 
 Typical usage when reading a TDMS file might look like::
 

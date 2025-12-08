@@ -78,7 +78,7 @@ require::
 Alternatively, after downloading the source code you can extract it and
 change into the new directory, then run::
 
-    python setup.py install
+    python pip install .
 
 Links
 -----
