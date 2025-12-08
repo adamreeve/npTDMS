@@ -11,6 +11,7 @@ requires-python = ">=3.9"
 description = "Cross-platform, NumPy based module for reading TDMS files produced by LabView"
 authors = [{ name = "Adam Reeve", email = "adreeve@gmail.com" }]
 readme = "README.rst"
+license = "LGPL-3.0-only"
 license-files = ["COPYING.LESSER"]
 classifiers = [
     "Development Status :: 5 - Production/Stable",
@@ -22,7 +23,6 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering",
-    "License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)",
     "Intended Audience :: Science/Research",
     "Natural Language :: English",
 ]
