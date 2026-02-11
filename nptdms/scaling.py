@@ -257,6 +257,13 @@ class StrainScaling(object):
             strain /= temp
             return strain
         elif self.configuration == StrainScaling.HALF_BRIDGE_2:
+            # In the half bridge type II configuration:
+            # R1 = R2 = R0
+            # R3 = R0 (1 - ε G)
+            # R4 = R0 (1 + ε G)
+            # This gives Vo = - ε G Vex / 2
+            # Rearrange for strain:
+            # ε = -2 Vo / (Vex G)
             lead_adjustment = 1.0 / (1.0 + self.lead_wire_resistance / self.gage_resistance)
             strain = voltage_out
             strain *= -2.0 * self.gain_adjustment / (
