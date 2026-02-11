@@ -242,7 +242,7 @@ class StrainScaling(object):
         elif self.configuration == StrainScaling.HALF_BRIDGE_1:
             # In the half bridge type I configuration:
             # R1 = R2 = R0
-            # R3 = R0 (1 + ε ν G)
+            # R3 = R0 (1 - ε ν G)
             # R4 = R0 (1 + ε G)
             # Which gives Vo = [(1 - ε ν G) / (2 + ε G - ε ν G) - 1/2] Vex
             # Rearranging for strain:
