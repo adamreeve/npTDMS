@@ -104,3 +104,11 @@ for contributing support for converting to Pandas DataFrames.
 
 Thanks to nmgeek and jshridha for implementing support for DAQmx raw data
 files.
+
+License
+-------
+
+This project is released under the LGPL-3.0 license.
+This is a set of additional permissions on top of the GPL-3.0 license.
+The GPL-3.0 license text is included in the `COPYING` file,
+and the LGPL-3.0 permissions are included in the `COPYING.LESSER` file.
