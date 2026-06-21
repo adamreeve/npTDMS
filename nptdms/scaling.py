@@ -303,22 +303,18 @@ class TableScaling(object):
     def __init__(
             self, pre_scaled_values, scaled_values, input_source):
 
-        # This is a bit counterintuitive but the scaled values are the input
-        # values and the pre-scaled values are the output values for
-        # interpolation.
-
-        # Ensure values are monotonically increasing for interpolation to work
-        if not np.all(np.diff(scaled_values) > 0):
-            scaled_values = np.flip(scaled_values)
+        # Ensure pre-scaled values (X axis) are monotonically increasing for interpolation to work
+        if not np.all(np.diff(pre_scaled_values) > 0):
             pre_scaled_values = np.flip(pre_scaled_values)
-        if not np.all(np.diff(scaled_values) > 0):
+            scaled_values = np.flip(scaled_values)
+        if not np.all(np.diff(pre_scaled_values) > 0):
             # Reversing didn't help
             raise ValueError(
                 "Table scaled values must be monotonically "
                 "increasing or decreasing")
 
-        self.input_values = scaled_values
-        self.output_values = pre_scaled_values
+        self.input_values = pre_scaled_values
+        self.output_values = scaled_values
         self.input_source = input_source
 
     @staticmethod

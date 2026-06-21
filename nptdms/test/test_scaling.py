@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 from nptdms import types
-from nptdms.scaling import get_scaling
+from nptdms.scaling import get_scaling, TableScaling
 
 
 def test_unsupported_scaling_type():
@@ -171,27 +171,57 @@ def test_table_scaling():
     data = StubTdmsData(np.array([0.5, 1.0, 1.5, 2.5, 3.0, 3.5]))
     expected_scaled_data = np.array([2.0, 2.0, 3.0, 6.0, 8.0, 8.0])
 
-    # The scaled values are actually the range of inputs into the scaling,
-    # which are mapped to the pre-scaled values. This makes no sense but
-    # matches the behaviour of the Excel TDMS plugin.
-
     properties = {
         "NI_Number_Of_Scales": 1,
         "NI_Scale[0]_Scale_Type": "Table",
-        "NI_Scale[0]_Table_Scaled_Values_Size": 3,
-        "NI_Scale[0]_Table_Scaled_Values[0]": 1.0,
-        "NI_Scale[0]_Table_Scaled_Values[1]": 2.0,
-        "NI_Scale[0]_Table_Scaled_Values[2]": 3.0,
         "NI_Scale[0]_Table_Pre_Scaled_Values_Size": 3,
-        "NI_Scale[0]_Table_Pre_Scaled_Values[0]": 2.0,
-        "NI_Scale[0]_Table_Pre_Scaled_Values[1]": 4.0,
-        "NI_Scale[0]_Table_Pre_Scaled_Values[2]": 8.0,
+        "NI_Scale[0]_Table_Pre_Scaled_Values[0]": 1.0,
+        "NI_Scale[0]_Table_Pre_Scaled_Values[1]": 2.0,
+        "NI_Scale[0]_Table_Pre_Scaled_Values[2]": 3.0,
+        "NI_Scale[0]_Table_Scaled_Values_Size": 3,
+        "NI_Scale[0]_Table_Scaled_Values[0]": 2.0,
+        "NI_Scale[0]_Table_Scaled_Values[1]": 4.0,
+        "NI_Scale[0]_Table_Scaled_Values[2]": 8.0,
     }
     scaling = get_scaling(properties, {}, {})
     scaled_data = scaling.scale(data)
 
     assert scaling.get_dtype(types.DoubleFloat, None) == np.dtype('float64')
     np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
+
+
+def test_table_scaling_decreasing_pre_scaled_values():
+    """Table scaling auto-flips when pre-scaled values are decreasing"""
+
+    data = StubTdmsData(np.array([0.5, 1.0, 1.5, 2.5, 3.0, 3.5]))
+    expected_scaled_data = np.array([2.0, 2.0, 3.0, 6.0, 8.0, 8.0])
+
+    properties = {
+        "NI_Number_Of_Scales": 1,
+        "NI_Scale[0]_Scale_Type": "Table",
+        "NI_Scale[0]_Table_Pre_Scaled_Values_Size": 3,
+        "NI_Scale[0]_Table_Pre_Scaled_Values[0]": 3.0,
+        "NI_Scale[0]_Table_Pre_Scaled_Values[1]": 2.0,
+        "NI_Scale[0]_Table_Pre_Scaled_Values[2]": 1.0,
+        "NI_Scale[0]_Table_Scaled_Values_Size": 3,
+        "NI_Scale[0]_Table_Scaled_Values[0]": 8.0,
+        "NI_Scale[0]_Table_Scaled_Values[1]": 4.0,
+        "NI_Scale[0]_Table_Scaled_Values[2]": 2.0,
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(data)
+
+    np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
+
+
+def test_table_scaling_non_monotonic_raises():
+    """Table scaling raises when pre-scaled values are non-monotonic"""
+
+    with pytest.raises(ValueError, match="monotonically"):
+        TableScaling(
+            pre_scaled_values=np.array([1.0, 3.0, 2.0]),
+            scaled_values=np.array([2.0, 4.0, 8.0]),
+            input_source=0)
 
 
 def test_add_scaling():
