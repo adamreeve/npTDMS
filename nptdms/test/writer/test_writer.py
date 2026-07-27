@@ -111,10 +111,10 @@ def test_can_write_multiple_channels():
 
     output_file = BytesIO()
     with TdmsWriter(output_file) as tdms_writer:
-        tdms_writer.write_segment([channel_1])  #Legacy entry for objects in write_segment, going into *object_inputs
-        tdms_writer.write_segment(objects=[channel_2, channel_3])  #Legacy entry for objects in write_segment
-        tdms_writer.write_segment(channel_4)  #Going into *object_inputs
-        tdms_writer.write_segment(channel_5, channel_6)  #Going into *object_inputs
+        tdms_writer.write_segment([channel_1])  # Legacy entry for objects in write_segment, going into *object_inputs
+        tdms_writer.write_segment(objects=[channel_2, channel_3])  # Legacy entry for objects in write_segment
+        tdms_writer.write_segment(channel_4)  # Going into *object_inputs
+        tdms_writer.write_segment(channel_5, channel_6)  # Going into *object_inputs
 
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
