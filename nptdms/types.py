@@ -301,6 +301,29 @@ class TimeStamp(TdmsType):
             dtype = np.dtype([('seconds', '>i8'), ('second_fractions', '>u8')])
         return TimestampArray(byte_array.view(dtype).reshape(-1))
 
+    @classmethod
+    def to_array_bytes(cls, array):
+        """ Vectorized conversion of a numpy datetime64 array (or TimestampArray)
+        to the packed bytes representation used in TDMS files.
+
+        This avoids constructing a Python TimeStamp object per element, which
+        is orders of magnitude slower than doing the equivalent computation
+        with numpy array operations.
+        """
+        array = np.asarray(array).astype('datetime64[us]')
+        epoch_delta_us = (array - cls._tdms_epoch).astype(np.int64)
+        seconds = epoch_delta_us // 1_000_000
+        microseconds = epoch_delta_us - seconds * 1_000_000
+        second_fractions = (
+            microseconds.astype(np.float64) * cls._fractions_per_microsecond
+        ).astype(np.uint64)
+
+        packed = np.empty(
+            len(array), dtype=np.dtype([('second_fractions', '<u8'), ('seconds', '<i8')]))
+        packed['second_fractions'] = second_fractions
+        packed['seconds'] = seconds
+        return packed.tobytes()
+
 
 @tds_data_type(0x08000c, np.complex64)
 class ComplexSingleFloat(TdmsType):
