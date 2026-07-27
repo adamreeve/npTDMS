@@ -121,10 +121,10 @@ class TdmsWriter(object):
         self._file = None
         self._index_file = None
 
-    def write_segment(self, *objects):
+    def write_segment(self, *object_inputs, objects=None):
         """ Write a segment of data to a TDMS file
 
-        :param objects: One or more arguments, where each argument is either
+        :param object_inputs: One or more arguments, where each argument is either
             a single TdmsObject instance, or an iterable (list, tuple, generator, etc.)
             of TdmsObject instances. This means you can pass objects individually,
             as a list, or mix and match, without needing to manually concatenate lists together,
@@ -136,9 +136,16 @@ class TdmsWriter(object):
                     root_obj,
                     (ChannelObject("Group", name, data) for name, data in channels)
                 )
+        :param objects: A list of TdmsObject instances to write.
+            Prefer ``object_inputs`` for new code.
         """
+        if objects is not None:
+            if object_inputs:
+                raise TypeError("Pass either positional object arguments or objects=, not both.")
+            object_inputs = (objects,)
+            
         _objects = []
-        for group in objects:
+        for group in object_inputs:
             if isinstance(group, TdmsObject):
                 _objects.append(group)
             else:

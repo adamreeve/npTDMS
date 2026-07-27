@@ -93,6 +93,49 @@ def test_can_write_multiple_segments():
     assert len(output_data) == len(expected_data)
     assert (output_data == expected_data).all()
 
+def test_can_write_multiple_channels():
+    input_1 = np.linspace(0.0, 1.0, 10)
+    input_2 = np.linspace(2.0, 3.0, 10)
+    input_3 = np.linspace(4.0, 5.0, 10)
+    input_4 = np.linspace(6.0, 7.0, 10)
+    input_5 = np.linspace(8.0, 9.0, 10)
+    input_6 = np.linspace(10.0, 11.0, 10)
+
+    channel_1 = ChannelObject("group", "1", input_1)
+    channel_2 = ChannelObject("group", "2", input_2)
+    channel_3 = ChannelObject("group", "3", input_3)
+    channel_4 = ChannelObject("group", "4", input_4)
+    channel_5 = ChannelObject("group", "5", input_5)
+    channel_6 = ChannelObject("group", "6", input_6)
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([channel_1]) # Legacy entry for objects in write_segment, going into *object_inputs
+        tdms_writer.write_segment(objects=[channel_2, channel_3]) # Legacy entry for objects in write_segment
+        tdms_writer.write_segment(channel_4) # Going into *object_inputs
+        tdms_writer.write_segment(channel_5, channel_6) # Going into *object_inputs
+
+
+    output_file.seek(0)
+    tdms_file = TdmsFile(output_file)
+
+    output_channels = tdms_file["group"].channels()
+
+    output_data_length = 0
+    output_data = []
+    for channel in output_channels:
+        output_data_length += len(channel.data)
+        output_data.append(channel.data)
+
+    expected_data_length = 0
+    expected_data = []
+    for channel in [input_1, input_2, input_3, input_4, input_5, input_6]:
+        expected_data_length += len(channel)
+        expected_data.append(channel)
+    
+    assert output_data_length == expected_data_length
+    assert all(np.array_equal(o, i) for o, i in zip(output_data, expected_data))
+
 
 def test_can_write_to_file_using_path():
     input_1 = np.linspace(0.0, 1.0, 10)
