@@ -124,10 +124,10 @@ class TdmsWriter(object):
         self._file = None
         self._index_file = None
 
-    def write_segment(self, *object_groups):
+    def write_segment(self, *objects):
         """ Write a segment of data to a TDMS file
 
-        :param object_groups: One or more arguments, where each argument is either
+        :param objects: One or more arguments, where each argument is either
             a single TdmsObject instance, or an iterable (list, tuple, generator, etc.)
             of TdmsObject instances. This means you can pass objects individually,
             as a list, or mix and match, without needing to manually concatenate lists together,
@@ -140,12 +140,12 @@ class TdmsWriter(object):
                     (ChannelObject("Group", name, data) for name, data in channels)
                 )
         """
-        objects = []
-        for group in object_groups:
+        _objects = []
+        for group in objects:
             if isinstance(group, TdmsObject):
-                objects.append(group)
+                _objects.append(group)
             else:
-                objects.extend(group)
+                _objects.extend(group)
 
         # Build ObjectPaths directly from each object's group/channel attributes
         # rather than parsing them back out of a path string, when possible.
@@ -155,7 +155,7 @@ class TdmsWriter(object):
         # path string, so fall back to parsing that.
         path_object_pairs = [
             (getattr(o, 'object_path', None) or ObjectPath.from_string(o.path), o)
-            for o in objects
+            for o in _objects
         ]
 
         # Make sure a root object is included if this is the first segment,
@@ -175,12 +175,12 @@ class TdmsWriter(object):
         # Channel ordering will be unchanged as sorts are stable.
         path_object_pairs.sort(key=lambda p: _path_ordering_key(p[0]))
 
-        objects = [p[1] for p in path_object_pairs]
-        segment = TdmsSegment(objects, version=self._tdms_version)
+        _objects = [p[1] for p in path_object_pairs]
+        segment = TdmsSegment(_objects, version=self._tdms_version)
         segment.write(self._file)
 
         if self._index_file is not None:
-            segment = TdmsSegment(objects, is_index_file=True, version=self._tdms_version)
+            segment = TdmsSegment(_objects, is_index_file=True, version=self._tdms_version)
             segment.write(self._index_file)
 
         self._root_written = True
@@ -423,7 +423,7 @@ def write_data(file, tdms_object):
         # so can't use data.tofile directly, but we can still avoid
         # creating a Python TimeStamp object per element by using a
         # vectorized numpy-based conversion when the data is array-like.
-        if isinstance(data, np.ndarray) and tdms_object.data.dtype.kind == 'M':
+        if isinstance(tdms_object.data, np.ndarray) and tdms_object.data.dtype.kind == 'M':
             file.write(TimeStamp.to_array_bytes(tdms_object.data))
         else:
             write_values(file, tdms_object.data)
