@@ -93,6 +93,7 @@ def test_can_write_multiple_segments():
     assert len(output_data) == len(expected_data)
     assert (output_data == expected_data).all()
 
+
 def test_can_write_multiple_channels():
     input_1 = np.linspace(0.0, 1.0, 10)
     input_2 = np.linspace(2.0, 3.0, 10)
@@ -110,11 +111,10 @@ def test_can_write_multiple_channels():
 
     output_file = BytesIO()
     with TdmsWriter(output_file) as tdms_writer:
-        tdms_writer.write_segment([channel_1]) # Legacy entry for objects in write_segment, going into *object_inputs
-        tdms_writer.write_segment(objects=[channel_2, channel_3]) # Legacy entry for objects in write_segment
-        tdms_writer.write_segment(channel_4) # Going into *object_inputs
-        tdms_writer.write_segment(channel_5, channel_6) # Going into *object_inputs
-
+        tdms_writer.write_segment([channel_1])  #Legacy entry for objects in write_segment, going into *object_inputs
+        tdms_writer.write_segment(objects=[channel_2, channel_3])  #Legacy entry for objects in write_segment
+        tdms_writer.write_segment(channel_4)  #Going into *object_inputs
+        tdms_writer.write_segment(channel_5, channel_6)  #Going into *object_inputs
 
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
@@ -132,7 +132,7 @@ def test_can_write_multiple_channels():
     for channel in [input_1, input_2, input_3, input_4, input_5, input_6]:
         expected_data_length += len(channel)
         expected_data.append(channel)
-    
+
     assert output_data_length == expected_data_length
     assert all(np.array_equal(o, i) for o, i in zip(output_data, expected_data))
 

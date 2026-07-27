@@ -143,7 +143,7 @@ class TdmsWriter(object):
             if object_inputs:
                 raise TypeError("Pass either positional object arguments or objects=, not both.")
             object_inputs = (objects,)
-            
+       
         _objects = []
         for group in object_inputs:
             if isinstance(group, TdmsObject):
