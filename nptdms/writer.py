@@ -440,7 +440,7 @@ def write_data(file, tdms_object):
 
 
 def to_file(file, array):
-    """Wrapper around ndarray.tofile to support any file-like object"""
+    """Wrapper around file.write to support any file-like object"""
 
     try:
         file.write(memoryview(array))
