@@ -306,6 +306,7 @@ def test_complex_metadata_reading(benchmark):
     for channel_num in range(10):
         assert len(tdms_file['group']['channel{0}'.format(channel_num)]) == 10
 
+
 @pytest.mark.benchmark(group='write-many-channels')
 def test_write_many_channels_low_data_per_channel(benchmark):
     """Benchmark writing many channels with a small amount of data each."""
@@ -355,6 +356,7 @@ def test_write_few_channels_data_per_channel(benchmark):
             expected + (num_channels - 1),
         )
 
+
 @pytest.mark.benchmark(group='write-single-channel')
 def test_write_single_channel_high_data(benchmark):
     """Benchmark writing a single channels with a high amount of data."""
@@ -378,6 +380,7 @@ def test_write_single_channel_high_data(benchmark):
             group['channel{0}'.format(num_channels - 1)][:],
             expected + (num_channels - 1),
         )
+
 
 def get_contiguous_file():
     test_file = GeneratedFile()
@@ -448,6 +451,7 @@ def get_slice(chan, start, stop):
 def index_values(chan, target):
     for i in range(len(chan)):
         target[i] = chan[i]
+
 
 def make_write_segment(num_channels, samples_per_channel):
     segment = [RootObject(), GroupObject("group")]

@@ -5,9 +5,6 @@ from datetime import datetime
 from functools import cached_property
 from io import UnsupportedOperation
 import struct
-
-_struct_pack = struct.pack
-
 import numpy as np
 from nptdms.common import toc_properties, ObjectPath
 from nptdms.timestamp import TdmsTimestamp
@@ -247,10 +244,10 @@ class TdmsSegment(object):
             if obj.data_type == String:
                 # For strings, we also need to write the total data size in bytes
                 total_size = object_data_size(obj.data_type, obj.data)
-                packed = _struct_pack(
+                packed = struct.pack(
                     '<LlLQQ', 20, obj.data_type.enum_value, 1, num_values, total_size)
             else:
-                packed = _struct_pack(
+                packed = struct.pack(
                     '<LlLQ', 20, obj.data_type.enum_value, 1, num_values)
             return [Bytes(packed)]
         else:
