@@ -448,7 +448,7 @@ def to_file(file, array):
 
     try:
         file.write(memoryview(array))
-    except (TypeError, UnsupportedOperation):
+    except (TypeError, BufferError, UnsupportedOperation):
         file.write(array.tobytes())
 
 
