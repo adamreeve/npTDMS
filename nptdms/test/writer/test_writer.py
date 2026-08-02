@@ -136,12 +136,11 @@ def test_can_write_multiple_channels():
     assert output_data_length == expected_data_length
     assert all(np.array_equal(o, i) for o, i in zip(output_data, expected_data))
 
+
 def test_writer_raises_value_error():
-    
     input_1 = np.linspace(0.0, 1.0, 10)
     input_2 = np.linspace(2.0, 3.0, 10)
     input_3 = np.linspace(4.0, 5.0, 10)
-
 
     channel_1 = ChannelObject("group", "1", input_1)
     channel_2 = ChannelObject("group", "2", input_2)
