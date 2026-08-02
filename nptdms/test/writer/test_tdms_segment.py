@@ -90,8 +90,7 @@ def test_write_metadata_with_properties():
     expected_values = [
         Uint32(1),  # Number of objects
         String("channel_path"),
-        # Raw data index: length (20), data type (3), array dimension (1), number of values (10),
-        # packed together into a single entry for efficiency (fewer small object allocations).
+        # Raw data index: length (20), data type (3), array dimension (1), number of values (10).
         Bytes(struct.pack('<LlLQ', 20, 3, 1, 10)),
         Uint32(2),  # Number of properties
         String("prop1"),  # Property name
