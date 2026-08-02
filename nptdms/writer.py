@@ -141,7 +141,7 @@ class TdmsWriter(object):
         """
         if objects is not None:
             if object_inputs:
-                raise TypeError("Pass either positional object arguments or objects=, not both.")
+                raise ValueError("Pass either positional object arguments or objects=, not both.")
             object_inputs = (objects,)
 
         _objects = []
@@ -305,8 +305,7 @@ class TdmsObject(object):
 
     @cached_property
     def object_path(self):
-        """ The ObjectPath for this object, built directly from group/channel
-        rather than by parsing a path string.
+        """ The ObjectPath for this object
         """
         components = tuple(c for c in (self.group, self.channel) if c is not None)
         return ObjectPath(*components)
