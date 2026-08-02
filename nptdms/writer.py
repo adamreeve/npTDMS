@@ -465,7 +465,9 @@ def write_string_values(file, strings):
         (len(s) for s in encoded_strings), dtype=np.uint32, count=len(encoded_strings))
     offsets = np.cumsum(lengths, dtype=np.uint32)
     file.write(offsets.tobytes())
-    file.write(b''.join(encoded_strings))
+    batch_size = 64
+    for i in range(0, len(encoded_strings), batch_size):
+        file.write(b''.join(encoded_strings[i:i + batch_size]))
 
 
 def object_data_size(data_type, data_values):
