@@ -105,9 +105,7 @@ class StructType(TdmsType):
     def from_bytes(cls, byte_array, endianness="<"):
         """ Convert an array of bytes into a numpy array of data
         """
-        array = byte_array.view()
-        array.dtype = cls.nptype.newbyteorder(endianness)
-        return array
+        return byte_array.view(cls.nptype.newbyteorder(endianness))
 
 
 @tds_data_type(0, None)
