@@ -148,8 +148,7 @@ def fromfile(file, dtype, count, *args, **kwargs):
         offset += bytes_read
     rounded_bytes = (offset // itemsize) * itemsize
     buffer = buffer[:rounded_bytes]
-    buffer.dtype = dtype
-    return buffer
+    return buffer.view(dtype)
 
 
 def read_interleaved_segment_bytes(f, bytes_per_row, num_values):
