@@ -71,7 +71,7 @@ class DaqmxDataReader(BaseDataReader):
 def get_daqmx_chunk_size(ordered_objects):
     # For DAQmx data, each channel should specify the same raw data widths,
     # but different buffers may have different numbers of values.
-    return sum((num_values * width) for (num_values, width) in get_buffer_dimensions(ordered_objects))
+    return sum((int(num_values) * int(width)) for (num_values, width) in get_buffer_dimensions(ordered_objects))
 
 
 def get_daqmx_final_chunk_lengths(ordered_objects, chunk_size_bytes):
@@ -82,6 +82,8 @@ def get_daqmx_final_chunk_lengths(ordered_objects, chunk_size_bytes):
     updated_buffer_lengths = [0] * len(buffer_dims)
     bytes_remaining = chunk_size_bytes
     for i, (orig_length, width) in enumerate(buffer_dims):
+        orig_length = int(orig_length)
+        width = int(width)
         buffer_total_bytes = orig_length * width
         if bytes_remaining > buffer_total_bytes:
             updated_buffer_lengths[i] = orig_length
