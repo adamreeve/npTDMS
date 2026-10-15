@@ -2,7 +2,9 @@
 """
 
 from collections import defaultdict
+from io import BytesIO
 import logging
+import os
 import numpy as np
 import pytest
 
@@ -13,6 +15,138 @@ from nptdms.test.scenarios import timestamp_hexlify
 from nptdms.test.util import (
     GeneratedFile, hexlify_value, string_hexlify, segment_objects_metadata, hex_properties,
     root_metadata, group_metadata)
+
+
+class SparseFile(object):
+    """Seekable test file with a logical data extent but no payload allocation."""
+
+    def __init__(self, contents, logical_size):
+        self._contents = BytesIO(contents)
+        self._physical_size = len(contents)
+        self._logical_size = logical_size
+
+    def read(self, size=-1):
+        if self.tell() >= self._physical_size:
+            return b""
+        return self._contents.read(size)
+
+    def seek(self, offset, whence=os.SEEK_SET):
+        if whence == os.SEEK_SET:
+            position = offset
+        elif whence == os.SEEK_CUR:
+            position = self.tell() + offset
+        elif whence == os.SEEK_END:
+            position = self._logical_size + offset
+        else:
+            raise ValueError("Invalid seek mode")
+        self._contents.seek(position, os.SEEK_SET)
+        return position
+
+    def tell(self):
+        return self._contents.tell()
+
+
+def test_large_daqmx_chunk_size_does_not_overflow_int32():
+    """A large DAQmx segment can be opened without allocating its payload."""
+    sample_count = 360_000_000
+    raw_width = 8
+    scaler_metadata = daqmx_scaler_metadata(0, 9, 0)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", sample_count, [raw_width], [scaler_metadata]))
+
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        segment_toc(), metadata, "", data_size_override=sample_count * raw_width)
+
+    physical_file = test_file.get_bytes_io_file()
+    sparse_file = SparseFile(
+        physical_file.getvalue(), len(test_file) + sample_count * raw_width)
+    with TdmsFile.open(sparse_file) as tdms_file:
+        segment = tdms_file._reader._segments[0]
+        assert segment._get_chunk_size() == sample_count * raw_width
+        assert segment.num_chunks == 1
+
+
+@pytest.mark.parametrize("sample_count, raw_type_id, raw_width", [
+    (360_000_000, 9, 8),
+    (2**31 + 1, 0, 1),
+    (2**31 - 1, 3, 2),
+])
+def test_large_daqmx_payload_read_size_does_not_overflow(
+        monkeypatch, sample_count, raw_type_id, raw_width):
+    """Payload reads use the full byte count without allocating large arrays."""
+    expected_bytes = sample_count * raw_width
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata(
+            "Channel1", sample_count, [raw_width], [daqmx_scaler_metadata(0, raw_type_id, 0)]))
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc(), metadata, "", data_size_override=expected_bytes)
+    sparse_file = SparseFile(
+        test_file.get_bytes_io_file().getvalue(), len(test_file) + expected_bytes)
+    requested_counts = []
+
+    def read_bytes(file, dtype, count):
+        requested_counts.append(count)
+        assert count == expected_bytes
+        return np.empty(0, dtype=dtype)
+
+    monkeypatch.setattr("nptdms.base_segment.fromfile", read_bytes)
+    with TdmsFile.open(sparse_file) as tdms_file:
+        assert len(list(tdms_file.data_chunks())) == 1
+    assert requested_counts == [expected_bytes]
+
+
+def test_large_daqmx_partial_chunk_lengths_do_not_overflow_int32():
+    """A partial large DAQmx chunk keeps its byte arithmetic in Python ints."""
+    sample_count = 360_000_000
+    raw_width = 8
+    data_size = sample_count * raw_width + 1
+    scaler_metadata = daqmx_scaler_metadata(0, 9, 0)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", sample_count, [raw_width], [scaler_metadata]))
+
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        segment_toc(), metadata, "", data_size_override=data_size)
+
+    physical_file = test_file.get_bytes_io_file()
+    sparse_file = SparseFile(physical_file.getvalue(), len(test_file) + data_size)
+    with TdmsFile.open(sparse_file) as tdms_file:
+        segment = tdms_file._reader._segments[0]
+        assert segment.num_chunks == 2
+        assert segment.final_chunk_lengths_override == {"/'Group'/'Channel1'": 0}
+
+
+@pytest.mark.parametrize("raw_type_id", [0, 1], ids=["u8", "i8"])
+@pytest.mark.parametrize("chunk_remainder, expected_length", [(1, 1), (2**31, 2**31)])
+def test_large_daqmx_width_one_partial_chunk_lengths_do_not_overflow(
+        raw_type_id, chunk_remainder, expected_length):
+    """Width-one DAQmx partial chunks preserve large Python integer lengths."""
+    sample_count = 2**31 + 1
+    scaler_metadata = daqmx_scaler_metadata(0, raw_type_id, 0)
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata("Channel1", sample_count, [1], [scaler_metadata]))
+
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        segment_toc(), metadata, "", data_size_override=sample_count + chunk_remainder)
+
+    physical_file = test_file.get_bytes_io_file()
+    sparse_file = SparseFile(
+        physical_file.getvalue(), len(test_file) + sample_count + chunk_remainder)
+    with TdmsFile.open(sparse_file) as tdms_file:
+        segment = tdms_file._reader._segments[0]
+        assert segment.num_chunks == 2
+        assert segment.final_chunk_lengths_override == {
+            "/'Group'/'Channel1'": expected_length}
 
 
 def test_single_channel_i16():

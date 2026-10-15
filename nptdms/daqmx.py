@@ -110,8 +110,8 @@ def get_buffer_dimensions(ordered_objects):
         daqmx_metadata = o.daqmx_metadata
         if dimensions is None:
             raw_data_widths = daqmx_metadata.raw_data_widths
-            # Set width for each buffer
-            dimensions = [(0, w) for w in raw_data_widths]
+            # Use Python ints so buffer size calculations do not overflow.
+            dimensions = [(0, int(w)) for w in raw_data_widths]
         else:
             if not _lists_are_equal(daqmx_metadata.raw_data_widths, raw_data_widths):
                 raise ValueError(
