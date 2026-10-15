@@ -69,6 +69,37 @@ def test_large_daqmx_chunk_size_does_not_overflow_int32():
         assert segment.num_chunks == 1
 
 
+@pytest.mark.parametrize("sample_count, raw_type_id, raw_width", [
+    (360_000_000, 9, 8),
+    (2**31 + 1, 0, 1),
+    (2**31 - 1, 3, 2),
+])
+def test_large_daqmx_payload_read_size_does_not_overflow(
+        monkeypatch, sample_count, raw_type_id, raw_width):
+    """Payload reads use the full byte count without allocating large arrays."""
+    expected_bytes = sample_count * raw_width
+    metadata = segment_objects_metadata(
+        root_metadata(),
+        group_metadata(),
+        daqmx_channel_metadata(
+            "Channel1", sample_count, [raw_width], [daqmx_scaler_metadata(0, raw_type_id, 0)]))
+    test_file = GeneratedFile()
+    test_file.add_segment(segment_toc(), metadata, "", data_size_override=expected_bytes)
+    sparse_file = SparseFile(
+        test_file.get_bytes_io_file().getvalue(), len(test_file) + expected_bytes)
+    requested_counts = []
+
+    def read_bytes(file, dtype, count):
+        requested_counts.append(count)
+        assert count == expected_bytes
+        return np.empty(0, dtype=dtype)
+
+    monkeypatch.setattr("nptdms.base_segment.fromfile", read_bytes)
+    with TdmsFile.open(sparse_file) as tdms_file:
+        assert len(list(tdms_file.data_chunks())) == 1
+    assert requested_counts == [expected_bytes]
+
+
 def test_large_daqmx_partial_chunk_lengths_do_not_overflow_int32():
     """A partial large DAQmx chunk keeps its byte arithmetic in Python ints."""
     sample_count = 360_000_000
