@@ -341,9 +341,31 @@ def test_can_write_string_data():
     assert output_data[1] == input_data[1]
 
 
+@pytest.mark.parametrize("input_data", [
+    pytest.param(np.array([b"hello", b"world!"]), id="numpy_bytes"),
+    pytest.param([b"hello", b"world!"], id="list_bytes"),
+    pytest.param(["hello", b"world!"], id="mixed_str_bytes"),
+])
+def test_can_write_bytes_string_data(input_data):
+    segment = ChannelObject("group", "string_data", input_data, properties={"prop": b"value"})
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([segment])
+
+    output_file.seek(0)
+    tdms_file = TdmsFile(output_file)
+
+    channel = tdms_file["group"]["string_data"]
+    assert channel.data_type == types.String
+    assert list(channel.data) == ["hello", "world!"]
+    assert channel.properties["prop"] == "value"
+
+
 @pytest.mark.parametrize("input_dtype,expected_type,expected_dtype", [
     (np.dtype('O'), types.String, np.dtype('O')),
     (np.dtype('<U5'), types.String, np.dtype('O')),
+    (np.dtype('|S5'), types.String, np.dtype('O')),
     (np.dtype('datetime64[us]'), types.TimeStamp, np.dtype('datetime64[us]')),
     (np.dtype('datetime64[ns]'), types.TimeStamp, np.dtype('datetime64[us]')),
 ])
