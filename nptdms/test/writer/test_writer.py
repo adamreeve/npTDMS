@@ -340,6 +340,22 @@ def test_can_write_string_data():
     assert output_data[1] == input_data[1]
 
 
+def test_can_write_empty_string_data():
+    segment = ChannelObject("group", "string_data", np.array([], dtype=object))
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([segment])
+
+    output_file.seek(0)
+    tdms_file = TdmsFile(output_file)
+
+    channel = tdms_file["group"]["string_data"]
+    assert channel.data_type == types.String
+    assert len(channel) == 0
+    assert channel.data.dtype == np.dtype('O')
+
+
 def test_can_write_floats_from_list():
     input_data = [1.0, 2.0, 3.0]
 
