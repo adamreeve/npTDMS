@@ -392,8 +392,8 @@ class ChannelObject(TdmsObject):
                 # No values to infer the type from, so infer it from the dtype
                 if np_dtype is None:
                     return Void
-                if np_dtype.kind in ('O', 'U'):
-                    # Assume empty object or unicode arrays are for string data
+                if np_dtype.kind in ('O', 'U', 'S'):
+                    # Assume empty object, unicode or bytes arrays are for string data
                     return String
                 if np_dtype.kind == 'M':
                     return TimeStamp
@@ -481,11 +481,7 @@ def write_values(file, array):
 
 
 def write_string_values(file, strings):
-    try:
-        encoded_strings = [s.encode("utf-8") for s in strings]
-    except AttributeError:
-        # Assume if we can't encode then we already have bytes
-        encoded_strings = strings
+    encoded_strings = [String.encode(s) for s in strings]
     lengths = np.fromiter(
         (len(s) for s in encoded_strings), dtype=np.uint32, count=len(encoded_strings))
     offsets = np.cumsum(lengths, dtype=np.uint32)
@@ -504,11 +500,7 @@ def object_data_size(data_type, data_values):
     if data_type == String:
         # For string data, the total size is 8 bytes per string for the
         # offsets to the start of each string, plus the length of each string.
-        try:
-            encoded_strings = [s.encode("utf-8") for s in data_values]
-        except AttributeError:
-            encoded_strings = data_values
-        return sum(4 + len(s) for s in encoded_strings)
+        return sum(4 + len(String.encode(s)) for s in data_values)
 
     return data_type.size * len(data_values)
 

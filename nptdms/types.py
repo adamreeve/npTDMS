@@ -199,9 +199,17 @@ class ExtendedFloatWithUnit(TdmsType):
 class String(TdmsType):
     def __init__(self, value):
         self.value = value
-        content = value.encode('utf-8')
+        content = String.encode(value)
         length = _struct_pack('<L', len(content))
         self.bytes = length + content
+
+    @staticmethod
+    def encode(value):
+        """ Encode a string value as UTF-8 bytes, passing through values that are already bytes
+        """
+        if isinstance(value, bytes):
+            return value
+        return value.encode('utf-8')
 
     @staticmethod
     def read(file, endianness="<"):
