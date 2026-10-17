@@ -391,6 +391,26 @@ def test_can_write_new_channel_without_data():
     assert channel.properties["prop1"] == "a"
 
 
+def test_can_write_tdms_channel_without_data_read_from_file():
+    input_file = BytesIO()
+    with TdmsWriter(input_file) as tdms_writer:
+        tdms_writer.write_segment([
+            ChannelObject("group", "channel", properties={"prop1": "a"})])
+
+    input_file.seek(0)
+    read_channel = TdmsFile(input_file)["group"]["channel"]
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([read_channel])
+
+    output_file.seek(0)
+    channel = TdmsFile(output_file)["group"]["channel"]
+    assert channel.data_type is None
+    assert len(channel) == 0
+    assert channel.properties["prop1"] == "a"
+
+
 def test_can_write_floats_from_list():
     input_data = [1.0, 2.0, 3.0]
 

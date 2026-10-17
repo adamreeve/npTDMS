@@ -292,7 +292,8 @@ class TdmsSegment(object):
 
 
 def _object_has_data(obj):
-    return getattr(obj, 'data', None) is not None
+    # Channels read from a file that never had data have no data type
+    return getattr(obj, 'data', None) is not None and obj.data_type is not None
 
 
 class TdmsObject(object):
