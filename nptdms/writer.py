@@ -45,11 +45,18 @@ class TdmsWriter(object):
             for group in file.groups():
                 new_file.write_segment([GroupObject(group.name, group.properties)])
                 for channel in group.channels():
+                    channel_data = channel.read_data(scaled=False)
+                    channel_properties = channel.properties
+                    if isinstance(channel_data, dict) and len(channel_data) == 1:
+                        scale_id, channel_data = next(iter(channel_data.items()))
+                        channel_properties = OrderedDict(channel_properties)
+                        channel_properties[
+                            "NI_Scale[%d]_Scale_Type" % scale_id] = "AdvancedAPI"
                     new_file.write_segment([ChannelObject(
                         group.name,
                         channel.name,
-                        channel.read_data(scaled=False),
-                        channel.properties
+                        channel_data,
+                        channel_properties
                     )])
 
     def __init__(self, file, mode='w', version=4712, index_file=False):
