@@ -389,9 +389,13 @@ class ChannelObject(TdmsObject):
             try:
                 return _to_tdms_value(self.data[0]).__class__
             except IndexError:
-                if np_dtype is not None and np_dtype.kind == 'O':
-                    # Assume an empty object typed array is for string data
-                    return String
+                # No values to infer the type from, so infer it from the dtype
+                if np_dtype is not None:
+                    if np_dtype.kind in ('O', 'U'):
+                        # Assume empty object or unicode arrays are for string data
+                        return String
+                    if np_dtype.kind == 'M':
+                        return TimeStamp
                 return Void
 
 

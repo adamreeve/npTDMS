@@ -340,8 +340,14 @@ def test_can_write_string_data():
     assert output_data[1] == input_data[1]
 
 
-def test_can_write_empty_string_data():
-    segment = ChannelObject("group", "string_data", np.array([], dtype=object))
+@pytest.mark.parametrize("input_dtype,expected_type,expected_dtype", [
+    (np.dtype('O'), types.String, np.dtype('O')),
+    (np.dtype('<U5'), types.String, np.dtype('O')),
+    (np.dtype('datetime64[us]'), types.TimeStamp, np.dtype('datetime64[us]')),
+    (np.dtype('datetime64[ns]'), types.TimeStamp, np.dtype('datetime64[us]')),
+])
+def test_can_write_empty_data(input_dtype, expected_type, expected_dtype):
+    segment = ChannelObject("group", "channel", np.array([], dtype=input_dtype))
 
     output_file = BytesIO()
     with TdmsWriter(output_file) as tdms_writer:
@@ -350,10 +356,10 @@ def test_can_write_empty_string_data():
     output_file.seek(0)
     tdms_file = TdmsFile(output_file)
 
-    channel = tdms_file["group"]["string_data"]
-    assert channel.data_type == types.String
+    channel = tdms_file["group"]["channel"]
+    assert channel.data_type == expected_type
     assert len(channel) == 0
-    assert channel.data.dtype == np.dtype('O')
+    assert channel.data.dtype == expected_dtype
 
 
 def test_can_write_channel_properties_without_data():
