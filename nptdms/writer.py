@@ -7,7 +7,7 @@ from io import UnsupportedOperation
 import struct
 import numpy as np
 from nptdms.common import toc_properties, ObjectPath
-from nptdms.timestamp import TdmsTimestamp
+from nptdms.timestamp import TdmsTimestamp, TimestampArray
 from nptdms.types import *
 from nptdms import TdmsFile
 
@@ -389,10 +389,19 @@ class ChannelObject(TdmsObject):
             try:
                 return _to_tdms_value(self.data[0]).__class__
             except IndexError:
-                if np_dtype is not None and np_dtype.kind == 'O':
-                    # Assume an empty object typed array is for string data
+                # No values to infer the type from, so infer it from the dtype
+                if np_dtype is None:
+                    return Void
+                if np_dtype.kind in ('O', 'U'):
+                    # Assume empty object or unicode arrays are for string data
                     return String
-                return Void
+                if np_dtype.kind == 'M':
+                    return TimeStamp
+                if isinstance(self.data, TimestampArray):
+                    return TdmsTimestamp
+                if np_dtype.kind == 'V' and np_dtype.fields is None:
+                    return Void
+                raise TypeError("Unsupported data type for channel data: %s" % np_dtype)
 
 
 def read_properties_dict(properties_dict):
