@@ -122,6 +122,26 @@ def test_write_metadata_with_string_data():
     _assert_sequence_equal(metadata, expected_values)
 
 
+def test_write_metadata_for_channel_without_data():
+    channel = ChannelObject("group", "channel", properties={"prop1": 42})
+
+    segment = TdmsSegment([channel])
+    metadata = segment.metadata()
+
+    expected_values = [
+        Uint32(1),  # Number of objects
+        String("/'group'/'channel'"),
+        Bytes(b'\xFF\xFF\xFF\xFF'),  # Raw data index indicating no data
+        Uint32(1),  # Number of properties
+        String("prop1"),
+        Int32(3),
+        Int32(42),
+        ]
+
+    _assert_sequence_equal(metadata, expected_values)
+    assert segment._data_size() == 0
+
+
 def test_write_metadata_with_no_data():
     obj = StubObject(
         path="object_path",
