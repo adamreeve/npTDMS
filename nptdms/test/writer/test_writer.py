@@ -9,6 +9,7 @@ import tempfile
 
 from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject, types
 from nptdms.test import scenarios
+from nptdms.timestamp import TimestampArray
 from nptdms.test.util import compare_arrays
 
 
@@ -360,6 +361,36 @@ def test_can_write_empty_data(input_dtype, expected_type, expected_dtype):
     assert channel.data_type == expected_type
     assert len(channel) == 0
     assert channel.data.dtype == expected_dtype
+
+
+def test_can_write_empty_raw_timestamp_data():
+    input_data = TimestampArray(np.array([], dtype=[('second_fractions', '<u8'), ('seconds', '<i8')]))
+    segment = ChannelObject("group", "channel", input_data)
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([segment])
+
+    output_file.seek(0)
+    tdms_file = TdmsFile(output_file)
+
+    channel = tdms_file["group"]["channel"]
+    assert channel.data_type == types.TimeStamp
+    assert len(channel) == 0
+
+
+@pytest.mark.parametrize("input_dtype", [
+    np.dtype('float16'),
+    np.dtype('timedelta64[s]'),
+    np.dtype([('a', '<i4'), ('b', '<f8')]),
+])
+def test_writing_empty_data_with_unsupported_type_raises(input_dtype):
+    segment = ChannelObject("group", "channel", np.array([], dtype=input_dtype))
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        with pytest.raises(TypeError, match="Unsupported data type for channel data"):
+            tdms_writer.write_segment([segment])
 
 
 def test_can_write_channel_properties_without_data():
