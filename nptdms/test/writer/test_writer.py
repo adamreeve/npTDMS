@@ -356,6 +356,61 @@ def test_can_write_empty_string_data():
     assert channel.data.dtype == np.dtype('O')
 
 
+def test_can_write_channel_properties_without_data():
+    input_data = np.linspace(0.0, 1.0, 10)
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([
+            ChannelObject("group", "channel", input_data, properties={"prop1": "a"})])
+        tdms_writer.write_segment([
+            ChannelObject("group", "channel", properties={"prop1": "b", "prop2": 2})])
+
+    output_file.seek(0)
+    tdms_file = TdmsFile(output_file)
+
+    channel = tdms_file["group"]["channel"]
+    assert channel.data_type == types.DoubleFloat
+    compare_arrays(channel.data, input_data)
+    assert channel.properties["prop1"] == "b"
+    assert channel.properties["prop2"] == 2
+
+
+def test_can_write_new_channel_without_data():
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([
+            ChannelObject("group", "channel", properties={"prop1": "a"})])
+
+    output_file.seek(0)
+    tdms_file = TdmsFile(output_file)
+
+    channel = tdms_file["group"]["channel"]
+    assert channel.data_type is None
+    assert len(channel) == 0
+    assert channel.properties["prop1"] == "a"
+
+
+def test_can_write_tdms_channel_without_data_read_from_file():
+    input_file = BytesIO()
+    with TdmsWriter(input_file) as tdms_writer:
+        tdms_writer.write_segment([
+            ChannelObject("group", "channel", properties={"prop1": "a"})])
+
+    input_file.seek(0)
+    read_channel = TdmsFile(input_file)["group"]["channel"]
+
+    output_file = BytesIO()
+    with TdmsWriter(output_file) as tdms_writer:
+        tdms_writer.write_segment([read_channel])
+
+    output_file.seek(0)
+    channel = TdmsFile(output_file)["group"]["channel"]
+    assert channel.data_type is None
+    assert len(channel) == 0
+    assert channel.properties["prop1"] == "a"
+
+
 def test_can_write_floats_from_list():
     input_data = [1.0, 2.0, 3.0]
 

@@ -246,7 +246,7 @@ class TdmsSegment(object):
         return metadata
 
     def raw_data_index(self, obj):
-        if hasattr(obj, 'data'):
+        if _object_has_data(obj):
             num_values = len(obj.data)
             if obj.data_type == String:
                 # For strings, we also need to write the total data size in bytes
@@ -281,14 +281,19 @@ class TdmsSegment(object):
     def _data_size(self):
         data_size = 0
         for obj in self.objects:
-            if hasattr(obj, 'data'):
+            if _object_has_data(obj):
                 data_size += object_data_size(obj.data_type, obj.data)
         return data_size
 
     def _write_data(self, file):
         for obj in self.objects:
-            if hasattr(obj, 'data'):
+            if _object_has_data(obj):
                 write_data(file, obj)
+
+
+def _object_has_data(obj):
+    # Channels read from a file that never had data have no data type
+    return getattr(obj, 'data', None) is not None and obj.data_type is not None
 
 
 class TdmsObject(object):
@@ -348,28 +353,35 @@ class ChannelObject(TdmsObject):
     """A TDMS object for a channel with data
     """
 
-    def __init__(self, group, channel, data, properties=None):
+    def __init__(self, group, channel, data=None, properties=None):
         """Initialise a new ChannelObject
 
         :param group: The name of the group this channel is in.
         :param channel: The name of this channel.
         :param data: 1-D Numpy array of data to be written.
+            If None, no data is written for this channel in the segment,
+            which allows writing only channel properties.
         :param properties: A dictionary mapping property names to
             their value.
         """
         self.group = group
         self.channel = channel
-        self.data = _to_np_array(data)
-        if self.data.ndim != 1:
-            raise ValueError("Channel data must be a 1d array")
+        if data is None:
+            self.data = None
+        else:
+            self.data = _to_np_array(data)
+            if self.data.ndim != 1:
+                raise ValueError("Channel data must be a 1d array")
         self.properties = properties
 
     @property
     def has_data(self):
-        return True
+        return self.data is not None
 
     @property
     def data_type(self):
+        if self.data is None:
+            return None
         np_dtype = getattr(self.data, 'dtype', None)
         try:
             return numpy_data_types[np_dtype]
