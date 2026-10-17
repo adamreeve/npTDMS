@@ -104,6 +104,24 @@ def test_write_metadata_with_properties():
     _assert_sequence_equal(metadata, expected_values)
 
 
+def test_write_metadata_with_string_data():
+    channel = ChannelObject("group", "channel", ["abc", "de"])
+
+    segment = TdmsSegment([channel])
+    metadata = segment.metadata()
+
+    expected_values = [
+        Uint32(1),  # Number of objects
+        String("/'group'/'channel'"),
+        # Raw data index: length (28), data type (0x20), array dimension (1), number of values (2),
+        # total size in bytes (2 offsets of 4 bytes plus 5 bytes of string data).
+        Bytes(struct.pack('<LlLQQ', 28, 0x20, 1, 2, 13)),
+        Uint32(0),  # Number of properties
+        ]
+
+    _assert_sequence_equal(metadata, expected_values)
+
+
 def test_write_metadata_with_no_data():
     obj = StubObject(
         path="object_path",

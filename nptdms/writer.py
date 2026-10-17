@@ -252,7 +252,7 @@ class TdmsSegment(object):
                 # For strings, we also need to write the total data size in bytes
                 total_size = object_data_size(obj.data_type, obj.data)
                 packed = struct.pack(
-                    '<LlLQQ', 20, obj.data_type.enum_value, 1, num_values, total_size)
+                    '<LlLQQ', 28, obj.data_type.enum_value, 1, num_values, total_size)
             else:
                 packed = struct.pack(
                     '<LlLQ', 20, obj.data_type.enum_value, 1, num_values)
@@ -370,12 +370,16 @@ class ChannelObject(TdmsObject):
 
     @property
     def data_type(self):
+        np_dtype = getattr(self.data, 'dtype', None)
         try:
-            return numpy_data_types[self.data.dtype]
-        except (AttributeError, KeyError):
+            return numpy_data_types[np_dtype]
+        except KeyError:
             try:
                 return _to_tdms_value(self.data[0]).__class__
             except IndexError:
+                if np_dtype is not None and np_dtype.kind == 'O':
+                    # Assume an empty object typed array is for string data
+                    return String
                 return Void
 
 
