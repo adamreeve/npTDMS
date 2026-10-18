@@ -56,7 +56,7 @@ def tdms_files_assert_equal(tdms1: TdmsFile, tdms2: TdmsFile):
 
 @pytest.mark.parametrize("tdms_file", [
     'raw_timestamps.tdms',  # Test defragmentation of a file with raw timestamps
-    # 'raw1.tdms', # <- cannot defragment this file (ValueError: Channel data must be a 1d array)
+    'raw1.tdms',
     'Digital_Input.tdms',
     'big_endian.tdms',
 ])
