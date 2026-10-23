@@ -13,7 +13,7 @@ class BaseSegmentObject(object):
 
     __slots__ = [
         'path', 'number_values', 'data_size',
-        'has_data', 'data_type']
+        'has_data', 'data_type', 'index_segment']
 
     def __init__(self, path):
         self.path = path
@@ -21,6 +21,8 @@ class BaseSegmentObject(object):
         self.data_size = 0
         self.has_data = False
         self.data_type = None
+        # Index of the segment that the raw data index for this object was read from
+        self.index_segment = None
 
     def read_raw_data_index(self, file, raw_data_index_header, endianness):
         """ Read the raw data index for a single object in a segment
