@@ -3,7 +3,7 @@ from io import BytesIO
 import numpy as np
 import pytest
 
-from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject
+from nptdms import TdmsFile, TdmsWriter, RootObject, GroupObject, ChannelObject, extract_segments
 from nptdms.test.util import (
     GeneratedFile,
     hexlify_value,
@@ -307,6 +307,46 @@ def test_complex_metadata_reading(benchmark):
         assert len(tdms_file['group']['channel{0}'.format(channel_num)]) == 10
 
 
+@pytest.mark.benchmark(group='read-metadata')
+def test_read_metadata_with_one_channel_per_segment(benchmark):
+    """ Benchmark reading metadata for a file where every segment contains the metadata and data of one channel
+    """
+    tdms_file = benchmark(read_metadata_from_start, get_one_channel_per_segment_file())
+
+    assert len(tdms_file['group']['channel7']) == 64 * 150
+
+
+@pytest.mark.benchmark(group='read-metadata')
+def test_read_metadata_of_many_channels_without_metadata_in_segments(benchmark):
+    """ Benchmark reading metadata for a file with many channels and many segments without metadata
+    """
+    tdms_file = benchmark(read_metadata_from_start, get_many_segments_without_metadata_file())
+
+    assert len(tdms_file['group']['channel7']) == 10 * 5000
+
+
+@pytest.mark.benchmark(group='read-channel-from-one-channel-per-segment')
+def test_read_channel_from_one_channel_per_segment(benchmark):
+    """ Benchmark reading a channel from a file where every segment contains one channel
+    """
+    channel_data = benchmark(read_channel_from_start, get_one_channel_per_segment_file(), 'group', 'channel7')
+
+    np.testing.assert_equal(channel_data, np.tile(np.arange(64, dtype=np.int32), 150))
+
+
+@pytest.mark.benchmark(group='read-channel-from-one-channel-per-segment')
+def test_read_channel_from_byte_ranges(benchmark):
+    """ Benchmark reading a channel from only its byte ranges, from a file where every segment contains one channel
+    """
+    file = get_one_channel_per_segment_file()
+    file.seek(0, os.SEEK_SET)
+    byte_ranges = TdmsFile.read_metadata(file, byte_ranges=True)['group']['channel7'].byte_ranges()
+
+    channel_data = benchmark(read_channel_from_byte_ranges, file, byte_ranges, 'group', 'channel7')
+
+    np.testing.assert_equal(channel_data, np.tile(np.arange(64, dtype=np.int32), 150))
+
+
 @pytest.mark.benchmark(group='write-many-channels')
 def test_write_many_channels_low_data_per_channel(benchmark):
     """Benchmark writing many channels with a small amount of data each."""
@@ -421,6 +461,38 @@ def get_interleaved_file():
         test_file.add_segment(
             ("kTocRawData", "kTocInterleavedData"), "", data, binary_data=True)
     return test_file
+
+
+def get_one_channel_per_segment_file():
+    file = BytesIO()
+    with TdmsWriter(file) as writer:
+        for i in range(3000):
+            writer.write_segment([ChannelObject(
+                'group', 'channel%d' % (i % 20), np.arange(64, dtype=np.int32), properties={'index': i})])
+    return file
+
+
+def get_many_segments_without_metadata_file():
+    data = np.zeros(10 * 50, dtype=np.int32).tobytes()
+    first_segment = GeneratedFile()
+    first_segment.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(*[
+            channel_metadata("/'group'/'channel%d'" % i, TDS_TYPE_INT32, 10) for i in range(50)]),
+        data, binary_data=True)
+    segment = GeneratedFile()
+    segment.add_segment(("kTocRawData", ), "", data, binary_data=True)
+    return BytesIO(first_segment.get_bytes_io_file().getvalue() + segment.get_bytes_io_file().getvalue() * 4999)
+
+
+def read_channel_from_start(file, group, channel):
+    file.seek(0, os.SEEK_SET)
+    with TdmsFile.open(file) as tdms_file:
+        return tdms_file[group][channel][:]
+
+
+def read_channel_from_byte_ranges(file, byte_ranges, group, channel):
+    return TdmsFile.read(BytesIO(extract_segments(file, byte_ranges)))[group][channel][:]
 
 
 def read_from_start(file):

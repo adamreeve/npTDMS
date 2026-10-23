@@ -48,9 +48,13 @@ class TdmsSegment(object):
         'has_daqmx_objects_cached',
         'chunk_size_cached',
         'data_objects_cached',
+        'index',
+        'list_source',
+        'index_dependencies',
+        'dependency_ranges',
     ]
 
-    def __init__(self, position, toc_mask, next_segment_pos, data_position, segment_incomplete):
+    def __init__(self, position, toc_mask, next_segment_pos, data_position, segment_incomplete, index=0):
         self.position = position
         self.toc_mask = toc_mask
         self.next_segment_pos = next_segment_pos
@@ -63,6 +67,15 @@ class TdmsSegment(object):
         self.has_daqmx_objects_cached = None
         self.chunk_size_cached = None
         self.data_objects_cached = None
+        # Index of this segment within the file
+        self.index = index
+        # Index of the segment whose metadata produced the list of objects used by this segment
+        self.list_source = index
+        # List of indexes of previous segments that raw data indexes were reused from,
+        # for objects not in the previous segment's object list, or None
+        self.index_dependencies = None
+        # Byte ranges of the previous segments required to read this segment
+        self.dependency_ranges = ()
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
@@ -87,6 +100,7 @@ class TdmsSegment(object):
         if new_obj_list or not previous_segment:
             self.ordered_objects = []
             existing_objects = None
+            list_changed = True
         else:
             # In this case, there can be a list of new objects that
             # are appended, or previous objects can also be repeated
@@ -95,6 +109,7 @@ class TdmsSegment(object):
             # metadata changed will need to be copied before being modified.
             self.ordered_objects = previous_segment.ordered_objects[:]
             existing_objects = {o.path: (i, o) for (i, o) in enumerate(self.ordered_objects)}
+            list_changed = False
 
         log.debug("Reading segment object metadata at %d", file.tell())
 
@@ -117,27 +132,35 @@ class TdmsSegment(object):
                 if existing_objects is not None
                 else (None, None))
             if existing_object_index is not None:
-                self._update_existing_object(
-                    existing_object_index, existing_object, raw_data_index_header, file, endianness)
+                if self._update_existing_object(
+                        existing_object_index, existing_object, raw_data_index_header, file, endianness):
+                    list_changed = True
             elif object_path in previous_segment_objects:
                 previous_segment_obj = previous_segment_objects[object_path]
                 self._reuse_previous_object(
                     previous_segment_obj, raw_data_index_header, file, endianness)
+                list_changed = True
             else:
                 segment_obj = self._new_segment_object(object_path, raw_data_index_header)
                 self.ordered_objects.append(segment_obj)
+                list_changed = True
                 if raw_data_index_header == RAW_DATA_INDEX_MATCHES_PREVIOUS:
                     raise ValueError("Raw data index for %s says to reuse previous structure, "
                                      "but we have not seen this object before" % object_path)
                 elif raw_data_index_header != RAW_DATA_INDEX_NO_DATA:
                     segment_obj.has_data = True
                     segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
+                    segment_obj.index_segment = self.index
 
             object_properties = self._read_object_properties(file, endianness)
             if object_properties is not None:
                 if properties is None:
                     properties = {}
                 properties[object_path] = object_properties
+
+        if not list_changed:
+            # Object list is unchanged, so it was produced by the same segment as the previous list
+            self.list_source = previous_segment.list_source
 
         if index_cache is not None:
             self.object_index = index_cache.get_index(self.ordered_objects)
@@ -155,6 +178,8 @@ class TdmsSegment(object):
     def _update_existing_object(
             self, existing_object_index, existing_object, raw_data_index_header, file, endianness):
         """ Update raw data index information for an object already in the list of segment objects
+
+        :returns: Whether the object in the list was replaced
         """
         object_path = existing_object.path
         if raw_data_index_header == RAW_DATA_INDEX_NO_DATA:
@@ -163,18 +188,23 @@ class TdmsSegment(object):
                 new_obj = copy(existing_object)
                 new_obj.has_data = False
                 self.ordered_objects[existing_object_index] = new_obj
+                return True
         elif raw_data_index_header == RAW_DATA_INDEX_MATCHES_PREVIOUS:
             # Re-use object and ensure we set has data to true for this segment
             if not existing_object.has_data:
                 new_obj = copy(existing_object)
                 new_obj.has_data = True
                 self.ordered_objects[existing_object_index] = new_obj
+                return True
         else:
             # New segment metadata, or updates to existing data
             segment_obj = self._new_segment_object(object_path, raw_data_index_header)
             segment_obj.has_data = True
             segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
+            segment_obj.index_segment = self.index
             self.ordered_objects[existing_object_index] = segment_obj
+            return True
+        return False
 
     def _reuse_previous_object(
             self, previous_segment_obj, raw_data_index_header, file, endianness):
@@ -200,12 +230,20 @@ class TdmsSegment(object):
             segment_obj = self._new_segment_object(object_path, raw_data_index_header)
             segment_obj.has_data = True
             segment_obj.read_raw_data_index(file, raw_data_index_header, endianness)
+            segment_obj.index_segment = self.index
+        if segment_obj.index_segment is not None and segment_obj.index_segment != self.index:
+            # Reading this segment requires the segment the raw data index was read from
+            if self.index_dependencies is None:
+                self.index_dependencies = [segment_obj.index_segment]
+            elif self.index_dependencies[-1] != segment_obj.index_segment:
+                self.index_dependencies.append(segment_obj.index_segment)
         self.ordered_objects.append(segment_obj)
 
     def _reuse_previous_segment_metadata(self, previous_segment):
         try:
             self.ordered_objects = previous_segment.ordered_objects
             self.object_index = previous_segment.object_index
+            self.list_source = previous_segment.list_source
             self._calculate_chunks()
         except AttributeError:
             raise ValueError(
