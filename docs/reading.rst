@@ -129,6 +129,31 @@ and your operating system will then page data in and out of memory as required::
     with tempfile.TemporaryDirectory() as temp_memmap_dir:
         tdms_file = TdmsFile.read(tdms_file_path, memmap_dir=temp_memmap_dir)
 
+Reading objects from part of a file
+-----------------------------------
+
+Reading the metadata of a file with many segments can be slow.
+If you need to read single objects from a file repeatedly, you can read the metadata once
+with ``byte_ranges=True``, store the byte ranges of the file needed for each object,
+for example in a database, and later read only these parts of the file::
+
+    from io import BytesIO
+    from nptdms import TdmsFile, extract_segments
+
+    tdms_file = TdmsFile.read_metadata("my_file.tdms_index", byte_ranges=True)
+    byte_ranges = tdms_file["group"]["channel"].byte_ranges()
+    # Store the (offset, length) byte ranges, and later:
+    data = extract_segments("my_file.tdms", byte_ranges)
+    channel = TdmsFile.read(BytesIO(data))["group"]["channel"]
+
+The byte ranges cover the whole segments that contain an object's data and properties,
+and any earlier segments their metadata depends on,
+so this reads less data when the object is in a small part of the file's segments.
+The byte ranges of a channel do not include the properties of its group or the file,
+for example if these define scaling, but the byte ranges of several objects can be combined with
+:py:func:`~nptdms.merge_byte_ranges`.
+Byte ranges are only valid for the file as it was read, and must be read again if the file changes.
+
 Timestamps
 ----------
 
