@@ -33,6 +33,10 @@ Reading TDMS Files
 .. autoclass:: nptdms.tdms.ChannelSegmentStatus()
   :members:
 
+.. autofunction:: merge_byte_ranges
+
+.. autofunction:: extract_segments
+
 Writing TDMS Files
 ------------------
 
