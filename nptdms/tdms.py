@@ -137,7 +137,7 @@ class TdmsFile(object):
         self._raw_timestamps = raw_timestamps
         self._groups = OrderedDict()
         self._properties = OrderedDict()
-        self._byte_ranges = None
+        self._byte_ranges_reader = None
         self._channel_data = {}
         self._tdms_version = 0
         self.data_read = False
@@ -184,7 +184,7 @@ class TdmsFile(object):
 
         :rtype: List of ``(offset, length)`` tuples
         """
-        return _get_byte_ranges(self._byte_ranges)
+        return _get_byte_ranges(self._byte_ranges_reader, '/')
 
     @property
     def file_status(self):
@@ -315,19 +315,16 @@ class TdmsFile(object):
             self._properties = object_properties['/']
         except KeyError:
             pass
-        group_byte_ranges = {}
-        if record_byte_ranges:
-            self._byte_ranges = []
+        byte_ranges_reader = tdms_reader if record_byte_ranges else None
+        self._byte_ranges_reader = byte_ranges_reader
 
         for (path_string, obj) in tdms_reader.object_metadata.items():
             properties = object_properties[path_string]
             path = ObjectPath.from_string(path_string)
-            byte_ranges = [tuple(r) for r in obj.byte_ranges] if record_byte_ranges else None
             if path.is_root:
-                self._byte_ranges = byte_ranges
+                pass
             elif path.is_group:
                 group_properties[path.group] = properties
-                group_byte_ranges[path.group] = byte_ranges
             else:
                 # Object is a channel
                 try:
@@ -337,7 +334,7 @@ class TdmsFile(object):
                 channel = TdmsChannel(
                     path, obj.data_type, obj.scaler_data_types, obj.num_values,
                     properties, channel_group_properties, self._properties,
-                    tdms_reader, self._raw_timestamps, self._memmap_dir, byte_ranges)
+                    tdms_reader, self._raw_timestamps, self._memmap_dir, byte_ranges_reader)
                 if path.group in group_channels:
                     group_channels[path.group].append(channel)
                 else:
@@ -350,12 +347,12 @@ class TdmsFile(object):
             except KeyError:
                 channels = []
             group_path = ObjectPath(group_name)
-            self._groups[group_name] = TdmsGroup(group_path, properties, channels, group_byte_ranges[group_name])
+            self._groups[group_name] = TdmsGroup(group_path, properties, channels, byte_ranges_reader)
         for group_name, channels in group_channels.items():
             if group_name not in self._groups:
                 # Group with channels but without any corresponding object metadata in the file:
                 group_path = ObjectPath(group_name)
-                self._groups[group_name] = TdmsGroup(group_path, {}, channels, [] if record_byte_ranges else None)
+                self._groups[group_name] = TdmsGroup(group_path, {}, channels, byte_ranges_reader)
 
         if not read_metadata_only:
             self._read_data(tdms_reader)
@@ -419,11 +416,11 @@ class TdmsGroup(object):
     :ivar ~.properties: Dictionary of TDMS properties defined for this group.
     """
 
-    def __init__(self, path, properties, channels, byte_ranges=None):
+    def __init__(self, path, properties, channels, byte_ranges_reader=None):
         self._path = path
         self.properties = properties
         self._channels = {c.name: c for c in channels}
-        self._byte_ranges = byte_ranges
+        self._byte_ranges_reader = byte_ranges_reader
 
     def __repr__(self):
         return "<TdmsGroup with path %s>" % self.path
@@ -461,7 +458,7 @@ class TdmsGroup(object):
 
         :rtype: List of ``(offset, length)`` tuples
         """
-        return _get_byte_ranges(self._byte_ranges)
+        return _get_byte_ranges(self._byte_ranges_reader, str(self._path))
 
     def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
         """
@@ -536,7 +533,7 @@ class TdmsChannel(object):
     def __init__(
             self, path, data_type, scaler_data_types, number_values,
             properties, group_properties, file_properties,
-            tdms_reader, raw_timestamps, memmap_dir, byte_ranges=None):
+            tdms_reader, raw_timestamps, memmap_dir, byte_ranges_reader=None):
         self._path = path
         self.properties = properties
         self._length = number_values
@@ -547,7 +544,7 @@ class TdmsChannel(object):
         self._reader = tdms_reader
         self._raw_timestamps = raw_timestamps
         self._memmap_dir = memmap_dir
-        self._byte_ranges = byte_ranges
+        self._byte_ranges_reader = byte_ranges_reader
 
         self._raw_data = None
         self._cached_chunk = None
@@ -693,7 +690,7 @@ class TdmsChannel(object):
 
         :rtype: List of ``(offset, length)`` tuples
         """
-        return _get_byte_ranges(self._byte_ranges)
+        return _get_byte_ranges(self._byte_ranges_reader, str(self._path))
 
     def read_data(self, offset=0, length=None, scaled=True):
         """ Reads data for this channel from the TDMS file and returns it as a numpy array
@@ -1035,10 +1032,10 @@ class ChannelDataChunk(object):
             return self._raw_data.data
 
 
-def _get_byte_ranges(byte_ranges):
-    if byte_ranges is None:
+def _get_byte_ranges(reader, path):
+    if reader is None:
         raise RuntimeError("Byte ranges are only available when reading the file with byte_ranges=True")
-    return list(byte_ranges)
+    return reader.get_byte_ranges(path)
 
 
 class FileStatus:

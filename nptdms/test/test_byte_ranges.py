@@ -11,7 +11,6 @@ import pytest
 
 from nptdms import TdmsFile, TdmsGroup, TdmsChannel, TdmsWriter, ChannelObject
 from nptdms import merge_byte_ranges, extract_segments
-from nptdms.reader import _insert_byte_range
 from nptdms.test import scenarios
 from nptdms.test.scenarios import TDS_TYPE_INT32
 from nptdms.test.util import (
@@ -208,20 +207,6 @@ def test_merge_byte_ranges():
     assert merge_byte_ranges([(300, 50), (0, 100)], [(100, 100), (0, 100)]) == [(0, 200), (300, 50)]
     assert merge_byte_ranges([(0, 200), (300, 50), (150, 200)]) == [(0, 350)]
     assert merge_byte_ranges() == []
-
-
-@pytest.mark.parametrize("byte_range,expected", [
-    ((0, 5), [[0, 5], [10, 10], [30, 10]]),
-    ((5, 5), [[5, 15], [30, 10]]),
-    ((12, 3), [[10, 10], [30, 10]]),
-    ((15, 20), [[10, 30]]),
-    ((0, 50), [[0, 50]]),
-    ((45, 5), [[10, 10], [30, 10], [45, 5]]),
-])
-def test_insert_byte_range(byte_range, expected):
-    ranges = [[10, 10], [30, 10]]
-    _insert_byte_range(ranges, *byte_range)
-    assert ranges == expected
 
 
 def test_extract_segments_with_wrong_byte_ranges():

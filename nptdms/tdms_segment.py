@@ -51,7 +51,7 @@ class TdmsSegment(object):
         'index',
         'list_source',
         'index_dependencies',
-        'dependency_ranges',
+        'dependencies',
     ]
 
     def __init__(self, position, toc_mask, next_segment_pos, data_position, segment_incomplete, index=0):
@@ -74,8 +74,8 @@ class TdmsSegment(object):
         # List of indexes of previous segments that raw data indexes were reused from,
         # for objects not in the previous segment's object list, or None
         self.index_dependencies = None
-        # Byte ranges of the previous segments required to read this segment
-        self.dependency_ranges = ()
+        # Indexes of the earlier segments required to read this segment, when recording byte ranges
+        self.dependencies = ()
 
     def __repr__(self):
         return "<TdmsSegment at position %d>" % self.position
