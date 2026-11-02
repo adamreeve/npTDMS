@@ -184,9 +184,9 @@ class TdmsReader(object):
         start_segment = first_segment + np.searchsorted(segment_offsets, offset, side='right')
         end_segment = first_segment + np.searchsorted(segment_offsets, end_index, side='left')
 
-        segment_index = start_segment
         values_read = 0
-        for segment in self._segments[start_segment:end_segment + 1]:
+        for segment_index, segment in enumerate(
+                self._segments[start_segment:end_segment + 1], start=start_segment):
             self._verify_segment_start(segment)
             # By default, read all chunks in a segment
             chunk_offset = 0
@@ -226,8 +226,6 @@ class TdmsReader(object):
                 values_read += len(chunk) - skip
                 trim = 0 if values_read < length else values_read - length
                 yield _trim_channel_chunk(chunk, skip, trim)
-
-            segment_index += 1
 
     def read_channel_chunk_for_index(self, channel_path, index):
         """ Read the chunk containing the given index
