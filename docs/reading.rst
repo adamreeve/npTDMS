@@ -148,7 +148,7 @@ for example in a database, and later read only these parts of the file::
 
 The byte ranges cover the whole segments that contain an object's data and properties,
 and any earlier segments their metadata depends on,
-so this reads less data when the object is in a small part of the file's segments.
+so this reads less data when the object is in a small fraction of the file's segments.
 The byte ranges of a channel do not include the properties of its group or the file,
 for example if these define scaling, but the byte ranges of several objects can be combined with
 :py:func:`~nptdms.merge_byte_ranges`.
