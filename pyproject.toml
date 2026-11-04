@@ -54,7 +54,7 @@ Documentation = "https://npTDMS.readthedocs.io"
 Github = "https://github.com/adamreeve/npTDMS"
 
 [project.scripts]
-npTDMS_info = "nptdms.tdmsinfo:main"
+tdmsinfo = "nptdms.tdmsinfo:main"
 
 [tool.setuptools]
 packages = [
