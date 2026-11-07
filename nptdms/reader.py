@@ -11,11 +11,13 @@ from nptdms.common import toc_properties
 from nptdms.utils import Timer
 from nptdms.base_segment import RawChannelDataChunk
 from nptdms.tdms_segment import TdmsSegment, SegmentIndexCache
+from nptdms.byte_ranges import merge_byte_ranges
 from nptdms.log import log_manager
 
 
 log = log_manager.get_logger(__name__)
 _struct_unpack = struct.unpack
+_NEW_OBJECT_LIST = toc_properties['kTocMetaData'] | toc_properties['kTocNewObjList']
 
 
 class TdmsReader(object):
@@ -92,10 +94,11 @@ class TdmsReader(object):
         self._file = None
         self._index_file = None
 
-    def read_metadata(self, require_segment_indexes=False):
+    def read_metadata(self, require_segment_indexes=False, record_byte_ranges=False):
         """ Read all metadata and structure information from a TdmsFile
 
         :param require_segment_indexes: Whether to create segment object indexes to allow lookup of objects by path.
+        :param record_byte_ranges: Whether to record the byte ranges of the file required to read each object.
         """
         if self._index_file is not None:  # generally try to read metadata from index file because it is faster
             file = self._index_file
@@ -122,8 +125,10 @@ class TdmsReader(object):
                         # We've finished reading the file
                         break
 
-                    self._update_object_metadata(segment)
-                    self._update_object_properties(properties)
+                    if record_byte_ranges:
+                        segment.dependencies = self._get_dependencies(segment)
+                    self._update_object_metadata(segment, record_byte_ranges)
+                    self._update_object_properties(properties, segment if record_byte_ranges else None)
                     self._segments.append(segment)
                     previous_segment = segment
 
@@ -273,7 +278,7 @@ class TdmsReader(object):
             file, segment_position, is_index_file)
 
         segment = TdmsSegment(
-            position, toc_mask, next_segment_pos, data_position, segment_incomplete)
+            position, toc_mask, next_segment_pos, data_position, segment_incomplete, len(self._segments))
 
         properties = segment.read_segment_objects(
             file, self._prev_segment_objects, index_cache, previous_segment)
@@ -359,7 +364,7 @@ class TdmsReader(object):
                     position) +
                 "Check that the tdms_index file matches the tdms data file.")
 
-    def _update_object_metadata(self, segment):
+    def _update_object_metadata(self, segment, record_byte_ranges=False):
         """ Update object metadata using the metadata read from a single segment
         """
         for segment_object in segment.ordered_objects:
@@ -367,12 +372,17 @@ class TdmsReader(object):
             self._prev_segment_objects[path] = segment_object
 
             object_metadata = self._get_or_create_object(path)
-            object_metadata.num_values += _number_of_segment_values(segment_object, segment)
+            num_values = _number_of_segment_values(segment_object, segment)
+            if record_byte_ranges and (num_values > 0 or not object_metadata.segment_runs or (
+                    object_metadata.data_type is None and segment_object.data_type is not None)):
+                # The segment contains data for the object, its first metadata or its data type
+                _add_segment(object_metadata, segment)
+            object_metadata.num_values += num_values
             _update_object_data_type(path, object_metadata, segment_object)
             if segment_object.scaler_data_types is not None:
                 _update_object_scaler_data_types(path, object_metadata, segment_object)
 
-    def _update_object_properties(self, segment_object_properties):
+    def _update_object_properties(self, segment_object_properties, byte_ranges_segment=None):
         """ Update object properties using any properties in a segment
         """
         if segment_object_properties is not None:
@@ -380,6 +390,49 @@ class TdmsReader(object):
                 object_metadata = self._get_or_create_object(path)
                 for prop, val in properties:
                     object_metadata.properties[prop] = val
+                if byte_ranges_segment is not None:
+                    _add_segment(object_metadata, byte_ranges_segment)
+
+    def _get_dependencies(self, segment):
+        """ Get the indexes of the earlier segments that are required to read the metadata of a segment
+        """
+        uses_previous_list = segment.index > 0 and segment.toc_mask & _NEW_OBJECT_LIST != _NEW_OBJECT_LIST
+        if segment.index_dependencies is None and not uses_previous_list:
+            return ()
+        dependencies = set(segment.index_dependencies or ())
+        if uses_previous_list:
+            # The object list is built from the previous segment's object list
+            dependencies.add(self._segments[segment.index - 1].list_source)
+        return tuple(dependencies)
+
+    def get_byte_ranges(self, path):
+        """ Get the byte ranges of the file required to read an object
+
+        These are the segments recorded for the object when reading metadata,
+        and all earlier segments that their metadata depends on.
+
+        :param path: Path string of the object.
+        :returns: Sorted list of merged ``(offset, length)`` tuples.
+        """
+        try:
+            segment_runs = self.object_metadata[path].segment_runs
+        except KeyError:
+            return []
+        segments = self._segments
+        # Consecutive segments are contiguous in the file, so each run is a single byte range
+        ranges = [
+            (segments[first].position, segments[last].next_segment_pos - segments[first].position)
+            for (first, last) in segment_runs]
+        to_visit = [i for (first, last) in segment_runs for s in segments[first:last + 1] for i in s.dependencies]
+        visited = set()
+        while to_visit:
+            i = to_visit.pop()
+            if i not in visited:
+                visited.add(i)
+                segment = segments[i]
+                ranges.append((segment.position, segment.next_segment_pos - segment.position))
+                to_visit.extend(segment.dependencies)
+        return merge_byte_ranges(ranges)
 
     def _get_or_create_object(self, path):
         """ Get existing object metadata or create metadata for a new object
@@ -475,6 +528,19 @@ class ObjectMetadata(object):
         self.data_type = None
         self.scaler_data_types = None
         self.num_values = 0
+        # Runs of consecutive segment indexes that contain this object's data or metadata,
+        # as (first, last) tuples
+        self.segment_runs = []
+
+
+def _add_segment(obj, segment):
+    """ Record that a segment is required to read an object
+    """
+    runs = obj.segment_runs
+    if runs and runs[-1][1] == segment.index - 1:
+        runs[-1] = (runs[-1][0], segment.index)
+    elif not runs or runs[-1][1] < segment.index:
+        runs.append((segment.index, segment.index))
 
 
 def _trim_channel_chunk(chunk, skip=0, trim=0):

@@ -84,7 +84,7 @@ def hex_properties(properties):
     return props_hex
 
 
-def channel_metadata_with_repeated_structure(channel_name):
+def channel_metadata_with_repeated_structure(channel_name, properties=None):
     return (
         # Length of the object path
         hexlify_value('<I', len(channel_name)) +
@@ -92,12 +92,11 @@ def channel_metadata_with_repeated_structure(channel_name):
         string_hexlify(channel_name) +
         # Raw data index header meaning repeat previous data structure
         "00 00 00 00" +
-        # Number of properties (0)
-        "00 00 00 00"
+        hex_properties(properties)
     )
 
 
-def channel_metadata_with_no_data(channel_name):
+def channel_metadata_with_no_data(channel_name, properties=None):
     return (
         # Length of the object path
         hexlify_value('<I', len(channel_name)) +
@@ -105,8 +104,7 @@ def channel_metadata_with_no_data(channel_name):
         string_hexlify(channel_name) +
         # Raw data index header meaning no data in this segment
         "FF FF FF FF" +
-        # Number of properties (0)
-        "00 00 00 00"
+        hex_properties(properties)
     )
 
 

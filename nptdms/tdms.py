@@ -56,7 +56,7 @@ class TdmsFile(object):
     """
 
     @staticmethod
-    def read(file, raw_timestamps=False, memmap_dir=None):
+    def read(file, raw_timestamps=False, memmap_dir=None, byte_ranges=False):
         """ Creates a new TdmsFile object and reads all data in the file
 
         :param file: Either the path to the tdms file to read
@@ -69,11 +69,13 @@ class TdmsFile(object):
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
+        :param byte_ranges: Whether to record the byte ranges of the file required to read each object,
+            which are returned by the ``byte_ranges`` methods of the file, groups and channels.
         """
-        return TdmsFile(file, raw_timestamps=raw_timestamps, memmap_dir=memmap_dir)
+        return TdmsFile(file, raw_timestamps=raw_timestamps, memmap_dir=memmap_dir, byte_ranges=byte_ranges)
 
     @staticmethod
-    def open(file, raw_timestamps=False, memmap_dir=None):
+    def open(file, raw_timestamps=False, memmap_dir=None, byte_ranges=False):
         """ Creates a new TdmsFile object and reads metadata, leaving the file open
             to allow reading channel data
 
@@ -87,12 +89,15 @@ class TdmsFile(object):
             as temporary files and are deleted when the channel data is no
             longer used. tempfile.gettempdir() can be used to get the default
             temporary file directory.
+        :param byte_ranges: Whether to record the byte ranges of the file required to read each object,
+            which are returned by the ``byte_ranges`` methods of the file, groups and channels.
         """
         return TdmsFile(
-            file, raw_timestamps=raw_timestamps, memmap_dir=memmap_dir, read_metadata_only=True, keep_open=True)
+            file, raw_timestamps=raw_timestamps, memmap_dir=memmap_dir, read_metadata_only=True, keep_open=True,
+            byte_ranges=byte_ranges)
 
     @staticmethod
-    def read_metadata(file, raw_timestamps=False):
+    def read_metadata(file, raw_timestamps=False, byte_ranges=False):
         """ Creates a new TdmsFile object and only reads the metadata
 
         :param file: Either the path to the tdms file to read
@@ -100,10 +105,14 @@ class TdmsFile(object):
         :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
             but this loses some precision.
             Setting this to true will read timestamps as a custom TdmsTimestamp type.
+        :param byte_ranges: Whether to record the byte ranges of the file required to read each object,
+            which are returned by the ``byte_ranges`` methods of the file, groups and channels.
         """
-        return TdmsFile(file, raw_timestamps=raw_timestamps, read_metadata_only=True)
+        return TdmsFile(file, raw_timestamps=raw_timestamps, read_metadata_only=True, byte_ranges=byte_ranges)
 
-    def __init__(self, file, raw_timestamps=False, memmap_dir=None, read_metadata_only=False, keep_open=False):
+    def __init__(
+            self, file, raw_timestamps=False, memmap_dir=None, read_metadata_only=False, keep_open=False,
+            byte_ranges=False):
         """Initialise a new TdmsFile object
 
         :param file: Either the path to the tdms file to read
@@ -120,12 +129,15 @@ class TdmsFile(object):
             metadata of the TDMS file will read.
         :param keep_open: Keeps the file open so data can be read if only metadata
             is read initially.
+        :param byte_ranges: Whether to record the byte ranges of the file required to read each object,
+            which are returned by the ``byte_ranges`` methods of the file, groups and channels.
         """
 
         self._memmap_dir = memmap_dir
         self._raw_timestamps = raw_timestamps
         self._groups = OrderedDict()
         self._properties = OrderedDict()
+        self._byte_ranges_reader = None
         self._channel_data = {}
         self._tdms_version = 0
         self.data_read = False
@@ -135,7 +147,8 @@ class TdmsFile(object):
             self._read_file(
                 self._reader,
                 read_metadata_only if not self._reader.is_index_file_only() else True,
-                keep_open
+                keep_open,
+                byte_ranges
             )
         finally:
             if not keep_open:
@@ -163,6 +176,15 @@ class TdmsFile(object):
         """
 
         return self._properties
+
+    def byte_ranges(self):
+        """ Get the byte ranges of the file required to read the properties of this file
+
+        See :py:meth:`TdmsChannel.byte_ranges` for details.
+
+        :rtype: List of ``(offset, length)`` tuples
+        """
+        return _get_byte_ranges(self._byte_ranges_reader, '/')
 
     @property
     def file_status(self):
@@ -279,8 +301,8 @@ class TdmsFile(object):
     def __exit__(self, exc_type, exc_value, traceback):
         self.close()
 
-    def _read_file(self, tdms_reader, read_metadata_only, keep_open):
-        tdms_reader.read_metadata(require_segment_indexes=keep_open)
+    def _read_file(self, tdms_reader, read_metadata_only, keep_open, record_byte_ranges):
+        tdms_reader.read_metadata(require_segment_indexes=keep_open, record_byte_ranges=record_byte_ranges)
         self._tdms_version = tdms_reader.tdms_version
 
         # Use object metadata to build group and channel objects
@@ -293,6 +315,8 @@ class TdmsFile(object):
             self._properties = object_properties['/']
         except KeyError:
             pass
+        byte_ranges_reader = tdms_reader if record_byte_ranges else None
+        self._byte_ranges_reader = byte_ranges_reader
 
         for (path_string, obj) in tdms_reader.object_metadata.items():
             properties = object_properties[path_string]
@@ -310,7 +334,7 @@ class TdmsFile(object):
                 channel = TdmsChannel(
                     path, obj.data_type, obj.scaler_data_types, obj.num_values,
                     properties, channel_group_properties, self._properties,
-                    tdms_reader, self._raw_timestamps, self._memmap_dir)
+                    tdms_reader, self._raw_timestamps, self._memmap_dir, byte_ranges_reader)
                 if path.group in group_channels:
                     group_channels[path.group].append(channel)
                 else:
@@ -323,12 +347,12 @@ class TdmsFile(object):
             except KeyError:
                 channels = []
             group_path = ObjectPath(group_name)
-            self._groups[group_name] = TdmsGroup(group_path, properties, channels)
+            self._groups[group_name] = TdmsGroup(group_path, properties, channels, byte_ranges_reader)
         for group_name, channels in group_channels.items():
             if group_name not in self._groups:
                 # Group with channels but without any corresponding object metadata in the file:
                 group_path = ObjectPath(group_name)
-                self._groups[group_name] = TdmsGroup(group_path, {}, channels)
+                self._groups[group_name] = TdmsGroup(group_path, {}, channels, byte_ranges_reader)
 
         if not read_metadata_only:
             self._read_data(tdms_reader)
@@ -392,10 +416,11 @@ class TdmsGroup(object):
     :ivar ~.properties: Dictionary of TDMS properties defined for this group.
     """
 
-    def __init__(self, path, properties, channels):
+    def __init__(self, path, properties, channels, byte_ranges_reader=None):
         self._path = path
         self.properties = properties
         self._channels = {c.name: c for c in channels}
+        self._byte_ranges_reader = byte_ranges_reader
 
     def __repr__(self):
         return "<TdmsGroup with path %s>" % self.path
@@ -425,6 +450,15 @@ class TdmsGroup(object):
         :rtype: A list of TdmsChannel
         """
         return list(self._channels.values())
+
+    def byte_ranges(self):
+        """ Get the byte ranges of the file required to read the properties of this group
+
+        This does not include the group's channels. See :py:meth:`TdmsChannel.byte_ranges` for details.
+
+        :rtype: List of ``(offset, length)`` tuples
+        """
+        return _get_byte_ranges(self._byte_ranges_reader, str(self._path))
 
     def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
         """
@@ -499,7 +533,7 @@ class TdmsChannel(object):
     def __init__(
             self, path, data_type, scaler_data_types, number_values,
             properties, group_properties, file_properties,
-            tdms_reader, raw_timestamps, memmap_dir):
+            tdms_reader, raw_timestamps, memmap_dir, byte_ranges_reader=None):
         self._path = path
         self.properties = properties
         self._length = number_values
@@ -510,6 +544,7 @@ class TdmsChannel(object):
         self._reader = tdms_reader
         self._raw_timestamps = raw_timestamps
         self._memmap_dir = memmap_dir
+        self._byte_ranges_reader = byte_ranges_reader
 
         self._raw_data = None
         self._cached_chunk = None
@@ -641,6 +676,21 @@ class TdmsChannel(object):
         for raw_data_chunk in self._read_channel_data_chunks():
             yield ChannelDataChunk(self, raw_data_chunk, channel_offset)
             channel_offset += len(raw_data_chunk)
+
+    def byte_ranges(self):
+        """ Get the byte ranges of the file required to read this channel
+
+        The file must have been read with ``byte_ranges=True``.
+        These are the whole segments containing the channel's data and properties,
+        and any earlier segments their metadata depends on.
+        Concatenating them gives TDMS data the channel can be read from, see :py:func:`~nptdms.extract_segments`.
+        Other objects in these segments may be incomplete, and the properties of the group and file
+        are not included, but byte ranges of several objects can be combined with
+        :py:func:`~nptdms.merge_byte_ranges`.
+
+        :rtype: List of ``(offset, length)`` tuples
+        """
+        return _get_byte_ranges(self._byte_ranges_reader, str(self._path))
 
     def read_data(self, offset=0, length=None, scaled=True):
         """ Reads data for this channel from the TDMS file and returns it as a numpy array
@@ -980,6 +1030,12 @@ class ChannelDataChunk(object):
             raise ValueError("Missing scaling information for DAQmx data")
         else:
             return self._raw_data.data
+
+
+def _get_byte_ranges(reader, path):
+    if reader is None:
+        raise RuntimeError("Byte ranges are only available when reading the file with byte_ranges=True")
+    return reader.get_byte_ranges(path)
 
 
 class FileStatus:
