@@ -739,6 +739,27 @@ def scaled_data():
 
 
 @scenario
+def reciprocal_scaled_data():
+    properties = {
+        "NI_Number_Of_Scales": (3, "01 00 00 00"),
+        "NI_Scale[0]_Scale_Type": (
+            0x20, hexlify_value("<I", len("Reciprocal")) + string_hexlify("Reciprocal")),
+    }
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ("kTocMetaData", "kTocRawData", "kTocNewObjList"),
+        segment_objects_metadata(
+            channel_metadata("/'group'/'channel1'", TDS_TYPE_INT32, 2, properties),
+        ),
+        "FC FF FF FF" "00 00 00 00" "02 00 00 00" "08 00 00 00"
+    )
+    expected_data = {
+        ('group', 'channel1'): np.array([-0.25, 0.0, 0.5, 0.125], dtype=np.float64),
+    }
+    return test_file, expected_data
+
+
+@scenario
 def timestamp_data():
     """Test reading contiguous timestamp data
     """

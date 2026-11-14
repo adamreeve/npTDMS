@@ -58,6 +58,23 @@ class LinearScaling(object):
         return data * self.slope + self.intercept
 
 
+class ReciprocalScaling(object):
+    """ Reciprocal scaling, with zero inputs mapped to zero
+    """
+    def __init__(self, input_source):
+        self.input_source = input_source
+
+    @staticmethod
+    def from_properties(properties, scale_index):
+        input_source = properties.get(
+            "NI_Scale[%d]_Reciprocal_Input_Source" % scale_index, RAW_DATA_INPUT_SOURCE)
+        return ReciprocalScaling(input_source)
+
+    def scale(self, data):
+        return np.reciprocal(
+            data, dtype=np.float64, out=np.zeros(data.shape, dtype=np.float64), where=data != 0)
+
+
 class PolynomialScaling(object):
     """ Polynomial scaling with an arbitrary number of coefficients
     """
@@ -607,6 +624,9 @@ def _get_channel_scaling(properties):
                 properties, scale_index)
         elif scale_type == 'Linear':
             scalings[scale_index] = LinearScaling.from_properties(
+                properties, scale_index)
+        elif scale_type == 'Reciprocal':
+            scalings[scale_index] = ReciprocalScaling.from_properties(
                 properties, scale_index)
         elif scale_type == 'RTD':
             scalings[scale_index] = RtdScaling.from_properties(
