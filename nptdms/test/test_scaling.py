@@ -41,6 +41,55 @@ def test_linear_scaling():
     np.testing.assert_almost_equal(scaled_data, expected_scaled_data)
 
 
+@pytest.mark.parametrize("data_type", [types.Int32, types.Uint32, types.SingleFloat, types.DoubleFloat])
+@pytest.mark.parametrize("explicit_source", [False, True])
+def test_reciprocal_scaling(data_type, explicit_source):
+    raw_data = np.array([0, 2, 3, 4], dtype=data_type.nptype)
+    original_data = raw_data.copy()
+    properties = {"NI_Scale[0]_Scale_Type": "Reciprocal"}
+    if explicit_source:
+        properties["NI_Scale[0]_Reciprocal_Input_Source"] = 0xFFFFFFFF
+    scaling = get_scaling(properties, {}, {})
+
+    with np.errstate(divide='raise', invalid='raise'):
+        scaled_data = scaling.scale(StubTdmsData(raw_data))
+
+    assert scaling.get_dtype(data_type, None) == np.dtype('float64')
+    assert scaled_data.dtype == np.dtype('float64')
+    np.testing.assert_array_equal(scaled_data, [0.0, 0.5, 1.0 / 3.0, 0.25])
+    np.testing.assert_array_equal(raw_data, original_data)
+
+
+def test_reciprocal_scaling_special_values():
+    raw_data = np.array([-2.0, -0.0, 0.0, np.inf, -np.inf, np.nan])
+    scaling = get_scaling({"NI_Scale[0]_Scale_Type": "Reciprocal"}, {}, {})
+
+    with np.errstate(divide='raise', invalid='raise'):
+        scaled_data = scaling.scale(StubTdmsData(raw_data))
+
+    np.testing.assert_array_equal(scaled_data, [-0.5, 0.0, 0.0, 0.0, -0.0, np.nan])
+
+
+def test_reciprocal_scaling_empty_data():
+    scaling = get_scaling({"NI_Scale[0]_Scale_Type": "Reciprocal"}, {}, {})
+    scaled_data = scaling.scale(StubTdmsData(np.array([], dtype=np.int32)))
+    assert scaled_data.dtype == np.dtype('float64')
+    assert len(scaled_data) == 0
+
+
+def test_reciprocal_scaling_with_child_scale():
+    properties = {
+        "NI_Scale[0]_Scale_Type": "Linear",
+        "NI_Scale[0]_Linear_Slope": 2.0,
+        "NI_Scale[0]_Linear_Y_Intercept": 0.0,
+        "NI_Scale[1]_Scale_Type": "Reciprocal",
+        "NI_Scale[1]_Reciprocal_Input_Source": 0,
+    }
+    scaling = get_scaling(properties, {}, {})
+    scaled_data = scaling.scale(StubTdmsData(np.array([1, 0, -2], dtype=np.int32)))
+    np.testing.assert_array_equal(scaled_data, [0.5, 0.0, -0.25])
+
+
 def test_polynomial_scaling():
     """Test polynomial scaling"""
 
