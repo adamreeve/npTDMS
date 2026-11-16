@@ -3,7 +3,7 @@ import numpy as np
 
 
 def from_tdms_file(tdms_file, time_index=False, absolute_time=False, scaled_data=True,
-                   arrow_dtypes=False):
+                   arrow_dtypes=False, align_time=False):
     """
     Converts the TDMS file to a DataFrame. DataFrame columns are named using the TDMS object paths.
 
@@ -14,6 +14,8 @@ def from_tdms_file(tdms_file, time_index=False, absolute_time=False, scaled_data
     :param scaled_data: By default the scaled data will be used.
         Set to False to use raw unscaled data.
     :param arrow_dtypes: Use PyArrow data types in the DataFrame.
+    :param align_time: With a relative time index, align channels to the earliest
+        sample across the file. Requires each channel's wf_start_time property.
     :return: The full TDMS file data.
     :rtype: pandas.DataFrame
     """
@@ -25,10 +27,11 @@ def from_tdms_file(tdms_file, time_index=False, absolute_time=False, scaled_data
     return _channels_to_dataframe(
         channels_to_export,
         time_index=time_index, absolute_time=absolute_time, scaled_data=scaled_data,
-        arrow_dtypes=arrow_dtypes)
+        arrow_dtypes=arrow_dtypes, align_time=align_time)
 
 
-def from_group(group, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
+def from_group(group, time_index=False, absolute_time=False, scaled_data=True,
+               arrow_dtypes=False, align_time=False):
     """
     Converts a TDMS group object to a DataFrame. DataFrame columns are named using the channel names.
 
@@ -39,6 +42,8 @@ def from_group(group, time_index=False, absolute_time=False, scaled_data=True, a
     :param scaled_data: By default the scaled data will be used.
         Set to False to use raw unscaled data.
     :param arrow_dtypes: Use PyArrow data types in the DataFrame.
+    :param align_time: With a relative time index, align channels to the earliest
+        sample in this group. Requires each channel's wf_start_time property.
     :return: The TDMS object data.
     :rtype: pandas.DataFrame
     """
@@ -46,11 +51,11 @@ def from_group(group, time_index=False, absolute_time=False, scaled_data=True, a
     channels_to_export = OrderedDict((ch.name, ch) for ch in group.channels())
     return _channels_to_dataframe(
         channels_to_export, time_index=time_index, absolute_time=absolute_time,
-        scaled_data=scaled_data, arrow_dtypes=arrow_dtypes)
+        scaled_data=scaled_data, arrow_dtypes=arrow_dtypes, align_time=align_time)
 
 
 def from_channel(channel, time_index=False, absolute_time=False, scaled_data=True,
-                 arrow_dtypes=False):
+                 arrow_dtypes=False, align_time=False):
     """
     Converts the TDMS channel to a DataFrame
 
@@ -61,6 +66,8 @@ def from_channel(channel, time_index=False, absolute_time=False, scaled_data=Tru
     :param scaled_data: By default the scaled data will be used.
         Set to False to use raw unscaled data.
     :param arrow_dtypes: Use PyArrow data types in the DataFrame.
+    :param align_time: With a relative time index, use the earliest sample as
+        the time origin. Requires the channel's wf_start_time property.
     :return: The TDMS object data.
     :rtype: pandas.DataFrame
     """
@@ -68,17 +75,17 @@ def from_channel(channel, time_index=False, absolute_time=False, scaled_data=Tru
     channels_to_export = {channel.path: channel}
     return _channels_to_dataframe(
         channels_to_export, time_index=time_index, absolute_time=absolute_time,
-        scaled_data=scaled_data, arrow_dtypes=arrow_dtypes)
+        scaled_data=scaled_data, arrow_dtypes=arrow_dtypes, align_time=align_time)
 
 
 def _channels_to_dataframe(
         channels_to_export, time_index=False, absolute_time=False, scaled_data=True,
-        arrow_dtypes=False):
+        arrow_dtypes=False, align_time=False):
     import pandas as pd
 
     column_data = []
     for column_name, channel in channels_to_export.items():
-        index = channel.time_track(absolute_time) if time_index else None
+        index = channel.time_track(absolute_time or align_time) if time_index else None
         if scaled_data:
             column_data.append((column_name, _array_for_pd(channel[:]), index))
         elif channel.scaler_data_types:
@@ -91,6 +98,14 @@ def _channels_to_dataframe(
             # Raw data for normal TDMS file
             raw_data = channel.read_data(scaled=False)
             column_data.append((column_name, _array_for_pd(raw_data), index))
+
+    if time_index and align_time and not absolute_time:
+        # Empty channels must not move the origin before the first actual sample.
+        origin = min((index.min() for _, _, index in column_data if len(index)), default=None)
+        column_data = [
+            (name, data, (index - origin) / np.timedelta64(1, 's') if len(index)
+             else np.empty(0, dtype='float64'))
+            for name, data, index in column_data]
 
     dataframe_dict = OrderedDict()
     if arrow_dtypes:
