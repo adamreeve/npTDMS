@@ -213,7 +213,8 @@ class TdmsFile(object):
 
         return FileStatus(incomplete_final_segment, channel_statuses)
 
-    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
+    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True,
+                     arrow_dtypes=False, align_time=False):
         """
         Converts the TDMS file to a DataFrame. DataFrame columns are named using the TDMS object paths.
 
@@ -224,13 +225,17 @@ class TdmsFile(object):
             Set to False to use raw unscaled data.
             For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
         :param arrow_dtypes: Use PyArrow data types in the DataFrame.
+        :param align_time: If time_index is true and absolute_time is false,
+            align channels using seconds relative to the earliest sample in the file.
+            Requires each channel's wf_start_time property. Defaults to False,
+            preserving each channel's own relative time origin.
         :return: The full TDMS file data.
         :rtype: pandas.DataFrame
         """
 
         return pandas_export.from_tdms_file(
             self, time_index=time_index, absolute_time=absolute_time, scaled_data=scaled_data,
-            arrow_dtypes=arrow_dtypes)
+            arrow_dtypes=arrow_dtypes, align_time=align_time)
 
     def as_hdf(self, filepath, mode='w', group='/'):
         """
@@ -460,7 +465,8 @@ class TdmsGroup(object):
         """
         return _get_byte_ranges(self._byte_ranges_reader, str(self._path))
 
-    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
+    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True,
+                     arrow_dtypes=False, align_time=False):
         """
         Converts the TDMS group to a DataFrame. DataFrame columns are named using the channel names.
 
@@ -471,13 +477,17 @@ class TdmsGroup(object):
             Set to False to use raw unscaled data.
             For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
         :param arrow_dtypes: Use PyArrow data types in the DataFrame.
+        :param align_time: If time_index is true and absolute_time is false,
+            align channels using seconds relative to the earliest sample in this group.
+            Requires each channel's wf_start_time property. Defaults to False,
+            preserving each channel's own relative time origin.
         :return: The TDMS object data.
         :rtype: pandas.DataFrame
         """
 
         return pandas_export.from_group(
             self, time_index=time_index, absolute_time=absolute_time, scaled_data=scaled_data,
-            arrow_dtypes=arrow_dtypes)
+            arrow_dtypes=arrow_dtypes, align_time=align_time)
 
     def __len__(self):
         """ Returns the number of channels in this group
@@ -783,7 +793,8 @@ class TdmsChannel(object):
         return (start_time +
                 (relative_time * unit_correction).astype(time_type))
 
-    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True, arrow_dtypes=False):
+    def as_dataframe(self, time_index=False, absolute_time=False, scaled_data=True,
+                     arrow_dtypes=False, align_time=False):
         """
         Converts the TDMS channel to a DataFrame. The DataFrame column is named using the channel path.
 
@@ -794,13 +805,17 @@ class TdmsChannel(object):
             Set to False to use raw unscaled data.
             For DAQmx data, there will be one column per DAQmx raw scaler and column names will include the scale id.
         :param arrow_dtypes: Use PyArrow data types in the DataFrame.
+        :param align_time: If time_index is true and absolute_time is false,
+            use seconds relative to this channel's earliest sample as the time index.
+            Requires the channel's wf_start_time property. Defaults to False,
+            preserving the channel's own relative time origin.
         :return: The TDMS object data.
         :rtype: pandas.DataFrame
         """
 
         return pandas_export.from_channel(
             self, time_index=time_index, absolute_time=absolute_time, scaled_data=scaled_data,
-            arrow_dtypes=arrow_dtypes)
+            arrow_dtypes=arrow_dtypes, align_time=align_time)
 
     def _read_data_values(self):
         for chunk in self.data_chunks():

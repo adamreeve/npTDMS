@@ -1,6 +1,7 @@
 """Test exporting TDMS data to Pandas"""
 
 from datetime import datetime
+from io import BytesIO
 import numpy as np
 import pytest
 try:
@@ -8,7 +9,7 @@ try:
 except ImportError:
     pytest.skip("Skipping Pandas tests as Pandas is not installed", allow_module_level=True)
 
-from nptdms import TdmsFile
+from nptdms import ChannelObject, TdmsFile, TdmsWriter
 from nptdms.test import scenarios
 from nptdms.test.test_daqmx import daqmx_channel_metadata, daqmx_scaler_metadata
 from nptdms.test.util import (
@@ -190,6 +191,100 @@ def test_file_as_dataframe_with_absolute_time():
 
     expected_start = datetime(2015, 9, 8, 10, 5, 49)
     assert (df.index[0] == expected_start)
+
+
+def staggered_channel_data():
+    stream = BytesIO()
+    channels = [
+        ChannelObject('Group', 'Late', [10, 20, 30], properties={
+            'wf_start_time': np.datetime64('2022-02-01T00:00:01'),
+            'wf_start_offset': 0.25, 'wf_increment': 0.25}),
+        ChannelObject('Group', 'Early', [1, 2, 3, 4], properties={
+            'wf_start_time': np.datetime64('2022-02-01T00:00:00'),
+            'wf_start_offset': 0.5, 'wf_increment': 0.5}),
+        ChannelObject('Group', 'Empty', [], properties={
+            'wf_start_time': np.datetime64('2020-01-01'),
+            'wf_start_offset': 0.0, 'wf_increment': 1.0})]
+    with TdmsWriter(stream) as writer:
+        writer.write_segment(channels)
+    stream.seek(0)
+    return stream
+
+
+@pytest.mark.parametrize('scope', ['file', 'group'])
+@pytest.mark.parametrize('arrow_dtypes', [False, True])
+@pytest.mark.parametrize('lazy_load,raw_timestamps', [(False, False), (True, True)])
+def test_dataframe_align_time(scope, arrow_dtypes, lazy_load, raw_timestamps):
+    read = TdmsFile.open if lazy_load else TdmsFile.read
+    with read(staggered_channel_data(), raw_timestamps=raw_timestamps) as tdms_file:
+        obj = tdms_file if scope == 'file' else tdms_file['Group']
+        dataframe = obj.as_dataframe(time_index=True, align_time=True, arrow_dtypes=arrow_dtypes)
+
+    prefix, suffix = ("/'Group'/'", "'") if scope == 'file' else ('', '')
+    late = dataframe[prefix + 'Late' + suffix].dropna()
+    early = dataframe[prefix + 'Early' + suffix].dropna()
+    np.testing.assert_allclose(late.index.to_numpy(dtype=float), [0.75, 1.0, 1.25])
+    np.testing.assert_allclose(early.index.to_numpy(dtype=float), [0.0, 0.5, 1.0, 1.5])
+    np.testing.assert_equal(late.to_numpy(), [10, 20, 30])
+    np.testing.assert_equal(early.to_numpy(), [1, 2, 3, 4])
+    assert dataframe[prefix + 'Empty' + suffix].isna().all()
+    if arrow_dtypes:
+        assert str(dataframe.index.dtype) == 'double[pyarrow]'
+
+
+def test_dataframe_align_time_preserves_other_index_modes():
+    tdms_file = TdmsFile.read(staggered_channel_data())
+    group = tdms_file['Group']
+    relative = group.as_dataframe(time_index=True)
+    # The default retains each channel's own relative origin for compatibility.
+    assert relative.loc[0.5, 'Late'] == 20
+    assert relative.loc[0.5, 'Early'] == 1
+    pandas.testing.assert_frame_equal(
+        relative, group.as_dataframe(time_index=True, align_time=False))
+    pandas.testing.assert_frame_equal(
+        group.as_dataframe(), group.as_dataframe(align_time=True))
+    pandas.testing.assert_frame_equal(
+        group.as_dataframe(time_index=True, absolute_time=True),
+        group.as_dataframe(time_index=True, absolute_time=True, align_time=True))
+
+
+@pytest.mark.parametrize('channel_name', ['Late', 'Empty'])
+def test_channel_dataframe_align_time(channel_name):
+    tdms_file = TdmsFile.read(staggered_channel_data())
+    channel = tdms_file['Group'][channel_name]
+    dataframe = channel.as_dataframe(time_index=True, align_time=True, scaled_data=False)
+    expected_time = [0.0, 0.25, 0.5] if channel_name == 'Late' else []
+    np.testing.assert_array_equal(dataframe.index, expected_time)
+    assert dataframe.index.dtype == np.dtype('float64')
+
+
+def test_dataframe_align_time_requires_start_time():
+    test_file = GeneratedFile()
+    test_file.add_segment(*timed_segment())
+    tdms_file = test_file.load()
+    del tdms_file['Group']['Channel2'].properties['wf_start_time']
+    with pytest.raises(KeyError, match='start time property'):
+        tdms_file.as_dataframe(time_index=True, align_time=True)
+
+
+@pytest.mark.parametrize('arrow_dtypes', [False, True])
+def test_raw_daqmx_dataframe_align_time(arrow_dtypes):
+    properties = {
+        'wf_start_time': (0x44, hexlify_value('<Q', 0) + hexlify_value('<q', 3524551547)),
+        'wf_start_offset': (10, hexlify_value('<d', 2.0)),
+        'wf_increment': (10, hexlify_value('<d', 0.5))}
+    scalers = [daqmx_scaler_metadata(0, 3, 0), daqmx_scaler_metadata(1, 3, 2)]
+    metadata = segment_objects_metadata(daqmx_channel_metadata('Channel1', 4, [4], scalers, properties))
+    test_file = GeneratedFile()
+    test_file.add_segment(
+        ('kTocMetaData', 'kTocRawData', 'kTocNewObjList', 'kTocDAQmxRawData'),
+        metadata, '01 00 11 00 02 00 12 00 03 00 13 00 04 00 14 00')
+
+    dataframe = test_file.load().as_dataframe(
+        time_index=True, align_time=True, scaled_data=False, arrow_dtypes=arrow_dtypes)
+    np.testing.assert_array_equal(dataframe.index.to_numpy(dtype=float), [0.0, 0.5, 1.0, 1.5])
+    np.testing.assert_array_equal(dataframe["/'Group'/'Channel1'[0]"].to_numpy(), [1, 2, 3, 4])
+    np.testing.assert_array_equal(dataframe["/'Group'/'Channel1'[1]"].to_numpy(), [17, 18, 19, 20])
 
 
 @pytest.mark.parametrize('lazy_load', [True, False])

@@ -249,6 +249,22 @@ In addition there is an :py:meth:`~nptdms.TdmsGroup.as_dataframe` method on :py:
 and an :py:meth:`~nptdms.TdmsGroup.as_dataframe` method on :py:class:`~nptdms.TdmsChannel`
 for converting a single group or channel to a Pandas DataFrame.
 
+By default, ``as_dataframe(time_index=True)`` uses each channel's own relative
+time track. If channels start at different times, these relative indices do not
+preserve their synchronization. Use ``align_time=True`` to align the channels
+on a common time axis measured in seconds from the earliest sample in the
+exported file or group::
+
+    dataframe = tdms_file.as_dataframe(time_index=True, align_time=True)
+
+This uses the channels' ``wf_start_time``, ``wf_start_offset`` and
+``wf_increment`` properties. Empty channels do not affect the time origin.
+All channels must have the required time properties; channels with missing
+properties raise ``KeyError`` rather than being silently omitted.
+The option also works with ``scaled_data=False`` and ``arrow_dtypes=True``.
+It has no effect when ``time_index=False`` or ``absolute_time=True``.
+For a single channel, ``align_time=True`` makes the earliest sample time zero.
+
 Thread safety
 -------------
 
