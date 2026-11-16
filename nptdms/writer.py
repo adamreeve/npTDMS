@@ -390,6 +390,8 @@ class ChannelObject(TdmsObject):
         if self.data is None:
             return None
         np_dtype = getattr(self.data, 'dtype', None)
+        if np_dtype is not None:
+            np_dtype = np_dtype.newbyteorder('=')
         try:
             return numpy_data_types[np_dtype]
         except KeyError:
@@ -477,6 +479,8 @@ def write_data(file, tdms_object):
 def to_file(file, array):
     """Wrapper around file.write to support any file-like object"""
 
+    if array.dtype.kind in 'biufc':
+        array = array.astype(array.dtype.newbyteorder('<'), copy=False)
     try:
         file.write(memoryview(array))
     except (TypeError, BufferError, UnsupportedOperation):

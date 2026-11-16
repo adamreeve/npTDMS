@@ -31,6 +31,9 @@ instance of one of:
 - :py:class:`nptdms.TdmsGroup` or :py:class:`nptdms.TdmsChannel`.
   A TDMS object that was read from a TDMS file using :py:class:`nptdms.TdmsFile`.
 
+Numeric NumPy channel arrays may use either byte order. The writer encodes them
+as little-endian data without changing the input arrays.
+
 Each of :py:class:`~nptdms.RootObject`, :py:class:`~nptdms.GroupObject` and :py:class:`~nptdms.ChannelObject`
 may optionally have properties associated with them, which
 are passed into the ``__init__`` method as a dictionary.
