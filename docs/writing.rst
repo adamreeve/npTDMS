@@ -91,3 +91,14 @@ to only copy certain channels for example, you could do something like::
 
 Note that this isn't suitable for copying channels with scaled data, as the channel data
 will already have scaling applied.
+
+Conditioning TDMS files
+-----------------------
+
+:py:func:`nptdms.condition` rewrites an existing TDMS file so that it is smaller and faster to read.
+By default it defragments the file, writing each channel with its properties and all of its data to a single
+segment, so that a channel can be read from one consecutive part of the file::
+
+    from nptdms import condition
+
+    condition("original_file.tdms", "conditioned_file.tdms")

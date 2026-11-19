@@ -704,7 +704,8 @@ def test_defragment_files():
     buf.seek(0, os.SEEK_SET)
 
     target_buf = BytesIO()
-    TdmsWriter.defragment(buf, target_buf)
+    with pytest.warns(DeprecationWarning, match="nptdms.condition"):
+        TdmsWriter.defragment(buf, target_buf)
 
 
 def test_write_data_stream_with_index():
@@ -758,7 +759,8 @@ def test_defragment_raw_timestamp_file():
     test_file, expected_data = scenarios.timestamp_data().values
     with test_file.get_tempfile() as temp_file:
         target_buf = BytesIO()
-        TdmsWriter.defragment(temp_file, target_buf)
+        with pytest.warns(DeprecationWarning):
+            TdmsWriter.defragment(temp_file, target_buf)
         target_buf.seek(0, os.SEEK_SET)
         f = TdmsFile.read(target_buf)
         for (group, channel), expected_values in expected_data.items():
