@@ -112,3 +112,12 @@ The other steps are optional and can be combined:
   precision. A warning is logged when the precision is more than 1 % of a channel's largest value.
   The scale is stored in ``NI_Scale`` properties, so npTDMS still reads these channels as floats.
   Other software might show the raw integer values if it doesn't apply these properties.
+- ``harmonize_time=True`` converts channels that have a time channel into waveform channels with
+  ``wf_start_time`` or ``wf_start_offset``, ``wf_increment`` and ``wf_samples`` properties, and drops
+  time channels that are no longer needed.
+  The time values come from the channel named by ``time_channel`` (``"Time"`` by default) in the same group,
+  or from a channel named with the ``time_suffix`` (``"_Time"`` by default), for example ``Pressure_Time``
+  for the ``Pressure`` channel.
+  Channels whose time values aren't equidistant are resampled with the median time step,
+  using linear interpolation for floats with fractions and the previous value for other data,
+  including integer-valued floats such as 0/1 flags.

@@ -108,6 +108,57 @@ def test_optimize_dtypes_keeps_scaled_channels():
     np.testing.assert_array_equal(channel[:], np.arange(10.0) * 2.0 + 1.0)
 
 
+def test_harmonize_time_with_timestamps():
+    time = np.datetime64("2026-10-25T12:00:00", "us") + np.arange(100) * np.timedelta64(10, "ms")
+    source = _tdms_file(
+        ChannelObject("Group", "Time", time),
+        ChannelObject("Group", "a", np.arange(100.0)),
+        ChannelObject("Group", "b", np.arange(100)))
+
+    group = _conditioned(source, harmonize_time=True)["Group"]
+
+    assert "Time" not in group
+    for channel in group.channels():
+        assert channel.properties["wf_increment"] == pytest.approx(0.01)
+        assert channel.properties["wf_samples"] == 100
+        offsets = channel.time_track(absolute_time=True, accuracy="ns") - time.astype("datetime64[ns]")
+        np.testing.assert_allclose(offsets.astype(np.int64), 0, atol=1)
+
+
+def test_harmonize_time_keeps_time_channel_for_other_lengths():
+    time = 2.0 + np.arange(10) * 0.5
+    source = _tdms_file(
+        ChannelObject("Group", "Time", time),
+        ChannelObject("Group", "a", np.arange(10.0)),
+        ChannelObject("Group", "short", np.arange(5.0)))
+
+    group = _conditioned(source, harmonize_time=True)["Group"]
+
+    np.testing.assert_allclose(group["a"].time_track(), time)
+    assert group["a"].properties["wf_start_offset"] == 2.0
+    assert "wf_increment" not in group["short"].properties
+    np.testing.assert_array_equal(group["Time"][:], time)
+
+
+def test_harmonize_time_resamples_with_own_time_channels():
+    time = np.array([0.0, 0.1, 0.2, 0.35, 0.4, 0.5])
+    source = _tdms_file(
+        ChannelObject("Group", "p", time * 10.0),
+        ChannelObject("Group", "p_Time", time),
+        ChannelObject("Group", "s", ["a", "b", "c", "d", "e", "f"]),
+        ChannelObject("Group", "s_Time", time),
+        ChannelObject("Group", "flag", [0.0, 0.0, 1.0, 1.0, 0.0, 1.0]),
+        ChannelObject("Group", "flag_Time", time))
+
+    group = _conditioned(source, harmonize_time=True)["Group"]
+
+    assert sorted(group) == ["flag", "p", "s"]
+    assert group["p"].properties["wf_increment"] == pytest.approx(0.1)
+    np.testing.assert_allclose(group["p"][:], [0.0, 1.0, 2.0, 3.0, 4.0, 5.0])
+    assert list(group["s"][:]) == ["a", "b", "c", "c", "e", "f"]
+    np.testing.assert_array_equal(group["flag"][:], [0.0, 0.0, 1.0, 1.0, 0.0, 1.0])
+
+
 @pytest.mark.parametrize("options", [
     dict(defragment=False),
 ])
