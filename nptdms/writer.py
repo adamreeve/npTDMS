@@ -522,24 +522,21 @@ def _to_np_array(data):
 
 def _infer_dtype(data):
     if data and isinstance(data[0], int):
-        max_value = max(data)
-        min_value = min(data)
-        if max_value >= 2**63 and min_value >= 0:
-            return np.dtype('uint64')
-        elif max_value >= 2**32 or min_value < -1 * 2**31:
-            return np.dtype('int64')
-        elif max_value >= 2**31 and min_value >= 0:
-            return np.dtype('uint32')
-        elif max_value >= 2**16 or min_value < -1 * 2**15:
-            return np.dtype('int32')
-        elif max_value >= 2**15 and min_value >= 0:
-            return np.dtype('uint16')
-        elif max_value >= 2**8 or min_value < -1 * 2**7:
-            return np.dtype('int16')
-        elif max_value >= 2**7 and min_value >= 0:
-            return np.dtype('uint8')
-        else:
-            return np.dtype('int8')
+        # Values outside the 64 bit range raise an OverflowError when converted to int64
+        return _smallest_int_dtype(min(data), max(data)) or np.dtype('int64')
+    return None
+
+
+_int_dtypes = [np.dtype(t) for t in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64')]
+
+
+def _smallest_int_dtype(min_value, max_value):
+    """ The smallest integer dtype that can hold all values from min_value to max_value, preferring signed types
+    """
+    for dtype in _int_dtypes:
+        info = np.iinfo(dtype)
+        if info.min <= min_value and max_value <= info.max:
+            return dtype
     return None
 
 
