@@ -61,6 +61,7 @@ class TdmsFile(object):
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+            A ZIP archive holding a single tdms file is decompressed into memory and read from there.
         :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
             but this loses some precision.
             Setting this to true will read timestamps as a custom TdmsTimestamp type.
@@ -81,6 +82,7 @@ class TdmsFile(object):
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+            A ZIP archive holding a single tdms file is decompressed into memory and read from there.
         :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
             but this loses some precision.
             Setting this to true will read timestamps as a custom TdmsTimestamp type.
@@ -102,6 +104,7 @@ class TdmsFile(object):
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+            A ZIP archive holding a single tdms file is decompressed into memory and read from there.
         :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
             but this loses some precision.
             Setting this to true will read timestamps as a custom TdmsTimestamp type.
@@ -117,6 +120,7 @@ class TdmsFile(object):
 
         :param file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+            A ZIP archive holding a single tdms file is decompressed into memory and read from there.
         :param raw_timestamps: By default TDMS timestamps are read as numpy datetime64
             but this loses some precision.
             Setting this to true will read timestamps as a custom TdmsTimestamp type.
@@ -687,6 +691,7 @@ class TdmsChannel(object):
         Other objects in these segments may be incomplete, and the properties of the group and file
         are not included, but byte ranges of several objects can be combined with
         :py:func:`~nptdms.merge_byte_ranges`.
+        For a ZIP archive, the byte ranges refer to the decompressed TDMS file, not to the archive.
 
         :rtype: List of ``(offset, length)`` tuples
         """

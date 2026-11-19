@@ -121,3 +121,11 @@ The other steps are optional and can be combined:
   Channels whose time values aren't equidistant are resampled with the median time step,
   using linear interpolation for floats with fractions and the previous value for other data,
   including integer-valued floats such as 0/1 flags.
+- ``archive=True`` writes a ZIP archive holding a single DEFLATE compressed TDMS file,
+  which can also be opened with other ZIP tools::
+
+    condition("original_file.tdms", "archive.zip", optimize_dtypes=True, precision=0.001, archive=True)
+
+:py:class:`~nptdms.TdmsFile` reads a ZIP archive holding a single TDMS file by decompressing it into memory::
+
+    tdms_file = TdmsFile.read("archive.zip")

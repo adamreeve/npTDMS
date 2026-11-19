@@ -1,6 +1,10 @@
 """ Conditioning of TDMS files for a smaller size and faster reading
 """
 
+import os
+import shutil
+import time
+import zipfile
 import numpy as np
 
 from nptdms.tdms import TdmsFile
@@ -16,7 +20,7 @@ log = log_manager.get_logger(__name__)
 def condition(
         source, destination, defragment=True, optimize_dtypes=False, precision=None,
         harmonize_time=False, time_channel="Time", time_suffix="_Time",
-        version=None, index_file=False):
+        archive=False, version=None, index_file=False):
     """ Rewrites a TDMS file so it is smaller and faster to read
 
     Each step is optional. Optimizing data types or harmonizing time channels always writes the
@@ -45,14 +49,35 @@ def condition(
     :param time_channel: Name of a channel that holds the time values for all channels of its group.
     :param time_suffix: Suffix of a channel name that holds the time values for the channel without the suffix,
         for example ``Pressure_Time`` for ``Pressure``. This takes priority over ``time_channel``.
+    :param archive: Write ``destination`` as a ZIP archive with a single DEFLATE compressed tdms file,
+        which :py:class:`~nptdms.TdmsFile` can read without unpacking it.
     :param version: The TDMS format version to write, by default the version of the source file.
     :param index_file: Whether to also write a ``.tdms_index`` file next to ``destination``.
-        Only supported when ``destination`` is a path.
+        Only supported when ``destination`` is a path and ``archive`` is false.
     """
-    if not (defragment or optimize_dtypes or harmonize_time):
-        raise ValueError("Nothing to do, enable defragment, optimize_dtypes or harmonize_time")
+    rewrite = defragment or optimize_dtypes or harmonize_time
     time_names = (time_channel, time_suffix) if harmonize_time else None
-    _rewrite(source, destination, optimize_dtypes, precision, time_names, version, index_file)
+
+    def write(file, index_file=False):
+        if rewrite:
+            _rewrite(source, file, optimize_dtypes, precision, time_names, version, index_file)
+        elif hasattr(source, "read"):
+            shutil.copyfileobj(source, file)
+        else:
+            with open(source, "rb") as source_file:
+                shutil.copyfileobj(source_file, file)
+
+    if not archive:
+        if not rewrite:
+            raise ValueError("Nothing to do, enable defragment, optimize_dtypes, harmonize_time or archive")
+        write(destination, index_file)
+        return
+    if index_file:
+        raise ValueError("An archive only holds the tdms file, so index_file must be False")
+    member = zipfile.ZipInfo(_member_name(destination), time.localtime()[:6])
+    member.compress_type = zipfile.ZIP_DEFLATED
+    with zipfile.ZipFile(destination, "w") as archive_file, archive_file.open(member, "w", force_zip64=True) as file:
+        write(file)
 
 
 def _rewrite(source, destination, optimize_dtypes, precision, time_names, version, index_file):
@@ -228,3 +253,11 @@ def _scaled_integers(data, precision, path):
         "NI_Scale[0]_Linear_Y_Intercept": intercept,
         "NI_Scale[0]_Linear_Input_Source": Uint32(0xFFFFFFFF),
     })]
+
+
+def _member_name(destination):
+    """ Name of the tdms file inside an archive, from the archive file name
+    """
+    name = getattr(destination, "name", destination)
+    stem = os.path.splitext(os.path.basename(name))[0] if isinstance(name, (str, os.PathLike)) else "data"
+    return stem + ".tdms"

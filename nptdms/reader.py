@@ -2,10 +2,13 @@
 """
 
 from collections import OrderedDict
+from io import BytesIO
 import logging
 import os
 import numpy as np
+import shutil
 import struct
+import zipfile
 
 from nptdms.common import toc_properties
 from nptdms.utils import Timer
@@ -31,6 +34,7 @@ class TdmsReader(object):
 
         :param tdms_file: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
+            A ZIP archive holding a single tdms file is decompressed into memory.
         """
         self._file_path = None
         self._index_file_path = None
@@ -52,9 +56,12 @@ class TdmsReader(object):
                 self._index_file = tdms_file
             elif tag == b"TDSm":
                 self._file = tdms_file
+            elif tag == b"PK\x03\x04":
+                self._file = _read_archived_file(tdms_file)
             else:
                 raise ValueError(
-                    f"File should either start with 'b`TDSh`' or 'b`TDSm`', submitted starts with '{tag}'.")
+                    f"File should either start with 'b`TDSh`' or 'b`TDSm`' or be a ZIP archive, "
+                    f"submitted starts with '{tag}'.")
 
         else:
             # Is path to a file
@@ -62,6 +69,9 @@ class TdmsReader(object):
             if source_path.endswith(".tdms_index"):
                 self._index_file_path = source_path
                 self._index_file = open(self._index_file_path, "rb")
+
+            elif source_path.lower().endswith(".zip"):
+                self._file = _read_archived_file(source_path)
 
             else:
                 self._file_path = source_path
@@ -581,6 +591,21 @@ def _array_equal(a, b, chunk_size=100):
         if not (a[offset:offset+chunk_size] == b[offset:offset+chunk_size]).all():
             return False
     return True
+
+
+def _read_archived_file(archive):
+    """ Decompress the single tdms file of a ZIP archive into memory
+    """
+    with zipfile.ZipFile(archive) as archive_file:
+        names = [name for name in archive_file.namelist() if name.lower().endswith(".tdms")]
+        if len(names) != 1:
+            raise ValueError("A ZIP archive must hold exactly one tdms file, but it holds %d" % len(names))
+        # Copying in chunks needs less memory than reading the whole member at once
+        file = BytesIO()
+        with archive_file.open(names[0]) as member:
+            shutil.copyfileobj(member, file)
+        file.seek(0)
+        return file
 
 
 def _get_file_size(file):

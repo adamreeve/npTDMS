@@ -1,6 +1,7 @@
 """ Tests for conditioning TDMS files """
 
 from io import BytesIO
+import zipfile
 
 import numpy as np
 import pytest
@@ -159,8 +160,44 @@ def test_harmonize_time_resamples_with_own_time_channels():
     np.testing.assert_array_equal(group["flag"][:], [0.0, 0.0, 1.0, 1.0, 0.0, 1.0])
 
 
+def test_archive(tmp_path):
+    source = DATA_DIR + "/raw_timestamps.tdms"
+    path = tmp_path / "conditioned.zip"
+    condition(source, path, archive=True)
+
+    with zipfile.ZipFile(path) as archive_file:
+        assert archive_file.namelist() == ["conditioned.tdms"]
+        assert archive_file.getinfo("conditioned.tdms").compress_type == zipfile.ZIP_DEFLATED
+    original = TdmsFile.read(source, raw_timestamps=True)
+    tdms_files_assert_equal(original, TdmsFile.read(path, raw_timestamps=True))
+    with open(path, "rb") as file:
+        tdms_files_assert_equal(original, TdmsFile.read(file, raw_timestamps=True))
+
+
+def test_archive_without_rewriting(tmp_path):
+    source = DATA_DIR + "/raw_timestamps.tdms"
+    path = tmp_path / "copy.zip"
+    condition(source, path, defragment=False, archive=True)
+
+    with zipfile.ZipFile(path) as archive_file, open(source, "rb") as source_file:
+        assert archive_file.read("copy.tdms") == source_file.read()
+
+
+@pytest.mark.parametrize("names", [[], ["a.tdms", "b.tdms"]])
+def test_archive_must_hold_one_tdms_file(names):
+    archive = BytesIO()
+    with zipfile.ZipFile(archive, "w") as archive_file:
+        for name in ["readme.txt"] + names:
+            archive_file.writestr(name, b"")
+    archive.seek(0)
+
+    with pytest.raises(ValueError, match="exactly one tdms file"):
+        TdmsFile.read(archive)
+
+
 @pytest.mark.parametrize("options", [
     dict(defragment=False),
+    dict(archive=True, index_file=True),
 ])
 def test_invalid_options(options):
     with pytest.raises(ValueError):
