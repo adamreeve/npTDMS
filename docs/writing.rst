@@ -102,3 +102,13 @@ segment, so that a channel can be read from one consecutive part of the file::
     from nptdms import condition
 
     condition("original_file.tdms", "conditioned_file.tdms")
+
+The other steps are optional and can be combined:
+
+- ``optimize_dtypes=True`` stores float channels as integers with a linear scale, or as single precision floats,
+  where this keeps every value exact, or within ``precision`` if this is given, either as one absolute value
+  or as a dictionary mapping channel paths to values.
+  Values smaller than the precision can become 0, so give channels with very different magnitudes their own
+  precision. A warning is logged when the precision is more than 1 % of a channel's largest value.
+  The scale is stored in ``NI_Scale`` properties, so npTDMS still reads these channels as floats.
+  Other software might show the raw integer values if it doesn't apply these properties.

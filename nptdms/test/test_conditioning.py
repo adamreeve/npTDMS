@@ -53,12 +53,75 @@ def test_daqmx_channel_with_several_scalers_is_written_scaled():
     assert channel.properties["NI_Scaling_Status"] == "scaled"
 
 
+def test_optimize_dtypes():
+    noisy = 20.0 + np.random.default_rng(0).normal(0.0, 0.05, 1000)
+    # float32 steps are 128 s at this magnitude, and 1010 s at a precision of 1 ms need more than 16 bits
+    epoch_seconds = 1.7e9 + np.arange(1000) * 1.0101
+    channels = {
+        # name: (data, precision, expected raw dtype)
+        "flags": (np.array([0.0, 1.0] * 500), None, np.int8),
+        "counts": (np.arange(1000.0) - 10.0, None, np.int16),
+        "large_counts": (np.arange(1000.0) * 100.0, None, np.float32),
+        "single": (noisy.astype(np.float32).astype(np.float64), None, np.float32),
+        "noisy": (noisy, None, np.float64),
+        "noisy_with_precision": (noisy, 0.01, np.int8),
+        # Half of the values are half a step of 2 * precision away from the integers
+        "three_decimals": (np.round(1e5 + noisy, 3), 0.001, np.int8),
+        "epoch_seconds": (epoch_seconds, 0.001, np.int32),
+        "with_nan": (np.array([1.5, np.nan, 2.25]), 0.001, np.float32),
+        "ints": (np.arange(10), None, np.int64),
+    }
+    source = _tdms_file(*(ChannelObject("Group", name, data) for name, (data, _, _) in channels.items()))
+    precision = {"/'Group'/'%s'" % name: p for name, (_, p, _) in channels.items()}
+
+    result = _conditioned(source, optimize_dtypes=True, precision=precision)
+
+    for name, (data, precision, raw_dtype) in channels.items():
+        channel = result["Group"][name]
+        assert channel.raw_data.dtype == raw_dtype, name
+        assert channel[:].dtype == (np.float32 if raw_dtype == np.float32 else data.dtype), name
+        # Values half a step away can be off by the precision plus float rounding
+        atol = precision + 4 * np.spacing(np.nanmax(np.abs(data))) if precision else 0
+        np.testing.assert_allclose(channel[:], data, rtol=0, atol=atol, err_msg=name)
+
+
+@pytest.mark.parametrize("data, precision, warns", [
+    (np.array([0.000054, 0.0004, 0.002]), 0.001, True),
+    (np.array([0.4, 1.7, 20.3]), 0.5, True),
+    (np.array([0.0, 1.0, 2.0]), 0.5, False),
+    (np.array([0.000054, 0.0004, 3.2]), 0.001, False),
+])
+def test_optimize_dtypes_warns_about_coarse_precision(caplog, data, precision, warns):
+    _conditioned(_tdms_file(ChannelObject("Group", "small", data)), optimize_dtypes=True, precision=precision)
+
+    assert ("Precision %g is more than 1 %%" % precision in caplog.text) == warns
+
+
+def test_optimize_dtypes_keeps_scaled_channels():
+    scale = {"NI_Scale[0]_Scale_Type": "Linear", "NI_Scale[0]_Linear_Slope": 2.0,
+             "NI_Scale[0]_Linear_Y_Intercept": 1.0}
+    source = _tdms_file(ChannelObject("Group", "scaled", np.arange(10.0), scale))
+
+    channel = _conditioned(source, optimize_dtypes=True, precision=0.1)["Group"]["scaled"]
+
+    assert channel.raw_data.dtype == np.float64
+    np.testing.assert_array_equal(channel[:], np.arange(10.0) * 2.0 + 1.0)
+
+
 @pytest.mark.parametrize("options", [
     dict(defragment=False),
 ])
 def test_invalid_options(options):
     with pytest.raises(ValueError):
         condition(DATA_DIR + "/raw_timestamps.tdms", BytesIO(), **options)
+
+
+def _tdms_file(*channels):
+    file = BytesIO()
+    with TdmsWriter(file) as writer:
+        writer.write_segment(channels)
+    file.seek(0)
+    return file
 
 
 def _conditioned(source, **options):
