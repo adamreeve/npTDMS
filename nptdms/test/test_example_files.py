@@ -66,7 +66,8 @@ def test_defragment(tdms_file):
     output_file = BytesIO()
 
     # verify we can defragment a file with raw timestamps
-    TdmsWriter.defragment(test_file_path, output_file)
+    with pytest.warns(DeprecationWarning):
+        TdmsWriter.defragment(test_file_path, output_file)
 
     # rewind output file BytesIO instance, so it can read it back in as a TdmsFile
     output_file.seek(0)

@@ -60,6 +60,8 @@ Writing TDMS Files
 
   .. automethod:: __init__
 
+.. autofunction:: condition
+
 Data Types for Property Values
 ------------------------------
 

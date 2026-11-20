@@ -517,6 +517,11 @@ def test_can_write_ints_from_list():
 
         (np.uint64, types.Uint64, [0, 2 ** 63]),
         (np.uint64, types.Uint64, [0, 2 ** 64 - 1]),
+
+        # Negative values need the next larger signed type
+        (np.int16, types.Int16, [-1, 2 ** 7]),
+        (np.int32, types.Int32, [-1, 2 ** 15]),
+        (np.int64, types.Int64, [-1, 2 ** 31]),
     ]
 
     for expected_dtype, expected_tdms_type, input_data in test_cases:
@@ -538,6 +543,12 @@ def test_can_write_ints_from_list():
         assert len(output_data) == len(input_data), test_case
         for (input_val, output_val) in zip(input_data, output_data):
             assert output_val == input_val, test_case
+
+
+@pytest.mark.parametrize("input_data", [[-1, 2 ** 63], [2 ** 64], [-2 ** 63 - 1]])
+def test_writing_ints_outside_64_bit_range_from_list_raises(input_data):
+    with pytest.raises(OverflowError):
+        ChannelObject("group", "data", input_data)
 
 
 def test_can_write_complex():
@@ -693,7 +704,8 @@ def test_defragment_files():
     buf.seek(0, os.SEEK_SET)
 
     target_buf = BytesIO()
-    TdmsWriter.defragment(buf, target_buf)
+    with pytest.warns(DeprecationWarning, match="nptdms.condition"):
+        TdmsWriter.defragment(buf, target_buf)
 
 
 def test_write_data_stream_with_index():
@@ -747,7 +759,8 @@ def test_defragment_raw_timestamp_file():
     test_file, expected_data = scenarios.timestamp_data().values
     with test_file.get_tempfile() as temp_file:
         target_buf = BytesIO()
-        TdmsWriter.defragment(temp_file, target_buf)
+        with pytest.warns(DeprecationWarning):
+            TdmsWriter.defragment(temp_file, target_buf)
         target_buf.seek(0, os.SEEK_SET)
         f = TdmsFile.read(target_buf)
         for (group, channel), expected_values in expected_data.items():

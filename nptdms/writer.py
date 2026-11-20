@@ -5,11 +5,11 @@ from datetime import datetime
 from functools import cached_property
 from io import UnsupportedOperation
 import struct
+import warnings
 import numpy as np
 from nptdms.common import toc_properties, ObjectPath
 from nptdms.timestamp import TdmsTimestamp, TimestampArray
 from nptdms.types import *
-from nptdms import TdmsFile
 
 
 class TdmsWriter(object):
@@ -23,8 +23,12 @@ class TdmsWriter(object):
 
     @classmethod
     def defragment(cls, source, destination, version=4712, index_file=False):
-        """ Defragemnts an existing TdmsFile by loading and moving each Object to a separate channel
-        to stream read one consecutive part of the file for faster access.
+        """ Defragments an existing TDMS file by writing each channel with its properties and all its data
+        to a single segment, so a channel can be read from one consecutive part of the file.
+
+        .. deprecated:: 1.15.0
+            Use :py:func:`nptdms.condition` instead, which writes the same layout:
+            ``nptdms.condition(source, destination)``.
 
         :param source: Either the path to the tdms file to read
             as a string or pathlib.Path, or an already opened file.
@@ -39,25 +43,11 @@ class TdmsWriter(object):
             If ``destination`` is a readable object ``index_file`` can either be a redable object or ``False``
             to store a ``.tdms_index`` file inside of the submitted object or not.
         """
-        file = TdmsFile(source, raw_timestamps=True)
-        with cls(destination, version=version, index_file=index_file) as new_file:
-            new_file.write_segment([RootObject(file.properties)])
-            for group in file.groups():
-                new_file.write_segment([GroupObject(group.name, group.properties)])
-                for channel in group.channels():
-                    channel_data = channel.read_data(scaled=False)
-                    channel_properties = channel.properties
-                    if isinstance(channel_data, dict) and len(channel_data) == 1:
-                        scale_id, channel_data = next(iter(channel_data.items()))
-                        channel_properties = OrderedDict(channel_properties)
-                        channel_properties[
-                            "NI_Scale[%d]_Scale_Type" % scale_id] = "AdvancedAPI"
-                    new_file.write_segment([ChannelObject(
-                        group.name,
-                        channel.name,
-                        channel_data,
-                        channel_properties
-                    )])
+        warnings.warn(
+            "TdmsWriter.defragment is deprecated, use nptdms.condition(source, destination) instead",
+            DeprecationWarning, stacklevel=2)
+        from nptdms.conditioning import condition
+        condition(source, destination, version=version, index_file=index_file)
 
     def __init__(self, file, mode='w', version=4712, index_file=False):
         """Initialise a new TDMS writer
@@ -106,7 +96,7 @@ class TdmsWriter(object):
             self._file_path = file
             if isinstance(index_file, bool):
                 if index_file:
-                    self._index_file_path = file + "_index"
+                    self._index_file_path = str(file) + "_index"
             else:
                 raise ValueError(
                     f"Invalid type, ``index_file`` can  only be ``False`` or ``True`` but is {type(index_file)}."
@@ -522,24 +512,21 @@ def _to_np_array(data):
 
 def _infer_dtype(data):
     if data and isinstance(data[0], int):
-        max_value = max(data)
-        min_value = min(data)
-        if max_value >= 2**63 and min_value >= 0:
-            return np.dtype('uint64')
-        elif max_value >= 2**32 or min_value < -1 * 2**31:
-            return np.dtype('int64')
-        elif max_value >= 2**31 and min_value >= 0:
-            return np.dtype('uint32')
-        elif max_value >= 2**16 or min_value < -1 * 2**15:
-            return np.dtype('int32')
-        elif max_value >= 2**15 and min_value >= 0:
-            return np.dtype('uint16')
-        elif max_value >= 2**8 or min_value < -1 * 2**7:
-            return np.dtype('int16')
-        elif max_value >= 2**7 and min_value >= 0:
-            return np.dtype('uint8')
-        else:
-            return np.dtype('int8')
+        # Values outside the 64 bit range raise an OverflowError when converted to int64
+        return _smallest_int_dtype(min(data), max(data)) or np.dtype('int64')
+    return None
+
+
+_int_dtypes = [np.dtype(t) for t in ('int8', 'uint8', 'int16', 'uint16', 'int32', 'uint32', 'int64', 'uint64')]
+
+
+def _smallest_int_dtype(min_value, max_value):
+    """ The smallest integer dtype that can hold all values from min_value to max_value, preferring signed types
+    """
+    for dtype in _int_dtypes:
+        info = np.iinfo(dtype)
+        if info.min <= min_value and max_value <= info.max:
+            return dtype
     return None
 
 

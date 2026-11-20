@@ -91,3 +91,41 @@ to only copy certain channels for example, you could do something like::
 
 Note that this isn't suitable for copying channels with scaled data, as the channel data
 will already have scaling applied.
+
+Conditioning TDMS files
+-----------------------
+
+:py:func:`nptdms.condition` rewrites an existing TDMS file so that it is smaller and faster to read.
+By default it defragments the file, writing each channel with its properties and all of its data to a single
+segment, so that a channel can be read from one consecutive part of the file::
+
+    from nptdms import condition
+
+    condition("original_file.tdms", "conditioned_file.tdms")
+
+The other steps are optional and can be combined:
+
+- ``optimize_dtypes=True`` stores float channels as integers with a linear scale, or as single precision floats,
+  where this keeps every value exact, or within ``precision`` if this is given, either as one absolute value
+  or as a dictionary mapping channel paths to values.
+  Values smaller than the precision can become 0, so give channels with very different magnitudes their own
+  precision. A warning is logged when the precision is more than 1 % of a channel's largest value.
+  The scale is stored in ``NI_Scale`` properties, so npTDMS still reads these channels as floats.
+  Other software might show the raw integer values if it doesn't apply these properties.
+- ``harmonize_time=True`` converts channels that have a time channel into waveform channels with
+  ``wf_start_time`` or ``wf_start_offset``, ``wf_increment`` and ``wf_samples`` properties, and drops
+  time channels that are no longer needed.
+  The time values come from the channel named by ``time_channel`` (``"Time"`` by default) in the same group,
+  or from a channel named with the ``time_suffix`` (``"_Time"`` by default), for example ``Pressure_Time``
+  for the ``Pressure`` channel.
+  Channels whose time values aren't equidistant are resampled with the median time step,
+  using linear interpolation for floats with fractions and the previous value for other data,
+  including integer-valued floats such as 0/1 flags.
+- ``archive=True`` writes a ZIP archive holding a single DEFLATE compressed TDMS file,
+  which can also be opened with other ZIP tools::
+
+    condition("original_file.tdms", "archive.zip", optimize_dtypes=True, precision=0.001, archive=True)
+
+:py:class:`~nptdms.TdmsFile` reads a ZIP archive holding a single TDMS file by decompressing it into memory::
+
+    tdms_file = TdmsFile.read("archive.zip")

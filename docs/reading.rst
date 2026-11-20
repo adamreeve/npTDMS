@@ -4,6 +4,7 @@ Reading TDMS files
 To read a TDMS file, create an instance of the :py:class:`~nptdms.TdmsFile`
 class using one of the static :py:meth:`nptdms.TdmsFile.read` or :py:meth:`nptdms.TdmsFile.open` methods,
 passing the path to the file, or an already opened file.
+A ZIP archive holding a single TDMS file can also be read, which decompresses the TDMS file into memory.
 The :py:meth:`~nptdms.TdmsFile.read` method will read all channel data immediately::
 
     tdms_file = TdmsFile.read("my_file.tdms")
@@ -154,6 +155,7 @@ The byte ranges of a channel do not include the properties of its group or the f
 for example if these define scaling, but the byte ranges of several objects can be combined with
 :py:func:`~nptdms.merge_byte_ranges`.
 Byte ranges are only valid for the file as it was read, and must be read again if the file changes.
+For a ZIP archive, the byte ranges refer to the decompressed TDMS file, not to the archive.
 
 Timestamps
 ----------
